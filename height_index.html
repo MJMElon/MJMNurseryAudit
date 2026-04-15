@@ -433,18 +433,16 @@
     </div>
   </div>
 
-  <!-- ============================================================
-       PHOTO LIGHTBOX
-  ============================================================ -->
-  <div class="lightbox" id="lightbox" onclick="closeLightbox()">
-    <img id="lightbox-img" src="" alt="Full photo" />
-    <button class="lightbox-close" onclick="closeLightbox()">×</button>
-  </div>
-
   <!-- Toast -->
   <div class="toast" id="toast"></div>
 
 </div><!-- /#app -->
+
+<!-- Photo Lightbox (outside app for proper overlay) -->
+<div class="lightbox" id="lightbox" onclick="closeLightbox()">
+  <img id="lightbox-img" src="" alt="Full photo" />
+  <button class="lightbox-close" onclick="closeLightbox()">×</button>
+</div>
 
 
   <!-- Loading overlay -->

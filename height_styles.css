@@ -1052,8 +1052,7 @@ html, body {
 .lightbox-close {
   position: absolute;
   top: 16px;
-  left: min(calc(50% + 216px), calc(100% - 16px));
-  transform: translateX(-100%);
+  right: 16px;
   width: 36px;
   height: 36px;
   border-radius: 50%;

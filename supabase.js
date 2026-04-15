@@ -3,8 +3,8 @@
    supabase.js  —  include this in every HTML file
    ================================================================ */
 
-const SUPA_URL = 'https://shbzvlkfdplqvibmhfgg.supabase.co';
-const SUPA_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNoYnp2bGtmZHBscXZpYm1oZmdnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYxOTI0MjUsImV4cCI6MjA5MTc2ODQyNX0.0dT8ptTlPN9cmBH8aS7Wd5fUrscN3IsRNh5z44M63_w';
+const SUPA_URL = 'https://kibqjztozokohqmhqqqf.supabase.co';
+const SUPA_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtpYnFqenRvem9rb2hxbWhxcXFmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQyMzQzNjIsImV4cCI6MjA4OTgxMDM2Mn0.J7qJUZhWXYf5b9oey4wXJkjdi66jomEMw_NeV9NWF7M';
 
 /* ----------------------------------------------------------------
    BASE FETCH WRAPPER

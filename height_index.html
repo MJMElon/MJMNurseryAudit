@@ -1,431 +1,200 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-  <meta name="theme-color" content="#1a4d1a" />
-  <title>Seedling Height — MJM Nursery</title>
-  <link rel="stylesheet" href="height_styles.css" />
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no"/>
+<meta name="theme-color" content="#1a4d1a"/>
+<title>Seedling Height — MJM Nursery</title>
+<link rel="stylesheet" href="height_styles.css"/>
 </head>
 <body>
-
 <div id="app">
 
-  <!-- ============================================================
-       TOP NAVIGATION BAR
-  ============================================================ -->
   <nav class="top-bar">
     <div class="top-bar-logo">
-      <a href="home.html" class="top-bar-back" title="Back to Home">
-        <svg viewBox="0 0 24 24">
-          <polyline points="15 18 9 12 15 6"/>
-        </svg>
-      </a>
-      <div class="top-bar-icon">
-        <svg viewBox="0 0 24 24">
-          <line x1="12" y1="20" x2="12" y2="10"/>
-          <line x1="12" y1="10" x2="8"  y2="14"/>
-          <line x1="12" y1="10" x2="16" y2="14"/>
-          <line x1="12" y1="6"  x2="9"  y2="9"/>
-          <line x1="12" y1="6"  x2="15" y2="9"/>
-          <line x1="12" y1="3"  x2="12" y2="6"/>
-        </svg>
-      </div>
+      <a href="home.html" class="top-bar-back"><svg viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg></a>
+      <div class="top-bar-icon"><svg viewBox="0 0 24 24"><line x1="12" y1="20" x2="12" y2="4"/><path d="M12 4C12 4 8 8 8 10"/><path d="M12 4C12 4 16 8 16 10"/><path d="M12 10C12 10 9 13 9 15"/><path d="M12 10C12 10 15 13 15 15"/></svg></div>
       <div>
-        <div class="top-bar-title">
-          Seedling Height &nbsp;—&nbsp;
-          <span id="topbar-nursery">PN</span>
-        </div>
+        <div class="top-bar-title">Seedling Height &nbsp;—&nbsp; <span id="topbar-nursery">PN</span></div>
         <div class="top-bar-sub" id="nav-today"></div>
       </div>
     </div>
     <div class="top-bar-actions">
-      <button class="top-bar-btn" title="Refresh" onclick="renderList()">
-        <svg viewBox="0 0 24 24">
-          <polyline points="23 4 23 10 17 10"/>
-          <path d="M20.49 15a9 9 0 11-2.12-9.36L23 10"/>
-        </svg>
-      </button>
+      <button class="top-bar-btn" onclick="loadRecords()"><svg viewBox="0 0 24 24"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 11-2.12-9.36L23 10"/></svg></button>
     </div>
   </nav>
 
-
-  <!-- ============================================================
-       VIEW: LIST
-  ============================================================ -->
+  <!-- LIST VIEW -->
   <div id="view-list" class="view page-scroll">
-
-    <!-- Stats strip -->
     <div class="summary-strip">
-      <div class="stat-card">
-        <div class="stat-value" id="stat-total">0</div>
-        <div class="stat-label">Total</div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-value" id="stat-avg">—</div>
-        <div class="stat-label">Avg cm</div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-value" id="stat-max">—</div>
-        <div class="stat-label">Max cm</div>
-      </div>
+      <div class="stat-card"><div class="stat-value" id="stat-total">0</div><div class="stat-label">Total</div></div>
+      <div class="stat-card"><div class="stat-value" id="stat-avg">—</div><div class="stat-label">Avg cm</div></div>
+      <div class="stat-card"><div class="stat-value" id="stat-max">—</div><div class="stat-label">Max cm</div></div>
     </div>
-
-    <!-- List header -->
     <div class="list-header">
       <span class="list-heading" id="list-heading">PN</span>
-      <span class="list-count"   id="list-count">0 records</span>
+      <span class="list-count" id="list-count">0 records</span>
     </div>
-
-    <!-- Records -->
     <div class="record-list" id="records-list"></div>
+  </div>
 
-  </div><!-- /view-list -->
-
-
-  <!-- ============================================================
-       VIEW: FORM (Add / Edit)
-  ============================================================ -->
+  <!-- FORM VIEW -->
   <div id="view-form" class="view page-scroll">
-
-    <!-- Form top bar -->
     <div class="form-view-header">
-      <button class="back-btn" onclick="cancelForm()">
-        <svg viewBox="0 0 24 24">
-          <polyline points="15 18 9 12 15 6"/>
-        </svg>
-      </button>
+      <button class="back-btn" onclick="cancelForm()"><svg viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg></button>
       <span class="form-view-title" id="form-view-title">New Record</span>
-      <span class="form-view-id"    id="form-view-id"></span>
+      <span class="form-view-id" id="form-view-id"></span>
     </div>
 
-    <!-- ── CARD 1: Audit Info ── -->
     <div class="form-card">
-      <div class="form-section-head">
-        <svg viewBox="0 0 24 24">
-          <path d="M13 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V9z"/>
-          <polyline points="13 2 13 9 20 9"/>
-        </svg>
-        Record Information
-      </div>
+      <div class="form-section-head"><svg viewBox="0 0 24 24"><path d="M13 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V9z"/><polyline points="13 2 13 9 20 9"/></svg>Record Information</div>
       <div class="form-inner">
         <div class="form-row">
-          <div class="form-field">
-            <div class="field-label">Record ID</div>
-            <input id="f-id" class="input" type="text" readonly />
-          </div>
-          <div class="form-field">
-            <div class="field-label">Date</div>
-            <input id="f-date" class="input" type="date" readonly />
-          </div>
+          <div class="form-field"><div class="field-label">Record ID</div><input id="f-id" class="input" type="text" readonly/></div>
+          <div class="form-field"><div class="field-label">Date</div><input id="f-date" class="input" type="date" readonly/></div>
         </div>
         <div class="form-row">
           <div class="form-field">
             <div class="field-label">Plot <span class="req">*</span></div>
-            <div class="select-wrap">
-              <select id="f-plot" class="input">
-                <option value="">— Select Plot —</option>
-              </select>
-            </div>
+            <div class="select-wrap"><select id="f-plot" class="input"><option value="">— Select Plot —</option></select></div>
           </div>
           <div class="form-field">
-            <div class="field-label">
-              Batch
-              <span class="opt">optional</span>
-            </div>
-            <input id="f-batch" class="input" type="text" placeholder="e.g. B-2025-01" maxlength="24" />
+            <div class="field-label">Batch <span class="opt">optional</span></div>
+            <input id="f-batch" class="input" type="text" placeholder="e.g. B-2025-01" maxlength="24"/>
           </div>
         </div>
       </div>
     </div>
 
-    <!-- ── CARD 2: Height Samples ── -->
     <div class="form-card">
-      <div class="form-section-head">
-        <svg viewBox="0 0 24 24">
-          <line x1="12" y1="2" x2="12" y2="22"/>
-          <path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/>
-        </svg>
-        Seedling Height Samples
-      </div>
+      <div class="form-section-head"><svg viewBox="0 0 24 24"><line x1="12" y1="2" x2="12" y2="22"/><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg>Seedling Height Samples</div>
       <div class="form-inner">
-
-        <!-- 3-column height inputs -->
         <div class="samples-grid">
-
-          <!-- Sample 1 -->
           <div class="sample-col">
             <div class="sample-num">1</div>
             <div class="sample-col-label">Sample 1</div>
             <div class="height-input-wrap">
-              <input
-                class="height-input"
-                id="f-s1"
-                type="number"
-                inputmode="decimal"
-                min="0"
-                step="0.1"
-                placeholder="0.0"
-                oninput="onHeightInput(1, this)"
-              />
+              <input class="height-input" id="f-s1" type="number" inputmode="decimal" min="0" step="0.1" placeholder="0.0" oninput="onHeightInput(1,this)"/>
               <span class="height-unit">cm</span>
             </div>
             <div class="sample-filled" id="s1-fb"></div>
           </div>
-
-          <!-- Sample 2 -->
           <div class="sample-col">
             <div class="sample-num">2</div>
             <div class="sample-col-label">Sample 2</div>
             <div class="height-input-wrap">
-              <input
-                class="height-input"
-                id="f-s2"
-                type="number"
-                inputmode="decimal"
-                min="0"
-                step="0.1"
-                placeholder="0.0"
-                oninput="onHeightInput(2, this)"
-              />
+              <input class="height-input" id="f-s2" type="number" inputmode="decimal" min="0" step="0.1" placeholder="0.0" oninput="onHeightInput(2,this)"/>
               <span class="height-unit">cm</span>
             </div>
             <div class="sample-filled" id="s2-fb"></div>
           </div>
-
-          <!-- Sample 3 -->
           <div class="sample-col">
             <div class="sample-num">3</div>
             <div class="sample-col-label">Sample 3</div>
             <div class="height-input-wrap">
-              <input
-                class="height-input"
-                id="f-s3"
-                type="number"
-                inputmode="decimal"
-                min="0"
-                step="0.1"
-                placeholder="0.0"
-                oninput="onHeightInput(3, this)"
-              />
+              <input class="height-input" id="f-s3" type="number" inputmode="decimal" min="0" step="0.1" placeholder="0.0" oninput="onHeightInput(3,this)"/>
               <span class="height-unit">cm</span>
             </div>
             <div class="sample-filled" id="s3-fb"></div>
           </div>
-
-        </div><!-- /samples-grid -->
-
-        <!-- Live average -->
+        </div>
         <div class="avg-bar">
           <span class="avg-bar-label">Average Height</span>
-          <span>
-            <span class="avg-bar-value" id="avg-display">—</span>
-            <span class="avg-bar-unit">cm</span>
-          </span>
+          <span><span class="avg-bar-value" id="avg-display">—</span><span class="avg-bar-unit">cm</span></span>
         </div>
-
       </div>
-    </div><!-- /height card -->
-
-    <!-- ── CARD 3: Photos ── -->
-    <div class="form-card">
-      <div class="form-section-head">
-        <svg viewBox="0 0 24 24">
-          <rect x="3" y="5" width="18" height="14" rx="2"/>
-          <circle cx="12" cy="12" r="3"/>
-          <path d="M9 5l1.5-2h3L15 5"/>
-        </svg>
-        Gambar Sampel (Photos)
-      </div>
-      <div class="form-inner">
-
-        <div class="photo-slots">
-
-          <!-- Photo slot 1 -->
-          <div class="photo-slot" id="photo-slot-1" onclick="triggerPhotoUpload(1)">
-            <div class="photo-slot-num">1</div>
-            <svg viewBox="0 0 24 24">
-              <rect x="3" y="5" width="18" height="14" rx="2"/>
-              <circle cx="12" cy="12" r="3"/>
-              <path d="M9 5l1.5-2h3L15 5"/>
-            </svg>
-            <span class="photo-slot-label">Sample 1</span>
-          </div>
-
-          <!-- Photo slot 2 -->
-          <div class="photo-slot" id="photo-slot-2" onclick="triggerPhotoUpload(2)">
-            <div class="photo-slot-num">2</div>
-            <svg viewBox="0 0 24 24">
-              <rect x="3" y="5" width="18" height="14" rx="2"/>
-              <circle cx="12" cy="12" r="3"/>
-              <path d="M9 5l1.5-2h3L15 5"/>
-            </svg>
-            <span class="photo-slot-label">Sample 2</span>
-          </div>
-
-          <!-- Photo slot 3 -->
-          <div class="photo-slot" id="photo-slot-3" onclick="triggerPhotoUpload(3)">
-            <div class="photo-slot-num">3</div>
-            <svg viewBox="0 0 24 24">
-              <rect x="3" y="5" width="18" height="14" rx="2"/>
-              <circle cx="12" cy="12" r="3"/>
-              <path d="M9 5l1.5-2h3L15 5"/>
-            </svg>
-            <span class="photo-slot-label">Sample 3</span>
-          </div>
-
-        </div><!-- /photo-slots -->
-
-        <!-- Hidden file inputs -->
-        <input type="file" style="display:none" id="photo-input-1" accept="image/*" onchange="handlePhotoUpload(1, this)" />
-        <input type="file" style="display:none" id="photo-input-2" accept="image/*" onchange="handlePhotoUpload(2, this)" />
-        <input type="file" style="display:none" id="photo-input-3" accept="image/*" onchange="handlePhotoUpload(3, this)" />
-
-        <p class="photo-req-note" id="photo-req-note">3 photos required (one per sample)</p>
-
-      </div>
-    </div><!-- /photo card -->
-
-    <!-- Action buttons -->
-    <div class="form-actions">
-      <button class="btn btn-cancel" onclick="cancelForm()">Cancel</button>
-      <button class="btn btn-save"   onclick="saveRecord()">Save Record</button>
     </div>
 
-  </div><!-- /view-form -->
+    <div class="form-card">
+      <div class="form-section-head"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="12" cy="12" r="3"/><path d="M9 5l1.5-2h3L15 5"/></svg>Gambar Sampel (Photos)</div>
+      <div class="form-inner">
+        <div class="photo-slots">
+          <div class="photo-slot" id="photo-slot-1" onclick="triggerPhoto(1)">
+            <div class="photo-slot-num">1</div>
+            <svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="12" cy="12" r="3"/><path d="M9 5l1.5-2h3L15 5"/></svg>
+            <span class="photo-slot-label">Sample 1</span>
+          </div>
+          <div class="photo-slot" id="photo-slot-2" onclick="triggerPhoto(2)">
+            <div class="photo-slot-num">2</div>
+            <svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="12" cy="12" r="3"/><path d="M9 5l1.5-2h3L15 5"/></svg>
+            <span class="photo-slot-label">Sample 2</span>
+          </div>
+          <div class="photo-slot" id="photo-slot-3" onclick="triggerPhoto(3)">
+            <div class="photo-slot-num">3</div>
+            <svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="12" cy="12" r="3"/><path d="M9 5l1.5-2h3L15 5"/></svg>
+            <span class="photo-slot-label">Sample 3</span>
+          </div>
+        </div>
+        <input type="file" id="photo-input-1" accept="image/*" style="display:none" onchange="handlePhoto(1,this)"/>
+        <input type="file" id="photo-input-2" accept="image/*" style="display:none" onchange="handlePhoto(2,this)"/>
+        <input type="file" id="photo-input-3" accept="image/*" style="display:none" onchange="handlePhoto(3,this)"/>
+        <p class="photo-req-note" id="photo-req-note">3 photos required — one per sample</p>
+      </div>
+    </div>
 
+    <div class="form-actions">
+      <button class="btn btn-cancel" onclick="cancelForm()">Cancel</button>
+      <button class="btn btn-save" onclick="saveRecord()">Save Record</button>
+    </div>
+  </div>
 
-  <!-- ============================================================
-       VIEW: DETAIL
-  ============================================================ -->
+  <!-- DETAIL VIEW -->
   <div id="view-detail" class="view page-scroll">
-
-    <!-- Photo row -->
     <div class="detail-photos">
       <div class="detail-photo" id="detail-p1"></div>
       <div class="detail-photo" id="detail-p2"></div>
       <div class="detail-photo" id="detail-p3"></div>
     </div>
-
     <div class="detail-body">
-
-      <!-- Tags -->
       <div class="detail-tag-row">
         <span class="detail-nursery-tag" id="detail-nursery-tag">PN</span>
-        <span class="detail-id"          id="detail-id">—</span>
-        <span class="detail-date"        id="detail-date">—</span>
+        <span class="detail-id" id="detail-id">—</span>
+        <span class="detail-date" id="detail-date">—</span>
       </div>
-
-      <div class="detail-plot"  id="detail-plot">—</div>
+      <div class="detail-plot" id="detail-plot">—</div>
       <div class="detail-batch" id="detail-batch"></div>
-
-      <!-- Height cells -->
       <div class="detail-height-grid">
-        <div class="detail-height-cell">
-          <div class="detail-height-cell-label">Sample 1</div>
-          <div class="detail-height-val" id="detail-s1">—</div>
-          <div class="detail-height-unit">cm</div>
-        </div>
-        <div class="detail-height-cell">
-          <div class="detail-height-cell-label">Sample 2</div>
-          <div class="detail-height-val" id="detail-s2">—</div>
-          <div class="detail-height-unit">cm</div>
-        </div>
-        <div class="detail-height-cell">
-          <div class="detail-height-cell-label">Sample 3</div>
-          <div class="detail-height-val" id="detail-s3">—</div>
-          <div class="detail-height-unit">cm</div>
-        </div>
+        <div class="detail-height-cell"><div class="detail-height-cell-label">Sample 1</div><div class="detail-height-val" id="detail-s1">—</div><div class="detail-height-unit">cm</div></div>
+        <div class="detail-height-cell"><div class="detail-height-cell-label">Sample 2</div><div class="detail-height-val" id="detail-s2">—</div><div class="detail-height-unit">cm</div></div>
+        <div class="detail-height-cell"><div class="detail-height-cell-label">Sample 3</div><div class="detail-height-val" id="detail-s3">—</div><div class="detail-height-unit">cm</div></div>
       </div>
-
-      <!-- Average -->
       <div class="detail-avg-row">
         <span class="detail-avg-label">Average Height</span>
-        <span>
-          <span class="detail-avg-val" id="detail-avg-val">—</span>
-          <span class="detail-avg-unit">cm</span>
-        </span>
+        <span><span class="detail-avg-val" id="detail-avg-val">—</span><span class="detail-avg-unit">cm</span></span>
       </div>
-
-      <!-- Actions -->
-      <div style="display:flex;gap:10px;margin-top:4px">
+      <div style="display:flex;gap:10px">
         <button class="btn btn-cancel" style="flex:1" onclick="closeDetail()">Back</button>
-        <button class="btn btn-save"   style="flex:1" onclick="editFromDetail()">Edit Record</button>
+        <button class="btn btn-save" style="flex:1" onclick="editFromDetail()">Edit Record</button>
       </div>
-
     </div>
-  </div><!-- /view-detail -->
+  </div>
 
-
-  <!-- ============================================================
-       BOTTOM TAB BAR
-  ============================================================ -->
+  <!-- BOTTOM TABS -->
   <nav class="bottom-tabs">
     <button class="tab-item active" data-n="PN" onclick="selectTab('PN')">
-      <div class="tab-icon">
-        <svg viewBox="0 0 24 24">
-          <path d="M12 22V12"/>
-          <path d="M12 12C12 12 7 10 5 6c3 0 6 2 7 6z"/>
-          <path d="M12 12C12 12 17 10 19 6c-3 0-6 2-7 6z"/>
-          <path d="M12 12C12 12 8 14 7 18c2.5-0.5 4.5-2.5 5-6z"/>
-          <path d="M12 12C12 12 16 14 17 18c-2.5-0.5-4.5-2.5-5-6z"/>
-        </svg>
-      </div>
+      <div class="tab-icon"><svg viewBox="0 0 24 24"><path d="M12 22V12"/><path d="M12 12C12 12 7 10 5 6c3 0 6 2 7 6z"/><path d="M12 12C12 12 17 10 19 6c-3 0-6 2-7 6z"/><path d="M12 12C12 12 8 14 7 18c2.5-.5 4.5-2.5 5-6z"/><path d="M12 12C12 12 16 14 17 18c-2.5-.5-4.5-2.5-5-6z"/></svg></div>
       <span class="tab-label">PN</span>
     </button>
     <button class="tab-item" data-n="BNN" onclick="selectTab('BNN')">
-      <div class="tab-icon">
-        <svg viewBox="0 0 24 24">
-          <path d="M12 22V12"/>
-          <path d="M12 12C12 12 7 10 5 6c3 0 6 2 7 6z"/>
-          <path d="M12 12C12 12 17 10 19 6c-3 0-6 2-7 6z"/>
-          <path d="M12 12C12 12 8 14 7 18c2.5-0.5 4.5-2.5 5-6z"/>
-          <path d="M12 12C12 12 16 14 17 18c-2.5-0.5-4.5-2.5-5-6z"/>
-        </svg>
-      </div>
+      <div class="tab-icon"><svg viewBox="0 0 24 24"><path d="M12 22V12"/><path d="M12 12C12 12 7 10 5 6c3 0 6 2 7 6z"/><path d="M12 12C12 12 17 10 19 6c-3 0-6 2-7 6z"/><path d="M12 12C12 12 8 14 7 18c2.5-.5 4.5-2.5 5-6z"/><path d="M12 12C12 12 16 14 17 18c-2.5-.5-4.5-2.5-5-6z"/></svg></div>
       <span class="tab-label">BNN</span>
     </button>
     <button class="tab-item" data-n="UNN1" onclick="selectTab('UNN1')">
-      <div class="tab-icon">
-        <svg viewBox="0 0 24 24">
-          <path d="M12 22V12"/>
-          <path d="M12 12C12 12 7 10 5 6c3 0 6 2 7 6z"/>
-          <path d="M12 12C12 12 17 10 19 6c-3 0-6 2-7 6z"/>
-          <path d="M12 12C12 12 8 14 7 18c2.5-0.5 4.5-2.5 5-6z"/>
-          <path d="M12 12C12 12 16 14 17 18c-2.5-0.5-4.5-2.5-5-6z"/>
-        </svg>
-      </div>
+      <div class="tab-icon"><svg viewBox="0 0 24 24"><path d="M12 22V12"/><path d="M12 12C12 12 7 10 5 6c3 0 6 2 7 6z"/><path d="M12 12C12 12 17 10 19 6c-3 0-6 2-7 6z"/><path d="M12 12C12 12 8 14 7 18c2.5-.5 4.5-2.5 5-6z"/><path d="M12 12C12 12 16 14 17 18c-2.5-.5-4.5-2.5-5-6z"/></svg></div>
       <span class="tab-label">UNN 1</span>
     </button>
     <button class="tab-item" data-n="UNN2" onclick="selectTab('UNN2')">
-      <div class="tab-icon">
-        <svg viewBox="0 0 24 24">
-          <path d="M12 22V12"/>
-          <path d="M12 12C12 12 7 10 5 6c3 0 6 2 7 6z"/>
-          <path d="M12 12C12 12 17 10 19 6c-3 0-6 2-7 6z"/>
-          <path d="M12 12C12 12 8 14 7 18c2.5-0.5 4.5-2.5 5-6z"/>
-          <path d="M12 12C12 12 16 14 17 18c-2.5-0.5-4.5-2.5-5-6z"/>
-        </svg>
-      </div>
+      <div class="tab-icon"><svg viewBox="0 0 24 24"><path d="M12 22V12"/><path d="M12 12C12 12 7 10 5 6c3 0 6 2 7 6z"/><path d="M12 12C12 12 17 10 19 6c-3 0-6 2-7 6z"/><path d="M12 12C12 12 8 14 7 18c2.5-.5 4.5-2.5 5-6z"/><path d="M12 12C12 12 16 14 17 18c-2.5-.5-4.5-2.5-5-6z"/></svg></div>
       <span class="tab-label">UNN 2</span>
     </button>
   </nav>
 
-  <!-- FAB -->
-  <button class="fab" id="fab" title="Add new height record">
-    <svg viewBox="0 0 24 24">
-      <line x1="12" y1="5" x2="12" y2="19"/>
-      <line x1="5"  y1="12" x2="19" y2="12"/>
-    </svg>
-  </button>
+  <button class="fab" id="fab"><svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></button>
 
-  <!-- ============================================================
-       CONFIRM DELETE MODAL
-  ============================================================ -->
   <div class="modal-overlay" id="modal-overlay">
     <div class="modal-box">
       <div class="modal-title">Delete Record?</div>
-      <div class="modal-msg">This height record will be permanently removed. This action cannot be undone.</div>
+      <div class="modal-msg">This height record will be permanently removed.</div>
       <div class="modal-btns">
         <button class="btn-modal-cancel" onclick="cancelDelete()">Cancel</button>
         <button class="btn-modal-delete" onclick="doDelete()">Delete</button>
@@ -433,25 +202,15 @@
     </div>
   </div>
 
-  <!-- Toast -->
   <div class="toast" id="toast"></div>
+  <div id="loading-overlay" class="hidden"><div class="loading-box"><div class="loading-spinner"></div><span class="loading-text">Saving...</span></div></div>
 
 </div><!-- /#app -->
 
-<!-- Photo Lightbox (outside app for proper overlay) -->
-<div class="lightbox" id="lightbox" onclick="closeLightbox()">
-  <img id="lightbox-img" src="" alt="Full photo" />
+<div class="lightbox" id="lightbox">
+  <img id="lightbox-img" src="" alt="photo"/>
   <button class="lightbox-close" onclick="closeLightbox()">×</button>
 </div>
-
-
-  <!-- Loading overlay -->
-  <div id="loading-overlay" class="hidden">
-    <div class="loading-box">
-      <div class="loading-spinner"></div>
-      <span class="loading-text">Saving...</span>
-    </div>
-  </div>
 
 <script src="supabase.js"></script>
 <script src="height_script.js"></script>

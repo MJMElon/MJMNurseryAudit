@@ -1140,3 +1140,5 @@ html, body {
   .samples-grid { gap: 7px; }
   .height-input { font-size: 16px; }
 }
+
+.hidden { display: none !important; }

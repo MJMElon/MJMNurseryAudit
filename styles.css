@@ -1077,3 +1077,5 @@ html, body {
   .form-row { grid-template-columns: 1fr; }
   .detail-grid { grid-template-columns: 1fr 1fr; }
 }
+
+.hidden { display: none !important; }

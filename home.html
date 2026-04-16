@@ -306,40 +306,53 @@ function toggleAlert(card){card.classList.toggle('open');}
 async function loadAlerts(){
   const section = document.getElementById('alert-section');
   try {
-    // Fetch latest plot_audits — one per plot (most recent)
-    const rows = await sb.select('plot_audits','select=plot,nursery,pest,tikus,warna_daun,created_at');
+    // Fetch plot_audits and papan_audits in parallel
+    const [plotRows, papanRows] = await Promise.all([
+      sb.select('plot_audits','select=plot,nursery,pest,tikus,warna_daun,created_at'),
+      sb.select('papan_audits','select=plot,nursery,presence,info_correct,condition,created_at')
+    ]);
 
-    // Get latest record per plot
+    // Plot audit — latest per plot
     const latestPerPlot = {};
-    rows.forEach(r => {
+    plotRows.forEach(r => {
       const key = r.nursery + '_' + r.plot;
-      if (!latestPerPlot[key] || r.created_at > latestPerPlot[key].created_at) {
-        latestPerPlot[key] = r;
-      }
+      if (!latestPerPlot[key] || r.created_at > latestPerPlot[key].created_at) latestPerPlot[key] = r;
     });
     const latest = Object.values(latestPerPlot);
 
-    // Apply alert rules
     const ratPlots    = latest.filter(r => r.tikus === 'Banyak' || r.tikus === 'Sedikit');
     const pestPlots   = latest.filter(r => r.pest  === 'Banyak');
     const yellowPlots = latest.filter(r => r.warna_daun === '5');
 
-    const totalAlerts = ratPlots.length + pestPlots.length + yellowPlots.length;
+    // Papan audit — latest per plot
+    const latestPapan = {};
+    papanRows.forEach(r => {
+      const key = r.nursery + '_' + r.plot;
+      if (!latestPapan[key] || r.created_at > latestPapan[key].created_at) latestPapan[key] = r;
+    });
+    const latestPapanList = Object.values(latestPapan);
+    const papanBadPlots    = latestPapanList.filter(r => r.presence==='Bad'    || r.info_correct==='Wrong'   || r.condition==='Wrong');
+    const papanEmptyPlots  = latestPapanList.filter(r => r.presence==='Empty'  || r.info_correct==='Empty'   || r.condition==='Empty');
 
-    // Check if alerts changed — notify if new
+    const totalAlerts = ratPlots.length + pestPlots.length + yellowPlots.length + papanBadPlots.length + papanEmptyPlots.length;
+
+    // Notify if alerts changed
     const prevAlerts = localStorage.getItem(ALERT_KEY);
-    const currAlerts = JSON.stringify({rat: ratPlots.map(r=>r.plot).sort(), pest: pestPlots.map(r=>r.plot).sort(), yellow: yellowPlots.map(r=>r.plot).sort()});
+    const currAlerts = JSON.stringify({
+      rat: ratPlots.map(r=>r.plot).sort(),
+      pest: pestPlots.map(r=>r.plot).sort(),
+      yellow: yellowPlots.map(r=>r.plot).sort(),
+      papanBad: papanBadPlots.map(r=>r.plot).sort(),
+      papanEmpty: papanEmptyPlots.map(r=>r.plot).sort()
+    });
     if (prevAlerts && prevAlerts !== currAlerts && totalAlerts > 0) {
-      sendNotification(ratPlots, pestPlots, yellowPlots);
+      sendNotification(ratPlots, pestPlots, yellowPlots, papanBadPlots, papanEmptyPlots);
     }
     localStorage.setItem(ALERT_KEY, currAlerts);
 
-    // Show notif dot if there are alerts
-    if (totalAlerts > 0) {
-      document.getElementById('notif-dot').classList.add('active');
-    }
+    if (totalAlerts > 0) document.getElementById('notif-dot').classList.add('active');
+    else document.getElementById('notif-dot').classList.remove('active');
 
-    // Render
     if (totalAlerts === 0) {
       section.innerHTML = `
         <div class="all-clear">
@@ -355,56 +368,27 @@ async function loadAlerts(){
     function plotPills(plots){
       return plots.map(r=>`<span class="plot-pill">${r.nursery} · ${r.plot}</span>`).join('');
     }
+    function alertCard(icon, iconClass, title, sub, count, badgeClass, plots){
+      return `<div class="alert-card" onclick="toggleAlert(this)">
+        <div class="alert-card-header">
+          <div class="alert-icon ${iconClass}">${icon}</div>
+          <div class="alert-card-info">
+            <div class="alert-card-title">${title}</div>
+            <div class="alert-card-sub">${sub}</div>
+          </div>
+          <span class="alert-count-badge ${badgeClass}">${count}</span>
+          <svg class="alert-chevron" viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"/></svg>
+        </div>
+        <div class="alert-plots">${plotPills(plots)}</div>
+      </div>`;
+    }
 
     let html = '';
-
-    if (ratPlots.length > 0) {
-      html += `
-        <div class="alert-card" onclick="toggleAlert(this)">
-          <div class="alert-card-header">
-            <div class="alert-icon alert-icon-rat">🐀</div>
-            <div class="alert-card-info">
-              <div class="alert-card-title">Rat Detection</div>
-              <div class="alert-card-sub">${ratPlots.length} plot${ratPlots.length>1?'s':''} affected — Sedikit &amp; Banyak</div>
-            </div>
-            <span class="alert-count-badge badge-red">${ratPlots.length}</span>
-            <svg class="alert-chevron" viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"/></svg>
-          </div>
-          <div class="alert-plots">${plotPills(ratPlots)}</div>
-        </div>`;
-    }
-
-    if (pestPlots.length > 0) {
-      html += `
-        <div class="alert-card" onclick="toggleAlert(this)">
-          <div class="alert-card-header">
-            <div class="alert-icon alert-icon-pest">🐛</div>
-            <div class="alert-card-info">
-              <div class="alert-card-title">Pest Infection</div>
-              <div class="alert-card-sub">${pestPlots.length} plot${pestPlots.length>1?'s':''} affected — Banyak only</div>
-            </div>
-            <span class="alert-count-badge badge-amber">${pestPlots.length}</span>
-            <svg class="alert-chevron" viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"/></svg>
-          </div>
-          <div class="alert-plots">${plotPills(pestPlots)}</div>
-        </div>`;
-    }
-
-    if (yellowPlots.length > 0) {
-      html += `
-        <div class="alert-card" onclick="toggleAlert(this)">
-          <div class="alert-card-header">
-            <div class="alert-icon alert-icon-leaf">🍂</div>
-            <div class="alert-card-info">
-              <div class="alert-card-title">Yellow Leaves Detected</div>
-              <div class="alert-card-sub">${yellowPlots.length} plot${yellowPlots.length>1?'s':''} with Warna Daun 5</div>
-            </div>
-            <span class="alert-count-badge badge-yellow">${yellowPlots.length}</span>
-            <svg class="alert-chevron" viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"/></svg>
-          </div>
-          <div class="alert-plots">${plotPills(yellowPlots)}</div>
-        </div>`;
-    }
+    if (ratPlots.length)       html += alertCard('🐀','alert-icon-rat','Rat Detection',`${ratPlots.length} plot${ratPlots.length>1?'s':''} — Sedikit & Banyak`,ratPlots.length,'badge-red',ratPlots);
+    if (pestPlots.length)      html += alertCard('🐛','alert-icon-pest','Pest Infection',`${pestPlots.length} plot${pestPlots.length>1?'s':''} — Banyak only`,pestPlots.length,'badge-amber',pestPlots);
+    if (yellowPlots.length)    html += alertCard('🍂','alert-icon-leaf','Yellow Leaves',`${yellowPlots.length} plot${yellowPlots.length>1?'s':''} — Warna Daun 5`,yellowPlots.length,'badge-yellow',yellowPlots);
+    if (papanBadPlots.length)  html += alertCard('🪧','alert-icon-rat','Papan Tanda — Bad / Wrong',`${papanBadPlots.length} plot${papanBadPlots.length>1?'s':''} with issues`,papanBadPlots.length,'badge-red',papanBadPlots);
+    if (papanEmptyPlots.length)html += alertCard('🪧','alert-icon-pest','Papan Tanda — Empty',`${papanEmptyPlots.length} plot${papanEmptyPlots.length>1?'s':''} with empty papan`,papanEmptyPlots.length,'badge-amber',papanEmptyPlots);
 
     section.innerHTML = html;
 
@@ -415,12 +399,14 @@ async function loadAlerts(){
 }
 
 /* ── BROWSER NOTIFICATION ── */
-function sendNotification(rat, pest, yellow){
+function sendNotification(rat, pest, yellow, papanBad=[], papanEmpty=[]){
   if (!('Notification' in window)) return;
   const parts = [];
-  if (rat.length)    parts.push(`🐀 Rat: ${rat.map(r=>r.plot).join(', ')}`);
-  if (pest.length)   parts.push(`🐛 Pest: ${pest.map(r=>r.plot).join(', ')}`);
-  if (yellow.length) parts.push(`🍂 Yellow: ${yellow.map(r=>r.plot).join(', ')}`);
+  if (rat.length)        parts.push(`🐀 Rat: ${rat.map(r=>r.plot).join(', ')}`);
+  if (pest.length)       parts.push(`🐛 Pest: ${pest.map(r=>r.plot).join(', ')}`);
+  if (yellow.length)     parts.push(`🍂 Yellow: ${yellow.map(r=>r.plot).join(', ')}`);
+  if (papanBad.length)   parts.push(`🪧 Papan Bad: ${papanBad.map(r=>r.plot).join(', ')}`);
+  if (papanEmpty.length) parts.push(`🪧 Papan Empty: ${papanEmpty.map(r=>r.plot).join(', ')}`);
   const body = parts.join(' | ');
 
   if (Notification.permission === 'granted') {

@@ -34,30 +34,30 @@
 
     <!-- Audit list -->
     <div id="audit-list-wrap">
+      <div id="papan-alert-strip" style="padding:12px 12px 0"></div>
       <div class="list-header">
         <span class="list-heading">Plots to Audit</span>
         <span class="list-count" id="audit-count">0 plots</span>
       </div>
-      <div class="record-list" id="audit-list"></div>
+      <div class="record-list" id="audit-list" style="padding:0 12px"></div>
+
+      <!-- Completion section - admin only -->
+      <div id="completion-section" style="display:none">
+        <div class="list-header" style="margin-top:8px">
+          <span class="list-heading">✅ Completion</span>
+          <span class="list-count" id="completion-count">0 audited</span>
+        </div>
+        <div class="record-list" id="completion-list" style="padding:0 12px"></div>
+      </div>
     </div>
 
-    <!-- Batch table -->
+    <!-- Batch list -->
     <div id="batch-list-wrap" class="hidden">
       <div class="list-header">
         <span class="list-heading">Batch Info</span>
         <span class="list-count" id="batch-count">0 batches</span>
       </div>
-      <div class="batch-table-wrap">
-        <table class="batch-table">
-          <thead>
-            <tr>
-              <th>Nursery</th><th>Plot</th><th>Batch</th><th>Breed</th>
-              <th>Qty</th><th>Planted</th><th>Transplant</th><th>Mature</th><th>Status</th>
-            </tr>
-          </thead>
-          <tbody id="batch-tbody"></tbody>
-        </table>
-      </div>
+      <div id="batch-tbody"></div>
     </div>
   </div>
 
@@ -163,35 +163,30 @@
       <div class="form-section-head"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 9h6M9 12h6M9 15h4"/></svg>Papan Tanda Checks</div>
       <div class="form-inner">
         <div class="form-field">
-          <div class="field-label">Kehadiran (Presence) <span class="req">*</span></div>
+          <div class="field-label">Presence &amp; Condition <span class="req">*</span></div>
           <div class="tri-group" id="f-presence-grp">
-            <button class="tri-btn" data-val="Ada"   onclick="pickTri('presence','Ada',this)">Ada ✓</button>
-            <button class="tri-btn" data-val="Tiada" onclick="pickTri('presence','Tiada',this)">Tiada ✗</button>
-            <button class="tri-btn" data-val="Rosak" onclick="pickTri('presence','Rosak',this)">Rosak</button>
+            <button class="tri-btn" data-val="Good"  onclick="pickTri('presence','Good',this)">Good ✓</button>
+            <button class="tri-btn" data-val="Bad"   onclick="pickTri('presence','Bad',this)">Bad ✗</button>
+            <button class="tri-btn" data-val="Empty" onclick="pickTri('presence','Empty',this)">Empty</button>
           </div>
         </div>
         <div class="divider-line"></div>
         <div class="form-field">
-          <div class="field-label">Maklumat Betul (Info Correct) <span class="req">*</span></div>
+          <div class="field-label">Correct Information <span class="req">*</span></div>
           <div class="tri-group" id="f-info-grp">
-            <button class="tri-btn" data-val="Betul" onclick="pickTri('info','Betul',this)">Betul ✓</button>
-            <button class="tri-btn" data-val="Salah" onclick="pickTri('info','Salah',this)">Salah ✗</button>
-            <button class="tri-btn" data-val="Tiada" onclick="pickTri('info','Tiada',this)">Tiada</button>
+            <button class="tri-btn" data-val="Correct" onclick="pickTri('info','Correct',this)">Correct ✓</button>
+            <button class="tri-btn" data-val="Wrong"   onclick="pickTri('info','Wrong',this)">Wrong ✗</button>
+            <button class="tri-btn" data-val="Empty"   onclick="pickTri('info','Empty',this)">Empty</button>
           </div>
         </div>
         <div class="divider-line"></div>
         <div class="form-field">
-          <div class="field-label">Keadaan (Condition) <span class="req">*</span></div>
+          <div class="field-label">Height of Papan Tanda (150cm) <span class="req">*</span></div>
           <div class="tri-group" id="f-cond-grp">
-            <button class="tri-btn" data-val="Baik"    onclick="pickTri('cond','Baik',this)">Baik ✓</button>
-            <button class="tri-btn" data-val="Damaged" onclick="pickTri('cond','Damaged',this)">Damaged</button>
-            <button class="tri-btn" data-val="Teruk"   onclick="pickTri('cond','Teruk',this)">Teruk ✗</button>
+            <button class="tri-btn" data-val="Correct" onclick="pickTri('cond','Correct',this)">Correct ✓</button>
+            <button class="tri-btn" data-val="Wrong"   onclick="pickTri('cond','Wrong',this)">Wrong ✗</button>
+            <button class="tri-btn" data-val="Empty"   onclick="pickTri('cond','Empty',this)">Empty</button>
           </div>
-        </div>
-        <div class="divider-line"></div>
-        <div class="form-field">
-          <div class="field-label">Remarks <span class="opt">optional</span></div>
-          <textarea id="f-remarks" class="input" placeholder="Any additional notes..."></textarea>
         </div>
       </div>
     </div>

@@ -52,15 +52,16 @@ function getAuditForBatch(batchUid){
 function overallStatus(audit){
   if(!audit)return'pending';
   const v=[audit.presence,audit.infoCorrect,audit.condition];
-  if(v.includes('Tiada')||v.includes('Teruk'))return'fail';
-  if(v.includes('Salah')||v.includes('Rosak')||v.includes('Damaged'))return'issue';
-  return'pass';
+  if(v.includes('Bad'))return'fail';
+  if(v.includes('Wrong')||v.includes('Empty'))return'issue';
+  if(v.every(x=>x==='Correct'||x==='Good'))return'pass';
+  return'issue';
 }
 function statusLabel(s){return{pending:'Pending',pass:'Pass ✓',issue:'Issues',fail:'Fail ✗'}[s]||'Pending';}
 function statusBadgeClass(s){return{pending:'badge-pending',pass:'badge-pass',issue:'badge-issue',fail:'badge-fail'}[s]||'badge-pending';}
-function valClass(v){if(['Ada','Betul','Baik'].includes(v))return'val-ok';if(['Rosak','Damaged'].includes(v))return'val-warn';if(['Tiada','Salah','Teruk'].includes(v))return'val-bad';return'';}
-function chipClass(v){if(['Ada','Betul','Baik'].includes(v))return'cc-ok';if(['Rosak','Damaged'].includes(v))return'cc-warn';if(['Tiada','Salah','Teruk'].includes(v))return'cc-bad';return'cc-na';}
-function getTriClass(v){if(['Ada','Betul','Baik'].includes(v))return'sel-ok';if(['Rosak','Damaged'].includes(v))return'sel-warn';return'sel-bad';}
+function valClass(v){if(['Good','Correct'].includes(v))return'val-ok';if(['Bad','Wrong'].includes(v))return'val-bad';if(v==='Empty')return'val-warn';return'';}
+function chipClass(v){if(['Good','Correct'].includes(v))return'cc-ok';if(['Bad','Wrong'].includes(v))return'cc-bad';if(v==='Empty')return'cc-warn';return'cc-na';}
+function getTriClass(v){if(['Good','Correct'].includes(v))return'sel-ok';if(v==='Empty')return'sel-warn';return'sel-bad';}
 function nextAuditID(){return'PTA-'+pad(audits.length+1);}
 
 /* --- UI HELPERS --- */
@@ -150,6 +151,7 @@ async function loadAll(){
     }));
 
     renderAuditList();
+    renderPapanAlerts();
     renderBatchTable();
     updateStats();
   }catch(e){
@@ -158,46 +160,91 @@ async function loadAll(){
   setLoading(false);
 }
 
+/* --- PAPAN ALERT STRIP --- */
+function renderPapanAlerts(){
+  const strip=document.getElementById('papan-alert-strip');
+  if(!strip)return;
+
+  // Get latest audit per plot
+  const latestAudit={};
+  audits.forEach(a=>{
+    if(!latestAudit[a.plot]||a.createdAt>latestAudit[a.plot].createdAt)
+      latestAudit[a.plot]=a;
+  });
+  const latest=Object.values(latestAudit);
+
+  const badPlots   =latest.filter(a=>a.presence==='Bad'  ||a.infoCorrect==='Wrong' ||a.condition==='Wrong');
+  const emptyPlots =latest.filter(a=>a.presence==='Empty'||a.infoCorrect==='Empty' ||a.condition==='Empty');
+
+  if(!badPlots.length&&!emptyPlots.length){strip.innerHTML='';return;}
+
+  function alertRow(icon,label,plots,bg,color){
+    const pills=plots.map(p=>`<span style="font-size:11px;font-weight:600;padding:3px 10px;border-radius:20px;background:#f4f6f4;border:1px solid #dde8dd;color:#3d5c3d">${p.plot}</span>`).join('');
+    return `<div style="background:#fff;border:1px solid #dde8dd;border-radius:12px;margin-bottom:6px;overflow:hidden">
+      <div style="display:flex;align-items:center;gap:10px;padding:10px 12px;cursor:pointer" onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display==='flex'?'none':'flex'">
+        <span style="font-size:16px">${icon}</span>
+        <div style="flex:1">
+          <div style="font-size:13px;font-weight:700;color:#182018">${label}</div>
+          <div style="font-size:11px;color:#6b8a6b">${plots.length} plot${plots.length>1?'s':''} affected</div>
+        </div>
+        <span style="font-size:11px;font-weight:700;padding:3px 10px;border-radius:20px;background:${bg};color:${color}">${plots.length}</span>
+      </div>
+      <div style="display:none;padding:0 12px 10px;flex-wrap:wrap;gap:5px">${pills}</div>
+    </div>`;
+  }
+
+  let html='<div style="margin-bottom:4px"><div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:#6b8a6b;margin-bottom:8px">⚠ Papan Tanda Alerts</div>';
+  if(badPlots.length)   html+=alertRow('🚨','Bad / Wrong Papan',badPlots,'#fff1f1','#b91c1c');
+  if(emptyPlots.length) html+=alertRow('⬜','Empty Papan',emptyPlots,'#fff7ed','#c2410c');
+  html+='</div>';
+  strip.innerHTML=html;
+}
+
 /* --- RENDER AUDIT LIST --- */
+// Get user role from localStorage
+function isAdmin(){
+  try{const u=JSON.parse(localStorage.getItem('mjm_user')||'{}');return(u.role||'').toLowerCase().includes('admin');}
+  catch(e){return false;}
+}
+
 function renderAuditList(){
   const listEl=document.getElementById('audit-list');
+  const compListEl=document.getElementById('completion-list');
+  const compSection=document.getElementById('completion-section');
   const latest=getLatestBatchPerPlot();
-  document.getElementById('audit-count').textContent=latest.length+' plot'+(latest.length!==1?'s':'');
 
   if(!latest.length){
     listEl.innerHTML=`<div class="empty-state">
       <div class="empty-state-icon"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 9h6M9 12h6M9 15h4"/></svg></div>
       <h3>No plots to audit</h3>
-      <p>Batch records from MJM Nursery AI will automatically appear here once transplanting is recorded.</p>
+      <p>Add batch records in the <strong>Batch Info</strong> tab first.</p>
     </div>`;
+    if(compSection)compSection.style.display='none';
     return;
   }
 
-  // Sort: pending first, then by transplant date desc
-  const sorted=[...latest].sort((a,b)=>{
-    const as=overallStatus(getAuditForBatch(a.uid));
-    const bs=overallStatus(getAuditForBatch(b.uid));
-    if(as==='pending'&&bs!=='pending')return -1;
-    if(bs==='pending'&&as!=='pending')return 1;
-    return(b.dateTransplant||'').localeCompare(a.dateTransplant||'');
-  });
+  // Split into pending and audited
+  const pending=latest.filter(b=>overallStatus(getAuditForBatch(b.uid))==='pending');
+  const audited=latest.filter(b=>overallStatus(getAuditForBatch(b.uid))!=='pending');
 
-  listEl.innerHTML=sorted.map(b=>{
+  document.getElementById('audit-count').textContent=pending.length+' plot'+(pending.length!==1?'s':'');
+
+  function makeCard(b, showActions){
     const audit=getAuditForBatch(b.uid);
     const status=overallStatus(audit);
     const chips=audit?`<div class="audit-checks">
-      <span class="check-chip ${chipClass(audit.presence)}">Kehadiran: ${audit.presence}</span>
-      <span class="check-chip ${chipClass(audit.infoCorrect)}">Maklumat: ${audit.infoCorrect}</span>
-      <span class="check-chip ${chipClass(audit.condition)}">Keadaan: ${audit.condition}</span>
+      <span class="check-chip ${chipClass(audit.presence)}">Presence: ${audit.presence}</span>
+      <span class="check-chip ${chipClass(audit.infoCorrect)}">Info: ${audit.infoCorrect}</span>
+      <span class="check-chip ${chipClass(audit.condition)}">Height: ${audit.condition}</span>
     </div>`:'';
-    const actions=audit
+    const actions=showActions?(audit
       ?`<div class="audit-item-actions">
           <button class="btn-view-audit" onclick="openDetail('${audit.uid}')">View</button>
           <button class="btn-audit-now" onclick="openAuditForm('${b.uid}',true,'${audit.uid}')">Re-audit</button>
         </div>`
       :`<div class="audit-item-actions">
           <button class="btn-audit-now" onclick="openAuditForm('${b.uid}',false,null)">Audit Now</button>
-        </div>`;
+        </div>`):'';
     return `<div class="audit-item status-${status}">
       <div class="audit-item-top">
         <span class="audit-nursery-tag">${b.nursery||'—'}</span>
@@ -208,7 +255,24 @@ function renderAuditList(){
       <div class="audit-batch">Batch: ${b.batch}${b.breed?' · '+b.breed:''}${b.qtyTransplant?' · Qty: '+b.qtyTransplant:''}</div>
       ${chips}${actions}
     </div>`;
-  }).join('');
+  }
+
+  // Plots to audit (pending only)
+  if(pending.length){
+    listEl.innerHTML=pending.sort((a,b)=>(a.plot).localeCompare(b.plot)).map(b=>makeCard(b,true)).join('');
+  } else {
+    listEl.innerHTML=`<div style="text-align:center;padding:20px;color:var(--text4);font-size:13px">🎉 All plots audited!</div>`;
+  }
+
+  // Completion section — visible to all, re-audit only for admin
+  if(audited.length){
+    if(compSection)compSection.style.display='block';
+    document.getElementById('completion-count').textContent=audited.length+' audited';
+    const admin=isAdmin();
+    compListEl.innerHTML=audited.sort((a,b)=>(a.plot).localeCompare(b.plot)).map(b=>makeCard(b,admin)).join('');
+  } else {
+    if(compSection)compSection.style.display='none';
+  }
 }
 
 /* --- RENDER BATCH TABLE --- */
@@ -225,27 +289,27 @@ function renderBatchTable(){
   }
   const latestUids=new Set(getLatestBatchPerPlot().map(b=>b.uid));
   const sorted=[...batches].sort((a,b)=>(b.dateTransplant||'').localeCompare(a.dateTransplant||''));
-  tbody.innerHTML=sorted.map(b=>{
+  tbody.innerHTML='<div class="record-list">'+sorted.map(b=>{
     const audit=getAuditForBatch(b.uid);
     const status=overallStatus(audit);
     const isLatest=latestUids.has(b.uid);
-    return `<div class="batch-card">
-      <div class="batch-card-top">
+    return `<div class="audit-item status-${status}">
+      <div class="audit-item-top">
         <span class="audit-nursery-tag">${b.nursery||'—'}</span>
-        ${isLatest?'<span class="latest-badge" style="font-size:10px;background:var(--g100);color:var(--g700);padding:2px 8px;border-radius:20px;font-weight:700">LATEST</span>':''}
-        <span class="audit-status-badge ${statusBadgeClass(status)}" style="margin-left:auto">${statusLabel(status)}</span>
+        ${isLatest&&status==='pending'?'<span class="audit-status-badge badge-pending">Latest · Pending</span>':''}
+        ${status!=='pending'?`<span class="audit-status-badge ${statusBadgeClass(status)}">${statusLabel(status)}</span>`:''}
+        <span class="audit-item-date">${fmtDate(b.dateTransplant)}</span>
       </div>
-      <div class="batch-card-plot">${b.plot}</div>
-      <div class="batch-card-meta">Batch ${b.batch||'—'} · ${b.breed||'—'}</div>
-      <div class="batch-card-grid">
-        <div class="bcg-item"><div class="bcg-label">Qty</div><div class="bcg-val">${b.qtyTransplant||'—'}</div></div>
-        <div class="bcg-item"><div class="bcg-label">Planted</div><div class="bcg-val">${fmtDate(b.datePlanted)}</div></div>
-        <div class="bcg-item"><div class="bcg-label">Transplant</div><div class="bcg-val">${fmtDate(b.dateTransplant)}</div></div>
-        <div class="bcg-item"><div class="bcg-label">Mature</div><div class="bcg-val">${fmtDate(b.dateMature)}</div></div>
+      <div class="audit-plot">${b.plot}</div>
+      <div class="audit-batch">Batch: ${b.batch||'—'} · ${b.breed||'—'} · Qty: ${b.qtyTransplant||'—'}</div>
+      <div class="audit-checks">
+        <span class="check-chip cc-na">Planted: ${fmtDate(b.datePlanted)}</span>
+        <span class="check-chip cc-na">Transplant: ${fmtDate(b.dateTransplant)}</span>
+        ${b.dateMature?`<span class="check-chip cc-na">Mature: ${fmtDate(b.dateMature)}</span>`:''}
       </div>
-      <div class="batch-card-actions">
-        <button class="btn-batch-edit" onclick="openEditBatch('${b.uid}')">✏️ Edit</button>
-        <button class="btn-batch-del" onclick="confirmDeleteBatch('${b.uid}')">🗑 Delete</button>
+      <div class="audit-item-actions">
+        <button class="btn-view-audit" onclick="openEditBatch('${b.uid}')">Edit</button>
+        <button class="btn-audit-now" style="background:var(--danger-text)" onclick="confirmDeleteBatch('${b.uid}')">Delete</button>
       </div>
     </div>`;
   }).join('');
@@ -372,7 +436,7 @@ function openAuditForm(batchUid, isEdit, existingAuditUid){
   if(formState.presence){const btn=document.querySelector('#f-presence-grp [data-val="'+formState.presence+'"]');if(btn)btn.classList.add(getTriClass(formState.presence));}
   if(formState.infoCorrect){const btn=document.querySelector('#f-info-grp [data-val="'+formState.infoCorrect+'"]');if(btn)btn.classList.add(getTriClass(formState.infoCorrect));}
   if(formState.condition){const btn=document.querySelector('#f-cond-grp [data-val="'+formState.condition+'"]');if(btn)btn.classList.add(getTriClass(formState.condition));}
-  document.getElementById('f-remarks').value=formState.remarks||'';
+  // no remarks field
 
   // Photo
   if(formState.photo){
@@ -414,11 +478,10 @@ function clearPhoto(e){
 }
 
 async function saveAudit(){
-  if(!formState.presence){showToast('⚠ Please select Kehadiran');return;}
-  if(!formState.infoCorrect){showToast('⚠ Please select Maklumat');return;}
-  if(!formState.condition){showToast('⚠ Please select Keadaan');return;}
+  if(!formState.presence){showToast('⚠ Please select Presence & Condition');return;}
+  if(!formState.infoCorrect){showToast('⚠ Please select Correct Information');return;}
+  if(!formState.condition){showToast('⚠ Please select Height of Papan Tanda');return;}
   const b=batches.find(x=>x.uid===auditFormBatchUid);if(!b)return;
-  const remarks=document.getElementById('f-remarks').value.trim();
   setLoading(true);
   try{
     let photoUrl=formState.photo;
@@ -428,7 +491,7 @@ async function saveAudit(){
       batch_ref:parseInt(auditFormBatchUid),
       nursery:b.nursery,plot:b.plot,batch_no:b.batch,
       presence:formState.presence,info_correct:formState.infoCorrect,
-      condition:formState.condition,remarks:remarks||null,
+      condition:formState.condition,remarks:null,
       photo_url:photoUrl||null,date:todayISO()
     };
     if(editMode&&editId){

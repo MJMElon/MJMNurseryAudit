@@ -216,7 +216,11 @@ function renderBatchTable(){
   const tbody=document.getElementById('batch-tbody');
   document.getElementById('batch-count').textContent=batches.length+' batch'+(batches.length!==1?'es':'');
   if(!batches.length){
-    tbody.innerHTML='<tr><td colspan="9" style="padding:40px;text-align:center;color:#9db09d;font-size:13px">No batch records found from Nursery AI.</td></tr>';
+    tbody.innerHTML=`<div class="empty-state">
+      <div class="empty-state-icon"><svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg></div>
+      <h3>No batches yet</h3>
+      <p>Tap <strong>+</strong> to add the first batch.</p>
+    </div>`;
     return;
   }
   const latestUids=new Set(getLatestBatchPerPlot().map(b=>b.uid));
@@ -225,21 +229,25 @@ function renderBatchTable(){
     const audit=getAuditForBatch(b.uid);
     const status=overallStatus(audit);
     const isLatest=latestUids.has(b.uid);
-    return `<tr>
-      <td><span class="nursery-tag">${b.nursery||'—'}</span></td>
-      <td style="font-weight:600">${b.plot}${isLatest?'<span class="latest-badge">LATEST</span>':''}</td>
-      <td>${b.batch||'—'}</td>
-      <td>${b.breed||'—'}</td>
-      <td style="text-align:right">${b.qtyTransplant||'—'}</td>
-      <td style="color:var(--text3);font-size:11px">${fmtDate(b.datePlanted)}</td>
-      <td style="color:var(--text3);font-size:11px">${fmtDate(b.dateTransplant)}</td>
-      <td style="color:var(--text3);font-size:11px">${fmtDate(b.dateMature)}</td>
-      <td><span class="audit-status-badge ${statusBadgeClass(status)}">${statusLabel(status)}</span></td>
-      <td style="white-space:nowrap">
-        <button onclick="openEditBatch('${b.uid}')" style="background:none;border:1px solid var(--border2);border-radius:6px;padding:3px 8px;cursor:pointer;font-size:11px;color:var(--g700);margin-right:4px">Edit</button>
-        <button onclick="confirmDeleteBatch('${b.uid}')" style="background:none;border:1px solid var(--danger-border);border-radius:6px;padding:3px 8px;cursor:pointer;font-size:11px;color:var(--danger-text)">Del</button>
-      </td>
-    </tr>`;
+    return `<div class="batch-card">
+      <div class="batch-card-top">
+        <span class="audit-nursery-tag">${b.nursery||'—'}</span>
+        ${isLatest?'<span class="latest-badge" style="font-size:10px;background:var(--g100);color:var(--g700);padding:2px 8px;border-radius:20px;font-weight:700">LATEST</span>':''}
+        <span class="audit-status-badge ${statusBadgeClass(status)}" style="margin-left:auto">${statusLabel(status)}</span>
+      </div>
+      <div class="batch-card-plot">${b.plot}</div>
+      <div class="batch-card-meta">Batch ${b.batch||'—'} · ${b.breed||'—'}</div>
+      <div class="batch-card-grid">
+        <div class="bcg-item"><div class="bcg-label">Qty</div><div class="bcg-val">${b.qtyTransplant||'—'}</div></div>
+        <div class="bcg-item"><div class="bcg-label">Planted</div><div class="bcg-val">${fmtDate(b.datePlanted)}</div></div>
+        <div class="bcg-item"><div class="bcg-label">Transplant</div><div class="bcg-val">${fmtDate(b.dateTransplant)}</div></div>
+        <div class="bcg-item"><div class="bcg-label">Mature</div><div class="bcg-val">${fmtDate(b.dateMature)}</div></div>
+      </div>
+      <div class="batch-card-actions">
+        <button class="btn-batch-edit" onclick="openEditBatch('${b.uid}')">✏️ Edit</button>
+        <button class="btn-batch-del" onclick="confirmDeleteBatch('${b.uid}')">🗑 Delete</button>
+      </div>
+    </div>`;
   }).join('');
 }
 

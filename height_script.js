@@ -245,8 +245,8 @@ async function saveRecord(){
       photo_1_url:p1u||null,photo_2_url:p2u||null,photo_3_url:p3u||null,
       date:todayISO()
     };
-    if(editMode&&editId){await sb.update('height_records',editId,payload);showToast('✓ Record updated');}
-    else{payload.record_id=nextID(formState.nursery);await sb.insert('height_records',payload);showToast('✓ Record saved');}
+    const result = await smartSave('height_records', editMode?'update':'insert', editMode?payload:{...payload,record_id:nextID(formState.nursery)}, editMode?editId:null);
+    showToast(result?.offline ? '📴 Saved offline — will sync later' : editMode?'✓ Record updated':'✓ Record saved');
     await loadRecords();setView('list');
   }catch(e){showToast('⚠ Save failed');console.error(e);setLoading(false);}
 }

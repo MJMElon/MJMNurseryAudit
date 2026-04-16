@@ -494,12 +494,8 @@ async function saveAudit(){
       condition:formState.condition,remarks:null,
       photo_url:photoUrl||null,date:todayISO()
     };
-    if(editMode&&editId){
-      await sb.update('papan_audits',editId,payload);showToast('✓ Audit updated');
-    } else {
-      payload.audit_id=nextAuditID();
-      await sb.insert('papan_audits',payload);showToast('✓ Audit saved');
-    }
+    const result = await smartSave('papan_audits', editMode?'update':'insert', editMode?payload:{...payload,audit_id:nextAuditID()}, editMode?editId:null);
+    showToast(result?.offline ? '📴 Saved offline — will sync later' : editMode?'✓ Audit updated':'✓ Audit saved');
     await loadAll();setView('list');selectTab('audit');
   }catch(e){showToast('⚠ Save failed');console.error(e);setLoading(false);}
 }

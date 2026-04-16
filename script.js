@@ -267,8 +267,8 @@ async function saveRecord(){
       pest:formState.ulat,tikus:formState.tikus,disease:formState.bintik,
       warna_daun:formState.warna,photo_url:photoUrl||null,date:todayISO()
     };
-    if(editMode&&editId){await sb.update('plot_audits',editId,payload);showToast('✓ Record updated');}
-    else{payload.audit_id=nextID(formState.nursery);await sb.insert('plot_audits',payload);showToast('✓ Record saved');}
+    const result = await smartSave('plot_audits', editMode?'update':'insert', editMode?payload:{...payload,audit_id:nextID(formState.nursery)}, editMode?editId:null);
+    showToast(result?.offline ? '📴 Saved offline — will sync later' : editMode?'✓ Record updated':'✓ Record saved');
     await loadRecords();setView('list');
   }catch(e){showToast('⚠ Save failed');console.error(e);setLoading(false);}
 }

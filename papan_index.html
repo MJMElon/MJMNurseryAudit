@@ -1,67 +1,38 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-  <meta name="theme-color" content="#1a4d1a" />
-  <title>Papan Tanda Audit — MJM Nursery</title>
-  <link rel="stylesheet" href="papan_styles.css" />
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no"/>
+<meta name="theme-color" content="#1a4d1a"/>
+<title>Papan Tanda Audit — MJM Nursery</title>
+<link rel="stylesheet" href="papan_styles.css"/>
 </head>
 <body>
 <div id="app">
 
-  <!-- ============================================================
-       TOP BAR
-  ============================================================ -->
   <nav class="top-bar">
     <div class="top-bar-logo">
-      <a href="home.html" class="top-bar-back" title="Back to Home">
-        <svg viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg>
-      </a>
-      <div class="top-bar-icon">
-        <svg viewBox="0 0 24 24">
-          <rect x="3" y="3" width="18" height="18" rx="2"/>
-          <path d="M9 9h6M9 12h6M9 15h4"/>
-        </svg>
-      </div>
+      <a href="home.html" class="top-bar-back"><svg viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg></a>
+      <div class="top-bar-icon"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 9h6M9 12h6M9 15h4"/></svg></div>
       <div>
         <div class="top-bar-title">Papan Tanda Audit</div>
         <div class="top-bar-sub" id="nav-today"></div>
       </div>
     </div>
     <div class="top-bar-actions">
-      <button class="top-bar-btn" title="Refresh" onclick="renderAuditList(); renderBatchList(); updateStats();">
-        <svg viewBox="0 0 24 24">
-          <polyline points="23 4 23 10 17 10"/>
-          <path d="M20.49 15a9 9 0 11-2.12-9.36L23 10"/>
-        </svg>
-      </button>
+      <button class="top-bar-btn" onclick="loadAll()"><svg viewBox="0 0 24 24"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 11-2.12-9.36L23 10"/></svg></button>
     </div>
   </nav>
 
-
-  <!-- ============================================================
-       VIEW: LIST
-  ============================================================ -->
+  <!-- LIST VIEW -->
   <div id="view-list" class="view page-scroll">
-
-    <!-- Stats strip -->
     <div class="summary-strip">
-      <div class="stat-card">
-        <div class="stat-value" id="stat-batches">0</div>
-        <div class="stat-label">Batches</div>
-      </div>
-      <div class="stat-card highlight">
-        <div class="stat-value" id="stat-pending">0</div>
-        <div class="stat-label">Pending</div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-value" id="stat-pass">0</div>
-        <div class="stat-label">Passed</div>
-      </div>
+      <div class="stat-card"><div class="stat-value" id="stat-total">0</div><div class="stat-label">Total Plots</div></div>
+      <div class="stat-card highlight"><div class="stat-value" id="stat-pending">0</div><div class="stat-label">Pending</div></div>
+      <div class="stat-card"><div class="stat-value" id="stat-pass">0</div><div class="stat-label">Passed</div></div>
     </div>
 
-    <!-- Audit list (default tab) -->
+    <!-- Audit list -->
     <div id="audit-list-wrap">
       <div class="list-header">
         <span class="list-heading">Plots to Audit</span>
@@ -70,43 +41,49 @@
       <div class="record-list" id="audit-list"></div>
     </div>
 
-    <!-- Batch list (secondary tab) -->
+    <!-- Batch table -->
     <div id="batch-list-wrap" class="hidden">
       <div class="list-header">
         <span class="list-heading">Batch Info</span>
         <span class="list-count" id="batch-count">0 batches</span>
       </div>
-      <div class="record-list" id="batch-list"></div>
+      <div class="batch-table-wrap">
+        <table class="batch-table">
+          <thead>
+            <tr>
+              <th>Nursery</th><th>Plot</th><th>Batch</th><th>Breed</th>
+              <th>Qty</th><th>Planted</th><th>Transplant</th><th>Mature</th><th>Status</th>
+            </tr>
+          </thead>
+          <tbody id="batch-tbody"></tbody>
+        </table>
+      </div>
     </div>
+  </div>
 
-  </div><!-- /view-list -->
-
-
-  <!-- ============================================================
-       VIEW: BATCH FORM (Add / Edit batch info)
-  ============================================================ -->
+  <!-- BATCH FORM VIEW -->
   <div id="view-batch-form" class="view page-scroll">
-
     <div class="form-view-header">
-      <button class="back-btn" onclick="setView('list'); selectTab('batch')">
-        <svg viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg>
-      </button>
+      <button class="back-btn" onclick="setView('list');selectTab('batch')"><svg viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg></button>
       <span class="form-view-title" id="batch-form-title">New Batch</span>
-      <span class="form-view-id"    id="batch-form-id"></span>
+      <span class="form-view-id" id="batch-form-id"></span>
     </div>
 
-    <!-- Nursery selector -->
-    <div style="padding: 14px 12px 0">
-      <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--text3);margin-bottom:10px">Select Nursery</div>
-      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:4px">
-        <div class="nursery-tab active" data-n="PN"   onclick="selectBatchNursery(this)" style="padding:10px 4px;text-align:center;font-size:13px;font-weight:600;border:1.5px solid var(--border2);border-radius:var(--r-md);cursor:pointer;background:var(--card);color:var(--text2);transition:all .15s;user-select:none">PN</div>
-        <div class="nursery-tab"        data-n="BNN"  onclick="selectBatchNursery(this)" style="padding:10px 4px;text-align:center;font-size:13px;font-weight:600;border:1.5px solid var(--border2);border-radius:var(--r-md);cursor:pointer;background:var(--card);color:var(--text2);transition:all .15s;user-select:none">BNN</div>
-        <div class="nursery-tab"        data-n="UNN1" onclick="selectBatchNursery(this)" style="padding:10px 4px;text-align:center;font-size:13px;font-weight:600;border:1.5px solid var(--border2);border-radius:var(--r-md);cursor:pointer;background:var(--card);color:var(--text2);transition:all .15s;user-select:none">UNN 1</div>
-        <div class="nursery-tab"        data-n="UNN2" onclick="selectBatchNursery(this)" style="padding:10px 4px;text-align:center;font-size:13px;font-weight:600;border:1.5px solid var(--border2);border-radius:var(--r-md);cursor:pointer;background:var(--card);color:var(--text2);transition:all .15s;user-select:none">UNN 2</div>
+    <div class="form-card">
+      <div class="form-section-head">
+        <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+        Nursery
+      </div>
+      <div class="form-inner">
+        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px">
+          <div class="nursery-sel active" data-n="PN"   onclick="selectBatchNursery(this)">PN</div>
+          <div class="nursery-sel"        data-n="BNN"  onclick="selectBatchNursery(this)">BNN</div>
+          <div class="nursery-sel"        data-n="UNN1" onclick="selectBatchNursery(this)">UNN 1</div>
+          <div class="nursery-sel"        data-n="UNN2" onclick="selectBatchNursery(this)">UNN 2</div>
+        </div>
       </div>
     </div>
 
-    <!-- Batch info card -->
     <div class="form-card">
       <div class="form-section-head">
         <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
@@ -116,103 +93,75 @@
         <div class="form-row">
           <div class="form-field">
             <div class="field-label">Plot <span class="req">*</span></div>
-            <div class="select-wrap">
-              <select id="bf-plot" class="input">
-                <option value="">— Select —</option>
-              </select>
-            </div>
+            <div class="select-wrap"><select id="bf-plot" class="input"><option value="">— Select —</option></select></div>
           </div>
           <div class="form-field">
             <div class="field-label">Batch No. <span class="req">*</span></div>
-            <input id="bf-batch" class="input" type="text" placeholder="e.g. B-2025-01" maxlength="30" />
+            <input id="bf-batch" class="input" type="text" placeholder="e.g. 250"/>
           </div>
         </div>
         <div class="form-field">
           <div class="field-label">Breed / Variety <span class="req">*</span></div>
-          <div class="select-wrap">
-            <select id="bf-breed" class="input">
-              <option value="">— Select Breed —</option>
-            </select>
-          </div>
+          <input id="bf-breed" class="input" type="text" placeholder="e.g. IOI DxP Hybrid"/>
         </div>
         <div class="form-field">
-          <div class="field-label">Quantity Transplant <span class="opt">optional</span></div>
-          <input id="bf-qty" class="input" type="number" inputmode="numeric" min="0" placeholder="e.g. 500" />
+          <div class="field-label">Plot Amount (Qty) <span class="req">*</span></div>
+          <input id="bf-qty" class="input" type="number" inputmode="numeric" min="0" placeholder="e.g. 2560"/>
         </div>
       </div>
     </div>
 
-    <!-- Dates card -->
     <div class="form-card">
       <div class="form-section-head">
-        <svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+        <svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
         Key Dates
       </div>
       <div class="form-inner">
         <div class="form-field">
-          <div class="field-label">Date Planted <span class="opt">optional</span></div>
-          <input id="bf-date-planted" class="input" type="date" />
+          <div class="field-label">Date Planted <span class="req">*</span></div>
+          <input id="bf-date-planted" class="input" type="date" onchange="autoCalcDates()"/>
         </div>
         <div class="form-field">
-          <div class="field-label">Date Transplant <span class="req">*</span></div>
-          <input id="bf-date-transplant" class="input" type="date" />
+          <div class="field-label">Date Transplant <span style="font-size:10px;color:var(--text4);margin-left:4px">auto: planted +3 months</span></div>
+          <input id="bf-date-transplant" class="input" type="date" readonly style="color:var(--text3);background:var(--g50)"/>
         </div>
-        <div class="form-field">
-          <div class="field-label">Date Mature <span class="opt">optional</span></div>
-          <input id="bf-date-mature" class="input" type="date" />
+        <div class="form-field" id="dm-field" style="display:none">
+          <div class="field-label">Date Mature <span style="font-size:10px;color:var(--text4);margin-left:4px">auto: planted +9 months</span></div>
+          <input id="bf-date-mature" class="input" type="date" readonly style="color:var(--text3);background:var(--g50)"/>
         </div>
       </div>
     </div>
 
     <div class="form-actions">
-      <button class="btn btn-cancel" onclick="setView('list'); selectTab('batch')">Cancel</button>
-      <button class="btn btn-save"   onclick="saveBatch()">Save Batch</button>
+      <button class="btn btn-cancel" onclick="setView('list');selectTab('batch')">Cancel</button>
+      <button class="btn btn-save" onclick="saveBatch()">Save Batch</button>
     </div>
+  </div>
 
-  </div><!-- /view-batch-form -->
-
-
-  <!-- ============================================================
-       VIEW: AUDIT FORM
-  ============================================================ -->
+  <!-- AUDIT FORM VIEW -->
   <div id="view-audit-form" class="view page-scroll">
-
     <div class="form-view-header">
-      <button class="back-btn" onclick="setView('list'); selectTab('audit')">
-        <svg viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg>
-      </button>
+      <button class="back-btn" onclick="setView('list');selectTab('audit')"><svg viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg></button>
       <span class="form-view-title" id="audit-form-title">Audit Plot</span>
-      <span class="form-view-id"    id="audit-form-id"></span>
+      <span class="form-view-id" id="audit-form-id"></span>
     </div>
-
-    <!-- Batch info banner -->
     <div style="padding:14px 12px 0">
       <div class="batch-banner">
-        <div class="batch-banner-title">
-          <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
-          Batch Info — <span id="banner-nursery"></span>
-        </div>
+        <div class="batch-banner-title"><svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>Batch Info</div>
         <div class="batch-banner-grid">
+          <div class="bbg-row"><span class="bbg-label">Nursery:</span><span class="bbg-val" id="banner-nursery"></span></div>
           <div class="bbg-row"><span class="bbg-label">Plot:</span><span class="bbg-val" id="banner-plot"></span></div>
           <div class="bbg-row"><span class="bbg-label">Batch:</span><span class="bbg-val" id="banner-batch"></span></div>
           <div class="bbg-row"><span class="bbg-label">Breed:</span><span class="bbg-val" id="banner-breed"></span></div>
           <div class="bbg-row"><span class="bbg-label">Qty:</span><span class="bbg-val" id="banner-qty"></span></div>
           <div class="bbg-row"><span class="bbg-label">Transplant:</span><span class="bbg-val" id="banner-dt"></span></div>
-          <div class="bbg-row"><span class="bbg-label">Planted:</span><span class="bbg-val" id="banner-dp"></span></div>
           <div class="bbg-row"><span class="bbg-label">Mature:</span><span class="bbg-val" id="banner-dm"></span></div>
         </div>
       </div>
     </div>
-
-    <!-- Papan Tanda checks card -->
     <div class="form-card">
-      <div class="form-section-head">
-        <svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 9h6M9 12h6M9 15h4"/></svg>
-        Papan Tanda Checks
-      </div>
+      <div class="form-section-head"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 9h6M9 12h6M9 15h4"/></svg>Papan Tanda Checks</div>
       <div class="form-inner">
-
-        <!-- Kehadiran (Presence) -->
         <div class="form-field">
           <div class="field-label">Kehadiran (Presence) <span class="req">*</span></div>
           <div class="tri-group" id="f-presence-grp">
@@ -221,10 +170,7 @@
             <button class="tri-btn" data-val="Rosak" onclick="pickTri('presence','Rosak',this)">Rosak</button>
           </div>
         </div>
-
         <div class="divider-line"></div>
-
-        <!-- Maklumat (Info Correctness) -->
         <div class="form-field">
           <div class="field-label">Maklumat Betul (Info Correct) <span class="req">*</span></div>
           <div class="tri-group" id="f-info-grp">
@@ -233,10 +179,7 @@
             <button class="tri-btn" data-val="Tiada" onclick="pickTri('info','Tiada',this)">Tiada</button>
           </div>
         </div>
-
         <div class="divider-line"></div>
-
-        <!-- Keadaan (Condition) -->
         <div class="form-field">
           <div class="field-label">Keadaan (Condition) <span class="req">*</span></div>
           <div class="tri-group" id="f-cond-grp">
@@ -245,24 +188,15 @@
             <button class="tri-btn" data-val="Teruk"   onclick="pickTri('cond','Teruk',this)">Teruk ✗</button>
           </div>
         </div>
-
         <div class="divider-line"></div>
-
-        <!-- Remarks -->
         <div class="form-field">
           <div class="field-label">Remarks <span class="opt">optional</span></div>
           <textarea id="f-remarks" class="input" placeholder="Any additional notes..."></textarea>
         </div>
-
       </div>
     </div>
-
-    <!-- Photo card -->
     <div class="form-card">
-      <div class="form-section-head">
-        <svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="12" cy="12" r="3"/><path d="M9 5l1.5-2h3L15 5"/></svg>
-        Gambar Papan Tanda (Photo)
-      </div>
+      <div class="form-section-head"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="12" cy="12" r="3"/><path d="M9 5l1.5-2h3L15 5"/></svg>Photo <span class="opt" style="margin-left:4px">optional</span></div>
       <div class="form-inner">
         <div id="papan-photo-drop" class="photo-drop" onclick="document.getElementById('papan-photo-input').click()">
           <svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="12" cy="12" r="3"/><path d="M9 5l1.5-2h3L15 5"/></svg>
@@ -270,124 +204,71 @@
           <div class="photo-drop-sub">JPG or PNG</div>
         </div>
         <div id="papan-photo-preview" class="photo-preview-wrap">
-          <img id="papan-photo-img" src="" alt="Papan tanda photo" />
+          <img id="papan-photo-img" src="" alt="photo"/>
           <button class="photo-clear" onclick="clearPhoto(event)">×</button>
         </div>
-        <input type="file" style="display:none" id="papan-photo-input" accept="image/*" onchange="handlePhoto(this)" />
+        <input type="file" style="display:none" id="papan-photo-input" accept="image/*" onchange="handlePhoto(this)"/>
       </div>
     </div>
-
     <div class="form-actions">
-      <button class="btn btn-cancel" onclick="setView('list'); selectTab('audit')">Cancel</button>
-      <button class="btn btn-save"   onclick="saveAudit()">Save Audit</button>
+      <button class="btn btn-cancel" onclick="setView('list');selectTab('audit')">Cancel</button>
+      <button class="btn btn-save" onclick="saveAudit()">Save Audit</button>
     </div>
+  </div>
 
-  </div><!-- /view-audit-form -->
-
-
-  <!-- ============================================================
-       VIEW: DETAIL
-  ============================================================ -->
+  <!-- DETAIL VIEW -->
   <div id="view-detail" class="view page-scroll">
-
     <div class="detail-hero">
-      <img id="detail-hero-img" src="" alt="Papan tanda" style="display:none" />
-      <div id="detail-hero-placeholder" class="detail-hero-placeholder">
-        <svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 9h6M9 12h6M9 15h4"/></svg>
-      </div>
-      <button class="detail-hero-back" onclick="closeDetail()">
-        <svg viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg>
-      </button>
+      <img id="detail-hero-img" src="" alt="photo" style="display:none"/>
+      <div id="detail-hero-placeholder" class="detail-hero-placeholder"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 9h6M9 12h6M9 15h4"/></svg></div>
+      <button class="detail-hero-back" onclick="closeDetail()"><svg viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg></button>
     </div>
-
     <div class="detail-body">
       <div class="detail-tag-row">
         <span class="detail-nursery-tag" id="detail-nursery-tag">PN</span>
-        <span class="detail-id"          id="detail-id">—</span>
-        <span class="detail-date"        id="detail-date">—</span>
+        <span class="detail-id" id="detail-id">—</span>
+        <span class="detail-date" id="detail-date">—</span>
       </div>
       <div class="detail-plot" id="detail-plot">—</div>
-      <div class="detail-sub"  id="detail-sub"></div>
-
-      <!-- 3 check cells -->
+      <div class="detail-sub" id="detail-sub"></div>
       <div class="detail-checks-grid">
-        <div class="detail-check-cell">
-          <div class="detail-check-label">Kehadiran</div>
-          <div class="detail-check-val" id="detail-presence-val">—</div>
-        </div>
-        <div class="detail-check-cell">
-          <div class="detail-check-label">Maklumat</div>
-          <div class="detail-check-val" id="detail-info-val">—</div>
-        </div>
-        <div class="detail-check-cell">
-          <div class="detail-check-label">Keadaan</div>
-          <div class="detail-check-val" id="detail-cond-val">—</div>
-        </div>
+        <div class="detail-check-cell"><div class="detail-check-label">Kehadiran</div><div class="detail-check-val" id="detail-presence-val">—</div></div>
+        <div class="detail-check-cell"><div class="detail-check-label">Maklumat</div><div class="detail-check-val" id="detail-info-val">—</div></div>
+        <div class="detail-check-cell"><div class="detail-check-label">Keadaan</div><div class="detail-check-val" id="detail-cond-val">—</div></div>
       </div>
-
-      <!-- Remarks -->
-      <div class="detail-remarks">
-        <div class="detail-remarks-label">Remarks</div>
-        <div class="detail-remarks-text" id="detail-remarks">—</div>
-      </div>
-
-      <!-- Batch info summary -->
+      <div class="detail-remarks"><div class="detail-remarks-label">Remarks</div><div class="detail-remarks-text" id="detail-remarks">—</div></div>
       <div class="batch-banner" style="margin-bottom:16px">
-        <div class="batch-banner-title">
-          <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
-          Batch Info
-        </div>
-        <div class="batch-banner-grid" id="detail-batch-info"></div>
+        <div class="batch-banner-title"><svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>Batch Info</div>
+        <div class="batch-banner-grid" id="detail-batch-grid"></div>
       </div>
-
       <div style="display:flex;gap:10px">
         <button class="btn btn-cancel" style="flex:1" onclick="closeDetail()">Back</button>
-        <button class="btn btn-save"   style="flex:1" onclick="editFromDetail()">Re-audit</button>
+        <button class="btn btn-save" style="flex:1" onclick="editFromDetail()">Re-audit</button>
       </div>
     </div>
-  </div><!-- /view-detail -->
+  </div>
 
-
-  <!-- ============================================================
-       BOTTOM TABS
-  ============================================================ -->
+  <!-- BOTTOM TABS -->
   <nav class="bottom-tabs">
     <button class="tab-item active" data-t="audit" onclick="selectTab('audit')">
-      <div class="tab-icon">
-        <svg viewBox="0 0 24 24">
-          <rect x="3" y="3" width="18" height="18" rx="2"/>
-          <path d="M9 9h6M9 12h6M9 15h4"/>
-        </svg>
-      </div>
+      <div class="tab-icon"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 9h6M9 12h6M9 15h4"/></svg></div>
       <span class="tab-label">Audit</span>
     </button>
     <button class="tab-item" data-t="batch" onclick="selectTab('batch')">
-      <div class="tab-icon">
-        <svg viewBox="0 0 24 24">
-          <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/>
-          <polyline points="14 2 14 8 20 8"/>
-          <line x1="16" y1="13" x2="8" y2="13"/>
-          <line x1="16" y1="17" x2="8" y2="17"/>
-          <polyline points="10 9 9 9 8 9"/>
-        </svg>
-      </div>
+      <div class="tab-icon"><svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg></div>
       <span class="tab-label">Batch Info</span>
     </button>
   </nav>
 
-  <!-- FAB -->
-  <button class="fab hidden" id="fab" title="Add batch info">
-    <svg viewBox="0 0 24 24">
-      <line x1="12" y1="5" x2="12" y2="19"/>
-      <line x1="5"  y1="12" x2="19" y2="12"/>
-    </svg>
+  <!-- FAB for adding batch -->
+  <button class="fab hidden" id="fab" onclick="openAddBatch()">
+    <svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
   </button>
 
-  <!-- Modal -->
   <div class="modal-overlay" id="modal-overlay">
     <div class="modal-box">
-      <div class="modal-title">Delete Record?</div>
-      <div class="modal-msg">This will be permanently removed and cannot be undone.</div>
+      <div class="modal-title">Delete Audit?</div>
+      <div class="modal-msg">This audit record will be permanently removed.</div>
       <div class="modal-btns">
         <button class="btn-modal-cancel" onclick="cancelDelete()">Cancel</button>
         <button class="btn-modal-delete" onclick="doDelete()">Delete</button>
@@ -395,20 +276,10 @@
     </div>
   </div>
 
-  <!-- Toast -->
   <div class="toast" id="toast"></div>
+  <div id="loading-overlay" class="hidden"><div class="loading-box"><div class="loading-spinner"></div><span class="loading-text">Loading...</span></div></div>
 
 </div><!-- /#app -->
-
-
-  <!-- Loading overlay -->
-  <div id="loading-overlay" class="hidden">
-    <div class="loading-box">
-      <div class="loading-spinner"></div>
-      <span class="loading-text">Saving...</span>
-    </div>
-  </div>
-
 <script src="supabase.js"></script>
 <script src="papan_script.js"></script>
 </body>

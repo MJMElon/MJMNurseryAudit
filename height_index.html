@@ -15,7 +15,7 @@
       <a href="home.html" class="top-bar-back"><svg viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg></a>
       <div class="top-bar-icon"><svg viewBox="0 0 24 24"><line x1="12" y1="20" x2="12" y2="4"/><path d="M12 4C12 4 8 8 8 10"/><path d="M12 4C12 4 16 8 16 10"/><path d="M12 10C12 10 9 13 9 15"/><path d="M12 10C12 10 15 13 15 15"/></svg></div>
       <div>
-        <div class="top-bar-title">Seedling Height &nbsp;—&nbsp; <span id="topbar-nursery">PN</span></div>
+        <div class="top-bar-title" id="page-title">Seedling Height Audit &nbsp;—&nbsp; <span id="topbar-nursery">PN</span></div>
         <div class="top-bar-sub" id="nav-today"></div>
       </div>
     </div>
@@ -27,12 +27,12 @@
   <!-- LIST VIEW -->
   <div id="view-list" class="view page-scroll">
     <div class="summary-strip">
-      <div class="stat-card"><div class="stat-value" id="stat-total">0</div><div class="stat-label">Total</div></div>
-      <div class="stat-card"><div class="stat-value" id="stat-avg">—</div><div class="stat-label">Avg cm</div></div>
-      <div class="stat-card"><div class="stat-value" id="stat-max">—</div><div class="stat-label">Max cm</div></div>
+      <div class="stat-card"><div class="stat-value" id="stat-total">0</div><div class="stat-label">This Month</div></div>
+      <div class="stat-card"><div class="stat-value" id="stat-avg">0</div><div class="stat-label">Plots ≥150cm</div></div>
+      <div class="stat-card"><div class="stat-value" id="stat-max">—</div><div class="stat-label">Reached %</div></div>
     </div>
     <div class="list-header">
-      <span class="list-heading" id="list-heading">PN</span>
+      <span class="list-heading" id="list-heading">Seedling Height Audit — PN</span>
       <span class="list-count" id="list-count">0 records</span>
     </div>
     <div class="record-list" id="records-list"></div>
@@ -140,6 +140,13 @@
 
   <!-- DETAIL VIEW -->
   <div id="view-detail" class="view page-scroll">
+    <!-- Detail top back bar -->
+    <div style="background:var(--g800);padding:14px 16px;display:flex;align-items:center;gap:12px;position:sticky;top:0;z-index:100">
+      <button class="back-btn" onclick="closeDetail()">
+        <svg viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg>
+      </button>
+      <span style="font-size:16px;font-weight:700;color:#fff;flex:1" id="detail-top-title">Record Detail</span>
+    </div>
     <div class="detail-photos">
       <div class="detail-photo" id="detail-p1"></div>
       <div class="detail-photo" id="detail-p2"></div>

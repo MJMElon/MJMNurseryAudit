@@ -56,6 +56,7 @@ function selectTab(nursery){
   activeTab=nursery;
   document.querySelectorAll('.tab-item').forEach(t=>t.classList.toggle('active',t.dataset.n===nursery));
   document.getElementById('topbar-nursery').textContent=NURSERY_LABELS[nursery];
+  document.getElementById('page-title').textContent='Seedling Height Audit — '+NURSERY_LABELS[nursery];
   renderList();
   setView('list');
 }
@@ -82,11 +83,24 @@ async function loadRecords(){
 function renderList(){
   const recs=records.filter(r=>r.nursery===activeTab);
   document.getElementById('list-count').textContent=recs.length+' record'+(recs.length!==1?'s':'');
-  document.getElementById('list-heading').textContent=NURSERY_LABELS[activeTab];
-  document.getElementById('stat-total').textContent=recs.length;
-  const avgs=recs.map(r=>parseFloat(calcAvg(r.s1,r.s2,r.s3))).filter(v=>!isNaN(v));
-  document.getElementById('stat-avg').textContent=avgs.length?(avgs.reduce((a,b)=>a+b,0)/avgs.length).toFixed(1):'—';
-  document.getElementById('stat-max').textContent=avgs.length?Math.max(...avgs).toFixed(1):'—';
+  document.getElementById('list-heading').textContent='Seedling Height Audit — '+NURSERY_LABELS[activeTab];
+
+  // Stat 1: This month's audits
+  const now=new Date();
+  const thisMonth=recs.filter(r=>{
+    if(!r.createdAt)return false;
+    const d=new Date(r.createdAt);
+    return d.getMonth()===now.getMonth()&&d.getFullYear()===now.getFullYear();
+  });
+  document.getElementById('stat-total').textContent=thisMonth.length;
+
+  // Stat 2 & 3: Plots with avg ≥ 150cm
+  const plotsReached=recs.filter(r=>{
+    const avg=parseFloat(calcAvg(r.s1,r.s2,r.s3));
+    return !isNaN(avg)&&avg>=150;
+  });
+  document.getElementById('stat-avg').textContent=plotsReached.length;
+  document.getElementById('stat-max').textContent=recs.length>0?Math.round((plotsReached.length/recs.length)*100)+'%':'—';
 
   // tab badges
   document.querySelectorAll('.tab-item').forEach(t=>{
@@ -254,6 +268,7 @@ function openDetail(uid){
     }
   });
   document.getElementById('detail-nursery-tag').textContent=NURSERY_LABELS[r.nursery];
+  const dtitle=document.getElementById('detail-top-title');if(dtitle)dtitle.textContent=r.plot+' — '+NURSERY_LABELS[r.nursery];
   document.getElementById('detail-id').textContent=r.id;
   document.getElementById('detail-date').textContent=fmtDate(r.date);
   document.getElementById('detail-plot').textContent=r.plot;

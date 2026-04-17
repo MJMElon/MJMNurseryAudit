@@ -3,7 +3,11 @@
 <head>
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no"/>
-  <meta name="theme-color" content="#0f2e0f"/>
+  <link rel="manifest" href="manifest.json"/>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+<meta name="apple-mobile-web-app-title" content="MJM Audit"/>
+<meta name="theme-color" content="#0f2e0f"/>
   <title>MJM Nursery — Dashboard</title>
   <link rel="preconnect" href="https://fonts.googleapis.com"/>
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
@@ -146,6 +150,25 @@
     .fade-in:nth-child(4){animation-delay:.29s}
     .fade-in:nth-child(5){animation-delay:.37s}
     @keyframes fadeUp{to{opacity:1;transform:translateY(0)}}
+
+    /* INSTALL BANNER */
+    .install-banner{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:480px;background:var(--g900);padding:14px 16px;display:flex;align-items:center;gap:12px;z-index:9000;box-shadow:0 -4px 20px rgba(0,0,0,.3);animation:slideUp .3s ease}
+    @keyframes slideUp{from{transform:translateX(-50%) translateY(100%)}to{transform:translateX(-50%) translateY(0)}}
+    .install-banner-icon{width:40px;height:40px;border-radius:10px;background:var(--g600);display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:20px}
+    .install-banner-text{flex:1;min-width:0}
+    .install-banner-title{font-size:13px;font-weight:700;color:#fff;margin-bottom:2px}
+    .install-banner-sub{font-size:11px;color:rgba(255,255,255,.55)}
+    .install-banner-btn{height:36px;padding:0 16px;border-radius:20px;background:var(--g500);border:none;color:#fff;font-size:13px;font-weight:700;font-family:'DM Sans',sans-serif;cursor:pointer;flex-shrink:0;white-space:nowrap}
+    .install-banner-close{width:28px;height:28px;border-radius:50%;background:rgba(255,255,255,.1);border:none;color:rgba(255,255,255,.6);font-size:16px;display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0}
+    .ios-install-modal{position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:9001;display:flex;align-items:flex-end;justify-content:center}
+    .ios-install-box{background:#fff;border-radius:20px 20px 0 0;padding:24px 20px 40px;width:100%;max-width:480px;text-align:center}
+    .ios-install-box h3{font-size:17px;font-weight:700;color:#182018;margin-bottom:8px}
+    .ios-install-box p{font-size:13px;color:#6b8a6b;line-height:1.6;margin-bottom:20px}
+    .ios-steps{text-align:left;background:#f4f6f4;border-radius:12px;padding:14px 16px;margin-bottom:20px}
+    .ios-step{display:flex;align-items:center;gap:10px;padding:6px 0;font-size:13px;color:#3d5c3d}
+    .ios-step-num{width:22px;height:22px;border-radius:50%;background:#1a4d1a;color:#fff;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+    .ios-close-btn{width:100%;height:44px;border-radius:12px;background:#1a4d1a;border:none;color:#fff;font-size:14px;font-weight:600;font-family:'DM Sans',sans-serif;cursor:pointer}
+
   </style>
 </head>
 <body>
@@ -260,6 +283,32 @@
     </div>
 
   </div><!-- /content -->
+
+<!-- INSTALL BANNER -->
+<div class="install-banner" id="install-banner" style="display:none">
+  <div class="install-banner-icon">🌿</div>
+  <div class="install-banner-text">
+    <div class="install-banner-title">Install MJM Audit App</div>
+    <div class="install-banner-sub">Use offline in the field</div>
+  </div>
+  <button class="install-banner-btn" id="install-btn" onclick="handleInstall()">Install</button>
+  <button class="install-banner-close" onclick="dismissInstall()">×</button>
+</div>
+
+<!-- iOS Install Instructions Modal -->
+<div class="ios-install-modal" id="ios-modal" style="display:none">
+  <div class="ios-install-box">
+    <h3>Install MJM Audit App 🌿</h3>
+    <p>Add to your home screen to use the app offline in the field — no internet needed!</p>
+    <div class="ios-steps">
+      <div class="ios-step"><span class="ios-step-num">1</span>Tap the <strong>Share</strong> button at the bottom of Safari</div>
+      <div class="ios-step"><span class="ios-step-num">2</span>Scroll down and tap <strong>"Add to Home Screen"</strong></div>
+      <div class="ios-step"><span class="ios-step-num">3</span>Tap <strong>"Add"</strong> — done! ✅</div>
+    </div>
+    <button class="ios-close-btn" onclick="closeIosModal()">Got it!</button>
+  </div>
+</div>
+
 </div><!-- /#app -->
 
 <!-- LOGOUT MODAL -->
@@ -296,7 +345,19 @@ document.getElementById('user-name').textContent   = user.name.split(' ')[0];
 function showLogout(){document.getElementById('logout-modal').classList.add('show');}
 function hideLogout(e){if(e.target===document.getElementById('logout-modal'))hideLogoutDirect();}
 function hideLogoutDirect(){document.getElementById('logout-modal').classList.remove('show');}
-function doLogout(){localStorage.removeItem('mjm_user');window.location.href='index.html';}
+async function doLogout(){
+  localStorage.removeItem('mjm_user');
+  // Also sign out from Supabase Auth if available
+  try{
+    if(typeof sb !== 'undefined' && sb._client){
+      await sb._client.auth.signOut();
+    } else {
+      // Fallback: use supabase-js directly
+      const s=window._supaClient;if(s)await s.auth.signOut();
+    }
+  }catch(e){}
+  window.location.href='index.html';
+}
 
 /* ── ALERT SYSTEM ── */
 const ALERT_KEY = 'mjm_last_alerts';
@@ -424,6 +485,57 @@ function requestNotifPermission(){
     Notification.requestPermission();
   }
 }
+
+
+/* --- INSTALL BANNER --- */
+let deferredPrompt = null;
+const INSTALL_DISMISSED = 'mjm_install_dismissed';
+
+function isIOS(){return /iphone|ipad|ipod/i.test(navigator.userAgent);}
+function isInStandaloneMode(){return window.matchMedia('(display-mode:standalone)').matches || window.navigator.standalone;}
+
+function showInstallBanner(){
+  if(isInStandaloneMode()) return; // already installed
+  if(localStorage.getItem(INSTALL_DISMISSED)) return; // dismissed before
+  document.getElementById('install-banner').style.display='flex';
+}
+function dismissInstall(){
+  document.getElementById('install-banner').style.display='none';
+  localStorage.setItem(INSTALL_DISMISSED, '1');
+}
+function handleInstall(){
+  if(isIOS()){
+    document.getElementById('install-banner').style.display='none';
+    document.getElementById('ios-modal').style.display='flex';
+    return;
+  }
+  if(deferredPrompt){
+    deferredPrompt.prompt();
+    deferredPrompt.userChoice.then(r=>{
+      if(r.outcome==='accepted') dismissInstall();
+      deferredPrompt=null;
+    });
+  }
+}
+function closeIosModal(){
+  document.getElementById('ios-modal').style.display='none';
+  document.getElementById('install-banner').style.display='none';
+  localStorage.setItem(INSTALL_DISMISSED,'1');
+}
+
+// Chrome/Android — capture install prompt
+window.addEventListener('beforeinstallprompt', e=>{
+  e.preventDefault();
+  deferredPrompt=e;
+  showInstallBanner();
+});
+
+// iOS — show banner after 2s if not installed
+if(isIOS() && !isInStandaloneMode()){
+  setTimeout(showInstallBanner, 2000);
+}
+// Android without prompt (already installable via browser)
+setTimeout(()=>{if(!deferredPrompt&&!isIOS()&&!isInStandaloneMode())showInstallBanner();}, 3000);
 
 /* ── Auto-refresh alerts every 5 minutes ── */
 loadAlerts();

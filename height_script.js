@@ -203,18 +203,43 @@ function renderSlot(n,src){
     slot.appendChild(num);slot.appendChild(svg);slot.appendChild(lbl);
   }
 }
-function triggerPhoto(n){document.getElementById('photo-input-'+n).click();}
-function handlePhoto(n,input){
-  if(!input.files||!input.files[0])return;
-  const reader=new FileReader();
-  reader.onload=e=>{
-    formState['p'+n]=e.target.result;renderSlot(n,e.target.result);
-    if(formState.p1&&formState.p2&&formState.p3){
-      const note=document.getElementById('photo-req-note');
-      if(note){note.classList.remove('error');note.textContent='3 photos required — one per sample';}
+function triggerPhoto(n){
+  // Show camera/gallery choice
+  const existing=document.getElementById('photo-choice-sheet');
+  if(existing)existing.remove();
+  const sheet=document.createElement('div');
+  sheet.id='photo-choice-sheet';
+  sheet.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:9999;display:flex;align-items:flex-end;justify-content:center';
+  sheet.innerHTML=`<div style="background:#fff;border-radius:20px 20px 0 0;padding:20px 16px 36px;width:100%;max-width:480px">
+    <div style="font-size:14px;font-weight:700;color:#182018;margin-bottom:16px;text-align:center">Sample ${n} — Add Photo</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px">
+      <button onclick="document.getElementById('photo-input-${n}').click();document.getElementById('photo-choice-sheet').remove()" style="height:64px;border-radius:12px;background:#1a4d1a;color:#fff;font-size:15px;font-weight:600;border:none;font-family:inherit;cursor:pointer">📷<br><span style="font-size:11px">Camera</span></button>
+      <button onclick="document.getElementById('photo-gallery-${n}').click();document.getElementById('photo-choice-sheet').remove()" style="height:64px;border-radius:12px;background:#f4f6f4;color:#3d5c3d;font-size:15px;font-weight:600;border:1px solid #dde8dd;font-family:inherit;cursor:pointer">🖼<br><span style="font-size:11px">Gallery</span></button>
+    </div>
+    <button onclick="document.getElementById('photo-choice-sheet').remove()" style="width:100%;height:44px;border-radius:12px;background:#f4f6f4;border:1px solid #dde8dd;color:#6b8a6b;font-size:14px;font-weight:600;font-family:inherit;cursor:pointer">Cancel</button>
+  </div>`;
+  sheet.addEventListener('click', e=>{ if(e.target===sheet) sheet.remove(); });
+  document.body.appendChild(sheet);
+  // Add gallery inputs if not exist
+  [1,2,3].forEach(i=>{
+    if(!document.getElementById('photo-gallery-'+i)){
+      const inp=document.createElement('input');
+      inp.type='file';inp.id='photo-gallery-'+i;inp.accept='image/*';inp.style.display='none';
+      inp.onchange=function(){handlePhoto(i,this);};
+      document.body.appendChild(inp);
     }
-  };
-  reader.readAsDataURL(input.files[0]);input.value='';
+  });
+}
+async function handlePhoto(n,input){
+  if(!input.files||!input.files[0])return;
+  const compressed=await compressPhoto(input.files[0]);
+  formState['p'+n]=compressed;
+  renderSlot(n,compressed);
+  if(formState.p1&&formState.p2&&formState.p3){
+    const note=document.getElementById('photo-req-note');
+    if(note){note.classList.remove('error');note.textContent='3 photos required — one per sample';}
+  }
+  input.value='';
 }
 function cancelForm(){setView('list');}
 

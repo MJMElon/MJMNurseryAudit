@@ -171,3 +171,31 @@ function initOffline(){
 
 // Run on load
 document.addEventListener('DOMContentLoaded', initOffline);
+
+/* ================================================================
+   PHOTO COMPRESSION
+   Resizes + compresses image to max 1200px, ~200KB
+================================================================ */
+function compressPhoto(file, maxWidth=1200, quality=0.75){
+  return new Promise((resolve) => {
+    const reader = new FileReader();
+    reader.onload = e => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        let w = img.width, h = img.height;
+        // Scale down if wider than maxWidth
+        if(w > maxWidth){ h = Math.round(h * maxWidth / w); w = maxWidth; }
+        canvas.width = w; canvas.height = h;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, w, h);
+        const compressed = canvas.toDataURL('image/jpeg', quality);
+        const kb = Math.round(compressed.length * 0.75 / 1024);
+        console.log(`Photo compressed: ${img.width}x${img.height} → ${w}x${h} (${kb}KB)`);
+        resolve(compressed);
+      };
+      img.src = e.target.result;
+    };
+    reader.readAsDataURL(file);
+  });
+}

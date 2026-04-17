@@ -203,8 +203,11 @@ function renderPapanAlerts(){
 /* --- RENDER AUDIT LIST --- */
 // Get user role from localStorage
 function isAdmin(){
-  try{const u=JSON.parse(localStorage.getItem('mjm_user')||'{}');return(u.role||'').toLowerCase().includes('admin');}
-  catch(e){return false;}
+  try{
+    const u=JSON.parse(localStorage.getItem('mjm_user')||'{}');
+    const role=(u.role||'').toLowerCase();
+    return role==='admin'||role==='administrator';
+  }catch(e){return false;}
 }
 
 function renderAuditList(){
@@ -458,16 +461,14 @@ function pickTri(field,val,el){
   if(field==='info')formState.infoCorrect=val;
   if(field==='cond')formState.condition=val;
 }
-function handlePhoto(input){
+async function handlePhoto(input){
   if(!input.files||!input.files[0])return;
-  const reader=new FileReader();
-  reader.onload=e=>{
-    formState.photo=e.target.result;
-    document.getElementById('papan-photo-img').src=e.target.result;
-    document.getElementById('papan-photo-drop').style.display='none';
-    document.getElementById('papan-photo-preview').style.display='block';
-  };
-  reader.readAsDataURL(input.files[0]);input.value='';
+  const compressed=await compressPhoto(input.files[0]);
+  formState.photo=compressed;
+  document.getElementById('papan-photo-img').src=compressed;
+  document.getElementById('papan-photo-drop').style.display='none';
+  document.getElementById('papan-photo-preview').style.display='block';
+  input.value='';
 }
 function clearPhoto(e){
   if(e)e.stopPropagation();formState.photo=null;

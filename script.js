@@ -225,16 +225,13 @@ function pickWarna(el){
   document.querySelectorAll('.warna-btn').forEach(b=>b.classList.remove('active'));
   el.classList.add('active');formState.warna=el.dataset.v;
 }
-function handlePhoto(input){
+async function handlePhoto(input){
   if(!input.files||!input.files[0])return;
-  const reader=new FileReader();
-  reader.onload=e=>{
-    formState.photo=e.target.result;
-    document.getElementById('f-photo-img').src=e.target.result;
-    document.getElementById('photo-drop').style.display='none';
-    document.getElementById('photo-preview').style.display='block';
-  };
-  reader.readAsDataURL(input.files[0]);
+  const compressed=await compressPhoto(input.files[0]);
+  formState.photo=compressed;
+  document.getElementById('f-photo-img').src=compressed;
+  document.getElementById('photo-drop').style.display='none';
+  document.getElementById('photo-preview').style.display='block';
 }
 function clearPhoto(e){
   if(e)e.stopPropagation();formState.photo=null;

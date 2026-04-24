@@ -56,7 +56,6 @@ function selectTab(nursery){
   activeTab=nursery;
   document.querySelectorAll('.tab-item').forEach(t=>t.classList.toggle('active',t.dataset.n===nursery));
   document.getElementById('topbar-nursery').textContent=NURSERY_LABELS[nursery];
-  document.getElementById('page-title').textContent='Seedling Height Audit — '+NURSERY_LABELS[nursery];
   renderList();
   setView('list');
 }

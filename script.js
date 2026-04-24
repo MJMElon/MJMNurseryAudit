@@ -16,7 +16,7 @@ const WARNA_LBL = {'1':'Very Green','2':'Green','3':'Light Green','4':'Yellowish
 
 let records=[], activeTab='PN', activeView='list';
 let editMode=false, editId=null, detailId=null, deleteTarget=null;
-let formState={nursery:'PN',ulat:null,tikus:null,bintik:null,warna:null,photo:null};
+let formState={nursery:'PN',ulat:null,tikus:null,bintik:null,warna:null,photo1:null,photo2:null};
 let toastTimer=null;
 
 function pad(n){return String(n).padStart(3,'0');}
@@ -65,7 +65,8 @@ async function loadRecords(){
     records=rows.map(r=>({
       uid:String(r.id),id:r.audit_id,nursery:r.nursery,plot:r.plot,
       batch:r.batch,ulat:r.pest,tikus:r.tikus,bintik:r.disease,
-      warna:r.warna_daun,photo:r.photo_url,date:r.date,createdAt:r.created_at
+      warna:r.warna_daun,photo:r.photo_url,photo2:r.photo_2_url||null,
+      date:r.date,createdAt:r.created_at
     }));
     renderList();
     renderAlertStrip();
@@ -77,59 +78,33 @@ async function loadRecords(){
 function renderAlertStrip(){
   const strip=document.getElementById('alert-strip');if(!strip)return;
   const recs=records.filter(r=>r.nursery===activeTab);
-
-  // Get latest record per plot
   const latestPerPlot={};
   recs.forEach(r=>{
     if(!latestPerPlot[r.plot]||r.createdAt>latestPerPlot[r.plot].createdAt)
       latestPerPlot[r.plot]=r;
   });
   const latest=Object.values(latestPerPlot);
-
-  const ratPlots    = latest.filter(r=>r.tikus==='Banyak'||r.tikus==='Sedikit');
-  const pestPlots   = latest.filter(r=>r.ulat==='Banyak');
-  const yellowPlots = latest.filter(r=>r.warna==='5');
-
-  if(!ratPlots.length&&!pestPlots.length&&!yellowPlots.length){
-    strip.innerHTML='';return;
-  }
-
-  let html='<div style="margin-bottom:12px">';
-  html+='<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:#6b8a6b;margin-bottom:8px">⚠ Alerts — '+NURSERY_LABELS[activeTab]+'</div>';
-
-  function alertRow(icon,label,plots,badgeColor){
+  const ratPlots   =latest.filter(r=>r.tikus==='Banyak'||r.tikus==='Sedikit');
+  const pestPlots  =latest.filter(r=>r.ulat==='Banyak');
+  const yellowPlots=latest.filter(r=>r.warna==='5');
+  if(!ratPlots.length&&!pestPlots.length&&!yellowPlots.length){strip.innerHTML='';return;}
+  let html='<div style="margin-bottom:12px"><div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:#6b8a6b;margin-bottom:8px">⚠ Alerts — '+NURSERY_LABELS[activeTab]+'</div>';
+  function alertRow(icon,label,plots,bg,color){
     return `<div style="background:#fff;border:1px solid #dde8dd;border-radius:12px;margin-bottom:6px;overflow:hidden">
-      <div style="display:flex;align-items:center;gap:10px;padding:10px 12px;cursor:pointer" onclick="this.parentElement.classList.toggle('open')">
+      <div style="display:flex;align-items:center;gap:10px;padding:10px 12px;cursor:pointer" onclick="const d=this.nextElementSibling;d.style.display=d.style.display==='flex'?'none':'flex'">
         <span style="font-size:16px">${icon}</span>
-        <div style="flex:1">
-          <div style="font-size:13px;font-weight:700;color:#182018">${label}</div>
-          <div style="font-size:11px;color:#6b8a6b">${plots.length} plot${plots.length>1?'s':''} affected</div>
-        </div>
-        <span style="font-size:11px;font-weight:700;padding:3px 10px;border-radius:20px;background:${badgeColor.bg};color:${badgeColor.text}">${plots.length}</span>
+        <div style="flex:1"><div style="font-size:13px;font-weight:700;color:#182018">${label}</div><div style="font-size:11px;color:#6b8a6b">${plots.length} plot${plots.length>1?'s':''} affected</div></div>
+        <span style="font-size:11px;font-weight:700;padding:3px 10px;border-radius:20px;background:${bg};color:${color}">${plots.length}</span>
       </div>
-      <div class="alert-plots" style="display:none;padding:0 12px 10px;flex-wrap:wrap;gap:5px">
+      <div style="display:none;padding:0 12px 10px;flex-wrap:wrap;gap:5px">
         ${plots.map(r=>`<span style="font-size:11px;font-weight:600;padding:3px 10px;border-radius:20px;background:#f4f6f4;border:1px solid #dde8dd;color:#3d5c3d">${r.plot}</span>`).join('')}
-      </div>
-    </div>`;
+      </div></div>`;
   }
-
-  // Toggle open/close for each alert row
-  if(ratPlots.length)    html+=alertRow('🐀','Animal Infestation',ratPlots,{bg:'#fff1f1',text:'#b91c1c'});
-  if(pestPlots.length)   html+=alertRow('🐛','Pest Infestation',pestPlots,{bg:'#fff7ed',text:'#c2410c'});
-  if(yellowPlots.length) html+=alertRow('🍂','Yellow Leaves',yellowPlots,{bg:'#fefce8',text:'#854d0e'});
+  if(ratPlots.length)    html+=alertRow('🐀','Animal Infestation',ratPlots,'#fff1f1','#b91c1c');
+  if(pestPlots.length)   html+=alertRow('🐛','Pest Infestation',pestPlots,'#fff7ed','#c2410c');
+  if(yellowPlots.length) html+=alertRow('🍂','Yellow Leaves',yellowPlots,'#fefce8','#854d0e');
   html+='</div>';
-
   strip.innerHTML=html;
-
-  // Add toggle functionality
-  strip.querySelectorAll('[onclick]').forEach(el=>{
-    el.addEventListener('click',function(){
-      const plotsDiv=this.parentElement.querySelector('.alert-plots');
-      if(plotsDiv){
-        plotsDiv.style.display=plotsDiv.style.display==='flex'?'none':'flex';
-      }
-    });
-  });
 }
 
 /* --- RENDER LIST --- */
@@ -137,14 +112,12 @@ function renderList(){
   const recs=records.filter(r=>r.nursery===activeTab);
   document.getElementById('list-count').textContent=recs.length+' record'+(recs.length!==1?'s':'');
   document.getElementById('list-heading').textContent='Plot Condition Audit — '+NURSERY_LABELS[activeTab];
-
   document.querySelectorAll('.tab-item').forEach(t=>{
     const cnt=records.filter(r=>r.nursery===t.dataset.n).length;
     let b=t.querySelector('.tab-badge');
     if(cnt>0){if(!b){b=document.createElement('span');b.className='tab-badge';t.appendChild(b);}b.textContent=cnt;}
     else if(b)b.remove();
   });
-
   const el=document.getElementById('records-list');
   if(!recs.length){
     el.innerHTML='<div class="empty-state"><div class="empty-state-icon"><svg viewBox="0 0 24 24"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="1"/></svg></div><h3>No audits yet</h3><p>Tap <strong>+</strong> to add the first audit for '+NURSERY_LABELS[activeTab]+'.</p></div>';
@@ -175,14 +148,14 @@ function renderList(){
 /* --- FORM --- */
 function openAddForm(){
   editMode=false;editId=null;
-  formState={nursery:activeTab,ulat:null,tikus:null,bintik:null,warna:null,photo:null};
+  formState={nursery:activeTab,ulat:null,tikus:null,bintik:null,warna:null,photo1:null,photo2:null};
   populateForm();setView('form');
   document.getElementById('form-view-title').textContent='New Audit — '+NURSERY_LABELS[activeTab];
 }
 function openEdit(uid){
   const r=records.find(x=>x.uid===uid);if(!r)return;
   editMode=true;editId=uid;
-  formState={nursery:r.nursery,ulat:r.ulat,tikus:r.tikus,bintik:r.bintik,warna:r.warna,photo:r.photo};
+  formState={nursery:r.nursery,ulat:r.ulat,tikus:r.tikus,bintik:r.bintik,warna:r.warna,photo1:r.photo||null,photo2:r.photo2||null};
   populateForm(r);setView('form');
   document.getElementById('form-view-title').textContent='Edit — '+r.id;
 }
@@ -205,17 +178,12 @@ function populateForm(r){
     if(formState[f]){const btn=[...grp.querySelectorAll('.tri-btn')].find(b=>b.dataset.val===formState[f]);if(btn)btn.classList.add(TRI[formState[f]]);}
   });
   document.querySelectorAll('.warna-btn').forEach(b=>b.classList.toggle('active',b.dataset.v===formState.warna));
-  if(formState.photo){
-    document.getElementById('f-photo-img').src=formState.photo;
-    document.getElementById('photo-drop').style.display='none';
-    document.getElementById('photo-preview').style.display='block';
-  }else{
-    document.getElementById('photo-drop').style.display='block';
-    document.getElementById('photo-preview').style.display='none';
-    document.getElementById('f-photo-img').src='';
-    document.getElementById('photo-input').value='';
-  }
+  renderPlotSlot(1,formState.photo1||null);
+  renderPlotSlot(2,formState.photo2||null);
+  const note=document.getElementById('photo-req-note');
+  if(note){note.classList.remove('error');note.textContent='2 photos required';}
 }
+
 const TRI_CLASS={'Banyak':'sel-b','Sedikit':'sel-s','Tidak Ada':'sel-t'};
 function pickTri(field,val,el){
   document.getElementById('f-'+field+'-grp').querySelectorAll('.tri-btn').forEach(b=>b.className='tri-btn');
@@ -225,20 +193,51 @@ function pickWarna(el){
   document.querySelectorAll('.warna-btn').forEach(b=>b.classList.remove('active'));
   el.classList.add('active');formState.warna=el.dataset.v;
 }
-async function handlePhoto(input){
+
+/* --- PHOTO SLOTS --- */
+function triggerPlotPhoto(n){
+  const sheet=document.createElement('div');
+  sheet.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:9999;display:flex;align-items:flex-end;justify-content:center';
+  sheet.innerHTML=`<div style="background:#fff;border-radius:20px 20px 0 0;padding:20px 16px 36px;width:100%;max-width:480px">
+    <div style="font-size:14px;font-weight:700;color:#182018;margin-bottom:16px;text-align:center">Photo ${n}</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px">
+      <button onclick="document.getElementById('plot-photo-camera-${n}').click();this.closest('[style*=fixed]').remove()" style="height:64px;border-radius:12px;background:#1a4d1a;color:#fff;font-size:15px;font-weight:600;border:none;font-family:inherit;cursor:pointer">📷<br><span style="font-size:11px">Camera</span></button>
+      <button onclick="document.getElementById('plot-photo-gallery-${n}').click();this.closest('[style*=fixed]').remove()" style="height:64px;border-radius:12px;background:#f4f6f4;color:#3d5c3d;font-size:15px;font-weight:600;border:1px solid #dde8dd;font-family:inherit;cursor:pointer">🖼<br><span style="font-size:11px">Gallery</span></button>
+    </div>
+    <button onclick="this.closest('[style*=fixed]').remove()" style="width:100%;height:44px;border-radius:12px;background:#f4f6f4;border:1px solid #dde8dd;color:#6b8a6b;font-size:14px;font-weight:600;font-family:inherit;cursor:pointer">Cancel</button>
+  </div>`;
+  sheet.addEventListener('click',e=>{if(e.target===sheet)sheet.remove();});
+  document.body.appendChild(sheet);
+}
+async function handlePlotPhoto(n,input){
   if(!input.files||!input.files[0])return;
   const compressed=await compressPhoto(input.files[0]);
-  formState.photo=compressed;
-  document.getElementById('f-photo-img').src=compressed;
-  document.getElementById('photo-drop').style.display='none';
-  document.getElementById('photo-preview').style.display='block';
+  formState['photo'+n]=compressed;
+  renderPlotSlot(n,compressed);
+  if(formState.photo1&&formState.photo2){
+    const note=document.getElementById('photo-req-note');
+    if(note){note.classList.remove('error');note.textContent='2 photos required';}
+  }
+  input.value='';
 }
-function clearPhoto(e){
-  if(e)e.stopPropagation();formState.photo=null;
-  document.getElementById('f-photo-img').src='';
-  document.getElementById('photo-drop').style.display='block';
-  document.getElementById('photo-preview').style.display='none';
-  document.getElementById('photo-input').value='';
+function renderPlotSlot(n,src){
+  const slot=document.getElementById('photo-slot-'+n);if(!slot)return;
+  while(slot.firstChild)slot.removeChild(slot.firstChild);
+  if(src){
+    slot.classList.add('has-photo');
+    const img=document.createElement('img');img.src=src;img.alt='Photo '+n;
+    img.onclick=()=>openLightbox(src);slot.appendChild(img);
+    const btn=document.createElement('button');btn.className='photo-slot-clear';btn.textContent='×';
+    btn.onclick=e=>{e.stopPropagation();formState['photo'+n]=null;renderPlotSlot(n,null);};
+    slot.appendChild(btn);
+  }else{
+    slot.classList.remove('has-photo');
+    const num=document.createElement('div');num.className='photo-slot-num';num.textContent=n;
+    const svg=document.createElementNS('http://www.w3.org/2000/svg','svg');svg.setAttribute('viewBox','0 0 24 24');
+    svg.innerHTML='<rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="12" cy="12" r="3"/><path d="M9 5l1.5-2h3L15 5"/>';
+    const lbl=document.createElement('span');lbl.className='photo-slot-label';lbl.textContent='Photo '+n;
+    slot.appendChild(num);slot.appendChild(svg);slot.appendChild(lbl);
+  }
 }
 function cancelForm(){setView('list');}
 
@@ -246,26 +245,33 @@ function cancelForm(){setView('list');}
 async function saveRecord(){
   const plot=document.getElementById('f-plot').value;
   const batch=document.getElementById('f-batch').value.trim();
-  if(!plot)          {showToast('⚠ Please select a plot');return;}
-  if(!batch)         {showToast('⚠ Please enter batch number');return;}
-  if(!formState.ulat)  {showToast('⚠ Please select Pest Infestation level');return;}
-  if(!formState.tikus) {showToast('⚠ Please select Animal Infestation level');return;}
+  if(!plot)           {showToast('⚠ Please select a plot');return;}
+  if(!batch)          {showToast('⚠ Please enter batch number');return;}
+  if(!formState.ulat) {showToast('⚠ Please select Pest Infestation level');return;}
+  if(!formState.tikus){showToast('⚠ Please select Animal Infestation level');return;}
   if(!formState.bintik){showToast('⚠ Please select Disease Infestation level');return;}
-  if(!formState.warna) {showToast('⚠ Please select Leaf Condition');return;}
-  if(!formState.photo) {showToast('⚠ Please upload a photo');return;}
-
+  if(!formState.warna){showToast('⚠ Please select Leaf Condition');return;}
+  if(!formState.photo1||!formState.photo2){
+    const note=document.getElementById('photo-req-note');
+    if(note){note.classList.add('error');note.textContent='⚠ Both photos are required';}
+    showToast('⚠ Please upload both photos');return;
+  }
   setLoading(true);
   try{
-    let photoUrl=formState.photo;
-    if(photoUrl&&photoUrl.startsWith('data:'))
-      photoUrl=await sb.uploadPhoto('audit-photos','plot_'+plot+'_'+Date.now(),photoUrl);
+    async function up(photo,label){return(photo&&photo.startsWith('data:'))?await sb.uploadPhoto('audit-photos',label,photo):photo;}
+    const [p1u,p2u]=await Promise.all([
+      up(formState.photo1,'plot_'+plot+'_1_'+Date.now()),
+      up(formState.photo2,'plot_'+plot+'_2_'+Date.now())
+    ]);
     const payload={
-      nursery:formState.nursery,plot,batch:batch,
+      nursery:formState.nursery,plot,batch,
       pest:formState.ulat,tikus:formState.tikus,disease:formState.bintik,
-      warna_daun:formState.warna,photo_url:photoUrl||null,date:todayISO()
+      warna_daun:formState.warna,photo_url:p1u||null,photo_2_url:p2u||null,date:todayISO()
     };
-    const result = await smartSave('plot_audits', editMode?'update':'insert', editMode?payload:{...payload,audit_id:nextID(formState.nursery)}, editMode?editId:null);
-    showToast(result?.offline ? '📴 Saved offline — will sync later' : editMode?'✓ Record updated':'✓ Record saved');
+    const result=await smartSave('plot_audits',editMode?'update':'insert',
+      editMode?payload:{...payload,audit_id:nextID(formState.nursery)},
+      editMode?editId:null);
+    showToast(result?.offline?'📴 Saved offline — will sync later':editMode?'✓ Record updated':'✓ Record saved');
     await loadRecords();setView('list');
   }catch(e){showToast('⚠ Save failed');console.error(e);setLoading(false);}
 }

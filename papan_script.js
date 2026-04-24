@@ -442,15 +442,7 @@ function openAuditForm(batchUid, isEdit, existingAuditUid){
   // no remarks field
 
   // Photo
-  if(formState.photo){
-    document.getElementById('papan-photo-img').src=formState.photo;
-    document.getElementById('papan-photo-drop').style.display='none';
-    document.getElementById('papan-photo-preview').style.display='block';
-  } else {
-    document.getElementById('papan-photo-drop').style.display='block';
-    document.getElementById('papan-photo-preview').style.display='none';
-    document.getElementById('papan-photo-img').src='';
-  }
+  renderPapanPhotoSlot(formState.photo||null);
   setView('audit-form');
 }
 
@@ -461,20 +453,50 @@ function pickTri(field,val,el){
   if(field==='info')formState.infoCorrect=val;
   if(field==='cond')formState.condition=val;
 }
+function triggerPapanPhoto(){
+  const sheet=document.createElement('div');
+  sheet.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:9999;display:flex;align-items:flex-end;justify-content:center';
+  sheet.innerHTML=`<div style="background:#fff;border-radius:20px 20px 0 0;padding:20px 16px 36px;width:100%;max-width:480px">
+    <div style="font-size:14px;font-weight:700;color:#182018;margin-bottom:16px;text-align:center">Add Photo</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px">
+      <button onclick="document.getElementById('papan-photo-input').click();this.closest('[style]').remove()" style="height:64px;border-radius:12px;background:#1a4d1a;color:#fff;font-size:15px;font-weight:600;border:none;font-family:inherit;cursor:pointer">📷<br><span style="font-size:11px">Camera</span></button>
+      <button onclick="document.getElementById('papan-photo-gallery').click();this.closest('[style]').remove()" style="height:64px;border-radius:12px;background:#f4f6f4;color:#3d5c3d;font-size:15px;font-weight:600;border:1px solid #dde8dd;font-family:inherit;cursor:pointer">🖼<br><span style="font-size:11px">Gallery</span></button>
+    </div>
+    <button onclick="this.closest('[style]').remove()" style="width:100%;height:44px;border-radius:12px;background:#f4f6f4;border:1px solid #dde8dd;color:#6b8a6b;font-size:14px;font-weight:600;font-family:inherit;cursor:pointer">Cancel</button>
+  </div>`;
+  sheet.addEventListener('click',e=>{if(e.target===sheet)sheet.remove();});
+  document.body.appendChild(sheet);
+}
 async function handlePhoto(input){
   if(!input.files||!input.files[0])return;
   const compressed=await compressPhoto(input.files[0]);
   formState.photo=compressed;
-  document.getElementById('papan-photo-img').src=compressed;
-  document.getElementById('papan-photo-drop').style.display='none';
-  document.getElementById('papan-photo-preview').style.display='block';
+  renderPapanPhotoSlot(compressed);
   input.value='';
 }
+function renderPapanPhotoSlot(src){
+  const slot=document.getElementById('papan-photo-slot');
+  if(!slot)return;
+  while(slot.firstChild)slot.removeChild(slot.firstChild);
+  if(src){
+    slot.classList.add('has-photo');
+    const img=document.createElement('img');img.src=src;img.alt='photo';slot.appendChild(img);
+    const btn=document.createElement('button');btn.className='photo-slot-clear';btn.textContent='×';
+    btn.onclick=e=>{e.stopPropagation();formState.photo=null;renderPapanPhotoSlot(null);};
+    slot.appendChild(btn);
+  }else{
+    slot.classList.remove('has-photo');
+    const num=document.createElement('div');num.className='photo-slot-num';num.textContent='1';
+    const svg=document.createElementNS('http://www.w3.org/2000/svg','svg');svg.setAttribute('viewBox','0 0 24 24');
+    svg.innerHTML='<rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="12" cy="12" r="3"/><path d="M9 5l1.5-2h3L15 5"/>';
+    const lbl=document.createElement('span');lbl.className='photo-slot-label';lbl.textContent='Papan';
+    slot.appendChild(num);slot.appendChild(svg);slot.appendChild(lbl);
+  }
+}
 function clearPhoto(e){
-  if(e)e.stopPropagation();formState.photo=null;
-  document.getElementById('papan-photo-drop').style.display='block';
-  document.getElementById('papan-photo-preview').style.display='none';
-  document.getElementById('papan-photo-img').src='';
+  if(e)e.stopPropagation();
+  formState.photo=null;
+  renderPapanPhotoSlot(null);
   document.getElementById('papan-photo-input').value='';
 }
 

@@ -14,31 +14,23 @@
 <body>
 <div id="app">
 
-  <!-- TOP BAR -->
   <nav class="top-bar">
     <div class="top-bar-logo">
       <a href="home.html" class="top-bar-back"><svg viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg></a>
-      <div class="top-bar-icon">
-        <svg viewBox="0 0 24 24"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="1"/><path d="M9 12l2 2 4-4"/></svg>
-      </div>
+      <div class="top-bar-icon"><svg viewBox="0 0 24 24"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="1"/><path d="M9 12l2 2 4-4"/></svg></div>
       <div>
         <div class="top-bar-title">Plot Condition Audit &nbsp;—&nbsp; <span id="topbar-nursery">PN</span></div>
         <div class="top-bar-sub" id="nav-today"></div>
       </div>
     </div>
     <div class="top-bar-actions">
-      <button class="top-bar-btn" onclick="loadRecords()">
-        <svg viewBox="0 0 24 24"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 11-2.12-9.36L23 10"/></svg>
-      </button>
+      <button class="top-bar-btn" onclick="loadRecords()"><svg viewBox="0 0 24 24"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 11-2.12-9.36L23 10"/></svg></button>
     </div>
   </nav>
 
   <!-- LIST VIEW -->
   <div id="view-list" class="view page-scroll">
-
-    <!-- Alert strip for this nursery -->
     <div id="alert-strip" style="padding:12px 12px 0"></div>
-
     <div class="list-header">
       <span class="list-heading" id="list-heading">PN</span>
       <span class="list-count" id="list-count">0 records</span>
@@ -54,12 +46,8 @@
       <span class="form-view-id" id="form-view-id"></span>
     </div>
 
-    <!-- Info card -->
     <div class="form-card">
-      <div class="form-section-head">
-        <svg viewBox="0 0 24 24"><path d="M13 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V9z"/><polyline points="13 2 13 9 20 9"/></svg>
-        Audit Information
-      </div>
+      <div class="form-section-head"><svg viewBox="0 0 24 24"><path d="M13 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V9z"/><polyline points="13 2 13 9 20 9"/></svg>Audit Information</div>
       <div class="form-inner">
         <div class="form-row">
           <div class="form-field"><div class="field-label">Audit ID</div><input id="f-id" class="input" type="text" readonly/></div>
@@ -72,21 +60,15 @@
           </div>
           <div class="form-field">
             <div class="field-label">Batch <span class="req">*</span></div>
-            <input id="f-batch" class="input" type="text" placeholder="e.g. B-2025-01" maxlength="24"/>
+            <input id="f-batch" class="input" type="text" placeholder="e.g. 231" maxlength="24"/>
           </div>
         </div>
       </div>
     </div>
 
-    <!-- Condition card -->
     <div class="form-card">
-      <div class="form-section-head">
-        <svg viewBox="0 0 24 24"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
-        Plot Condition
-      </div>
+      <div class="form-section-head"><svg viewBox="0 0 24 24"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>Plot Condition</div>
       <div class="form-inner">
-
-        <!-- Pest Infestation -->
         <div class="form-field">
           <div class="field-label">Pest Infestation <span class="req">*</span></div>
           <div class="tri-group" id="f-ulat-grp">
@@ -95,10 +77,7 @@
             <button class="tri-btn" data-val="Tidak Ada" onclick="pickTri('ulat','Tidak Ada',this)">Tidak Ada</button>
           </div>
         </div>
-
         <div class="divider-line"></div>
-
-        <!-- Animal Infestation -->
         <div class="form-field">
           <div class="field-label">Animal Infestation <span class="req">*</span></div>
           <div class="tri-group" id="f-tikus-grp">
@@ -107,10 +86,7 @@
             <button class="tri-btn" data-val="Tidak Ada" onclick="pickTri('tikus','Tidak Ada',this)">Tidak Ada</button>
           </div>
         </div>
-
         <div class="divider-line"></div>
-
-        <!-- Disease Infestation -->
         <div class="form-field">
           <div class="field-label">Disease Infestation <span class="req">*</span></div>
           <div class="tri-group" id="f-bintik-grp">
@@ -119,10 +95,7 @@
             <button class="tri-btn" data-val="Tidak Ada" onclick="pickTri('bintik','Tidak Ada',this)">Tidak Ada</button>
           </div>
         </div>
-
         <div class="divider-line"></div>
-
-        <!-- Leaf Condition -->
         <div class="form-field">
           <div class="field-label">Leaf Condition <span class="req">*</span></div>
           <div class="warna-group" id="f-warna-grp">
@@ -140,31 +113,29 @@
             <div class="warna-label">Very Yellow</div>
           </div>
         </div>
-
       </div>
     </div>
 
-    <!-- Photo card -->
     <div class="form-card">
-      <div class="form-section-head">
-        <svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="12" cy="12" r="3"/><path d="M9 5l1.5-2h3L15 5"/></svg>
-        Gambar Plot (Photo) <span class="req" style="margin-left:4px">*</span>
-      </div>
+      <div class="form-section-head"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="12" cy="12" r="3"/><path d="M9 5l1.5-2h3L15 5"/></svg>Gambar Plot (Photos) <span class="req" style="margin-left:4px">*</span></div>
       <div class="form-inner">
-        <div id="photo-drop" class="photo-drop">
-          <svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="12" cy="12" r="3"/><path d="M9 5l1.5-2h3L15 5"/></svg>
-          <div class="photo-drop-title">Add Photo</div>
-          <div style="display:flex;gap:8px;justify-content:center;margin-top:10px">
-            <button type="button" onclick="document.getElementById('photo-input').click()" style="flex:1;height:36px;border-radius:8px;background:#1a4d1a;color:#fff;font-size:12px;font-weight:600;border:none;font-family:inherit">📷 Camera</button>
-            <button type="button" onclick="document.getElementById('photo-gallery').click()" style="flex:1;height:36px;border-radius:8px;background:#fff;color:#3d5c3d;font-size:12px;font-weight:600;border:1px solid #c4d8c4;font-family:inherit">🖼 Gallery</button>
+        <div class="photo-slots">
+          <div class="photo-slot" id="photo-slot-1" onclick="triggerPlotPhoto(1)">
+            <div class="photo-slot-num">1</div>
+            <svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="12" cy="12" r="3"/><path d="M9 5l1.5-2h3L15 5"/></svg>
+            <span class="photo-slot-label">Photo 1</span>
+          </div>
+          <div class="photo-slot" id="photo-slot-2" onclick="triggerPlotPhoto(2)">
+            <div class="photo-slot-num">2</div>
+            <svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="12" cy="12" r="3"/><path d="M9 5l1.5-2h3L15 5"/></svg>
+            <span class="photo-slot-label">Photo 2</span>
           </div>
         </div>
-        <input type="file" style="display:none" id="photo-gallery" accept="image/*" onchange="handlePhoto(this)"/>
-        <div id="photo-preview" class="photo-preview-wrap">
-          <img id="f-photo-img" src="" alt="Plot photo" onclick="openLightbox(this.src)"/>
-          <button class="photo-clear" onclick="clearPhoto(event)">×</button>
-        </div>
-        <input type="file" style="display:none" id="photo-input" accept="image/*" capture="environment" onchange="handlePhoto(this)"/>
+        <input type="file" id="plot-photo-camera-1"  accept="image/*" capture="environment" style="display:none" onchange="handlePlotPhoto(1,this)"/>
+        <input type="file" id="plot-photo-gallery-1" accept="image/*" style="display:none" onchange="handlePlotPhoto(1,this)"/>
+        <input type="file" id="plot-photo-camera-2"  accept="image/*" capture="environment" style="display:none" onchange="handlePlotPhoto(2,this)"/>
+        <input type="file" id="plot-photo-gallery-2" accept="image/*" style="display:none" onchange="handlePlotPhoto(2,this)"/>
+        <p class="photo-req-note" id="photo-req-note">2 photos required</p>
       </div>
     </div>
 
@@ -178,12 +149,8 @@
   <div id="view-detail" class="view page-scroll">
     <div class="detail-hero">
       <img id="detail-hero-img" src="" alt="Plot photo" style="display:none" onclick="openLightbox(this.src)"/>
-      <div id="detail-hero-placeholder" class="detail-hero-placeholder">
-        <svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="12" cy="12" r="3"/><path d="M9 5l1.5-2h3L15 5"/></svg>
-      </div>
-      <button class="detail-hero-back" onclick="closeDetail()">
-        <svg viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg>
-      </button>
+      <div id="detail-hero-placeholder" class="detail-hero-placeholder"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="12" cy="12" r="3"/><path d="M9 5l1.5-2h3L15 5"/></svg></div>
+      <button class="detail-hero-back" onclick="closeDetail()"><svg viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg></button>
     </div>
     <div class="detail-body">
       <div class="detail-tag-row">
@@ -194,18 +161,9 @@
       <div class="detail-plot" id="detail-plot">—</div>
       <div class="detail-batch" id="detail-batch"></div>
       <div class="detail-grid">
-        <div class="detail-cell">
-          <div class="detail-cell-label">Pest</div>
-          <div class="detail-cell-val" id="detail-ulat-val">—</div>
-        </div>
-        <div class="detail-cell">
-          <div class="detail-cell-label">Animal</div>
-          <div class="detail-cell-val" id="detail-tikus-val">—</div>
-        </div>
-        <div class="detail-cell">
-          <div class="detail-cell-label">Disease</div>
-          <div class="detail-cell-val" id="detail-bintik-val">—</div>
-        </div>
+        <div class="detail-cell"><div class="detail-cell-label">Pest</div><div class="detail-cell-val" id="detail-ulat-val">—</div></div>
+        <div class="detail-cell"><div class="detail-cell-label">Animal</div><div class="detail-cell-val" id="detail-tikus-val">—</div></div>
+        <div class="detail-cell"><div class="detail-cell-label">Disease</div><div class="detail-cell-val" id="detail-bintik-val">—</div></div>
       </div>
       <div class="warna-display" id="detail-warna-box">
         <div>
@@ -258,7 +216,6 @@
 
 </div><!-- /#app -->
 
-<!-- Lightbox -->
 <div class="lightbox" id="lightbox">
   <img id="lightbox-img" src="" alt="photo"/>
   <button class="lightbox-close" onclick="closeLightbox()">×</button>

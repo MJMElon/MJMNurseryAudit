@@ -110,7 +110,7 @@
     </div>
 
     <div class="form-card">
-      <div class="form-section-head"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="12" cy="12" r="3"/><path d="M9 5l1.5-2h3L15 5"/></svg>Gambar Sampel (Photos)</div>
+      <div class="form-section-head"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="12" cy="12" r="3"/><path d="M9 5l1.5-2h3L15 5"/></svg>Gambar Sampel (Photos) <span class="req" style="margin-left:4px">*</span></div>
       <div class="form-inner">
         <div class="photo-slots">
           <div class="photo-slot" id="photo-slot-1" onclick="triggerPhoto(1)">
@@ -123,17 +123,12 @@
             <svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="12" cy="12" r="3"/><path d="M9 5l1.5-2h3L15 5"/></svg>
             <span class="photo-slot-label">Sample 2</span>
           </div>
-          <div class="photo-slot" id="photo-slot-3" onclick="triggerPhoto(3)">
-            <div class="photo-slot-num">3</div>
-            <svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="12" cy="12" r="3"/><path d="M9 5l1.5-2h3L15 5"/></svg>
-            <span class="photo-slot-label">Sample 3</span>
-          </div>
+
         </div>
         <!-- Hidden file inputs — camera + gallery per slot -->
         <input type="file" id="photo-input-1" accept="image/*" capture="environment" style="display:none" onchange="handlePhoto(1,this)"/>
         <input type="file" id="photo-input-2" accept="image/*" capture="environment" style="display:none" onchange="handlePhoto(2,this)"/>
-        <input type="file" id="photo-input-3" accept="image/*" capture="environment" style="display:none" onchange="handlePhoto(3,this)"/>
-        <p class="photo-req-note" id="photo-req-note">3 photos required — one per sample</p>
+        <p class="photo-req-note" id="photo-req-note">2 photos required — one per sample</p>
       </div>
     </div>
 
@@ -225,7 +220,7 @@
 </div>
 
 <script src="supabase.js"></script>
-<script src="offline.js"></script>
+<script src="dexie_offline.js"></script>
 <script src="height_script.js"></script>
 </body>
 </html>

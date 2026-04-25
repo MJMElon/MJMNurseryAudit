@@ -1,8 +1,9 @@
 /* ================================================================
-   MJM NURSERY AUDIT — SERVICE WORKER
-   sw.js — caches app for offline use
+   MJM NURSERY AUDIT — SERVICE WORKER v3
+   sw.js — Full PWA offline support
 ================================================================ */
-const CACHE = 'mjm-audit-v1';
+const CACHE = 'mjm-audit-v3';
+
 const FILES = [
   './',
   './index.html',
@@ -16,44 +17,83 @@ const FILES = [
   './papan_index.html',
   './papan_styles.css',
   './papan_script.js',
+  './maintenance_index.html',
+  './maintenance_styles.css',
+  './maintenance_script.js',
   './supabase.js',
-  './offline.js',
+  './dexie_offline.js',
+  './manifest.json',
+  'https://unpkg.com/dexie@3.2.4/dist/dexie.min.js',
+  'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2',
   'https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&display=swap'
 ];
 
-// Install — cache all files
+/* INSTALL */
 self.addEventListener('install', e => {
+  console.log('[SW] Installing v3...');
   e.waitUntil(
-    caches.open(CACHE).then(cache => cache.addAll(FILES)).then(() => self.skipWaiting())
+    caches.open(CACHE).then(cache =>
+      Promise.allSettled(FILES.map(url =>
+        cache.add(url).catch(err => console.warn('[SW] Cache miss:', url, err.message))
+      ))
+    ).then(() => {
+      console.log('[SW] Installed');
+      return self.skipWaiting();
+    })
   );
 });
 
-// Activate — clean old caches
+/* ACTIVATE */
 self.addEventListener('activate', e => {
   e.waitUntil(
     caches.keys().then(keys =>
       Promise.all(keys.filter(k => k !== CACHE).map(k => caches.delete(k)))
-    ).then(() => self.clients.claim())
+    ).then(() => {
+      console.log('[SW] Activated v3');
+      return self.clients.claim();
+    })
   );
 });
 
-// Fetch — serve from cache, fallback to network
+/* FETCH */
 self.addEventListener('fetch', e => {
-  // Always go network-first for Supabase API calls
-  if (e.request.url.includes('supabase.co')) {
+  if(e.request.method !== 'GET') return;
+  const url = e.request.url;
+
+  // Supabase API — network only, no cache
+  if(url.includes('supabase.co')){
     e.respondWith(
-      fetch(e.request).catch(() => new Response(JSON.stringify({error:'offline'}), {
-        headers: {'Content-Type':'application/json'}
-      }))
+      fetch(e.request).catch(() =>
+        new Response(JSON.stringify({error:'offline'}), {
+          headers: {'Content-Type':'application/json'}
+        })
+      )
     );
     return;
   }
-  // Cache-first for app files
+
+  // Everything else — cache first, then network
   e.respondWith(
-    caches.match(e.request).then(cached => cached || fetch(e.request).then(res => {
-      const clone = res.clone();
-      caches.open(CACHE).then(cache => cache.put(e.request, clone));
-      return res;
-    }))
+    caches.match(e.request).then(cached => {
+      if(cached) return cached;
+      return fetch(e.request).then(res => {
+        if(res && res.status === 200 && res.type !== 'opaque'){
+          const clone = res.clone();
+          caches.open(CACHE).then(c => c.put(e.request, clone));
+        }
+        return res;
+      }).catch(() => {
+        // Offline fallback for HTML pages
+        if(e.request.headers.get('accept')?.includes('text/html')){
+          return caches.match('./index.html');
+        }
+        return new Response('Offline', {status: 503});
+      });
+    })
   );
+});
+
+/* MESSAGE */
+self.addEventListener('message', e => {
+  if(e.data === 'skipWaiting') self.skipWaiting();
 });

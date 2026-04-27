@@ -217,13 +217,12 @@ async function updateOfflineBadge(){
     if(!badge){
       badge=document.createElement('div');
       badge.id='offline-badge';
-      badge.style.cssText='position:fixed;top:0;left:50%;transform:translateX(-50%);font-size:11px;font-weight:700;padding:5px 16px;border-radius:0 0 10px 10px;z-index:99999;letter-spacing:.4px;white-space:nowrap;box-shadow:0 2px 8px rgba(0,0,0,.2);cursor:pointer';
-      badge.onclick=()=>syncAll();
+      badge.style.cssText='position:fixed;top:0;left:50%;transform:translateX(-50%);font-size:11px;font-weight:700;padding:5px 16px;border-radius:0 0 10px 10px;z-index:99999;letter-spacing:.4px;white-space:nowrap;box-shadow:0 2px 8px rgba(0,0,0,.2)';
       document.body.appendChild(badge);
     }
     if(navigator.onLine){
       badge.style.background='#3d9c3d';
-      badge.textContent='🔄 Syncing... — '+n+' pending (tap to sync)';
+      badge.textContent='🔄 Syncing '+n+' record'+(n>1?'s':'')+'...';
     } else {
       badge.style.background='#f59e0b';
       badge.textContent='📴 Offline — '+n+' record'+(n>1?'s':'')+' pending';
@@ -301,6 +300,11 @@ async function initOffline(){
     if(typeof showToast==='function') showToast('🔄 Back online — syncing...');
     updateOfflineBadge();
     startAutoSync();
+  });
+
+  // Tab regained focus — try syncing immediately
+  document.addEventListener('visibilitychange',()=>{
+    if(!document.hidden && navigator.onLine) syncAll();
   });
 
   // Offline

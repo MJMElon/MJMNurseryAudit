@@ -143,7 +143,7 @@ function renderList(){
 /* --- FORM --- */
 function openAddForm(){
   editMode=false;editId=null;
-  formState={nursery:activeTab,s1:'',s2:'',s3:'',p1:null,p2:null,p3:null}; // p3 unused
+  formState={nursery:activeTab,s1:'',s2:'',s3:'',p1:null,p2:null,p3:null};
   populateForm();setView('form');
   document.getElementById('form-view-title').textContent='New Record — '+NURSERY_LABELS[activeTab];
 }
@@ -172,7 +172,7 @@ function populateForm(r){
   updateAvg();
   [1,2,3].forEach(n=>renderSlot(n,formState['p'+n]));
   const note=document.getElementById('photo-req-note');
-  if(note){note.classList.remove('error');note.textContent=t('photo_2_req');}
+  if(note){note.classList.remove('error');note.textContent=t('photo_3_req');}
 }
 function onHeightInput(n,el){
   formState['s'+n]=el.value.trim();updateAvg();
@@ -210,12 +210,12 @@ function triggerPhoto(n){
   sheet.id='photo-choice-sheet';
   sheet.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:9999;display:flex;align-items:flex-end;justify-content:center';
   sheet.innerHTML=`<div style="background:#fff;border-radius:20px 20px 0 0;padding:20px 16px 36px;width:100%;max-width:480px">
-    <div style="font-size:14px;font-weight:700;color:#182018;margin-bottom:16px;text-align:center">Sample ${n} — Add Photo</div>
+    <div style="font-size:14px;font-weight:700;color:#182018;margin-bottom:16px;text-align:center">${t('sample')} ${n}</div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px">
-      <button onclick="document.getElementById('photo-input-${n}').click();document.getElementById('photo-choice-sheet').remove()" style="height:64px;border-radius:12px;background:#1a4d1a;color:#fff;font-size:15px;font-weight:600;border:none;font-family:inherit;cursor:pointer">📷<br><span style="font-size:11px">Camera</span></button>
-      <button onclick="document.getElementById('photo-gallery-${n}').click();document.getElementById('photo-choice-sheet').remove()" style="height:64px;border-radius:12px;background:#f4f6f4;color:#3d5c3d;font-size:15px;font-weight:600;border:1px solid #dde8dd;font-family:inherit;cursor:pointer">🖼<br><span style="font-size:11px">Gallery</span></button>
+      <button onclick="document.getElementById('photo-input-${n}').click();document.getElementById('photo-choice-sheet').remove()" style="height:64px;border-radius:12px;background:#1a4d1a;color:#fff;font-size:15px;font-weight:600;border:none;font-family:inherit;cursor:pointer">📷<br><span style="font-size:11px">${t('cam')}</span></button>
+      <button onclick="document.getElementById('photo-gallery-${n}').click();document.getElementById('photo-choice-sheet').remove()" style="height:64px;border-radius:12px;background:#f4f6f4;color:#3d5c3d;font-size:15px;font-weight:600;border:1px solid #dde8dd;font-family:inherit;cursor:pointer">🖼<br><span style="font-size:11px">${t('gal')}</span></button>
     </div>
-    <button onclick="document.getElementById('photo-choice-sheet').remove()" style="width:100%;height:44px;border-radius:12px;background:#f4f6f4;border:1px solid #dde8dd;color:#6b8a6b;font-size:14px;font-weight:600;font-family:inherit;cursor:pointer">Cancel</button>
+    <button onclick="document.getElementById('photo-choice-sheet').remove()" style="width:100%;height:44px;border-radius:12px;background:#f4f6f4;border:1px solid #dde8dd;color:#6b8a6b;font-size:14px;font-weight:600;font-family:inherit;cursor:pointer">${t('cancel')}</button>
   </div>`;
   sheet.addEventListener('click', e=>{ if(e.target===sheet) sheet.remove(); });
   document.body.appendChild(sheet);
@@ -224,7 +224,8 @@ function triggerPhoto(n){
     if(!document.getElementById('photo-gallery-'+i)){
       const inp=document.createElement('input');
       inp.type='file';inp.id='photo-gallery-'+i;inp.accept='image/*';inp.style.display='none';
-      inp.onchange=function(){handlePhoto(i,this);};
+      const slot=i; // capture value not reference
+      inp.onchange=function(){handlePhoto(slot,this);};
       document.body.appendChild(inp);
     }
   });
@@ -234,9 +235,9 @@ async function handlePhoto(n,input){
   const compressed=await compressPhoto(input.files[0]);
   formState['p'+n]=compressed;
   renderSlot(n,compressed);
-  if(formState.p1&&formState.p2){
+  if(formState.p1&&formState.p2&&formState.p3){
     const note=document.getElementById('photo-req-note');
-    if(note){note.classList.remove('error');note.textContent=t('photo_2_req');}
+    if(note){note.classList.remove('error');note.textContent=t('photo_3_req');}
   }
   input.value='';
 }
@@ -248,18 +249,17 @@ async function saveRecord(){
   const batch=document.getElementById('f-batch').value.trim();
   if(!plot){showToast(t('err_select_plot'));return;}
   if(!formState.s1&&!formState.s2&&!formState.s3){showToast(t('err_height'));return;}
-  if(!formState.p1||!formState.p2){
+  if(!formState.p1||!formState.p2||!formState.p3){
     const note=document.getElementById('photo-req-note');
     if(note){note.classList.add('error');note.textContent='⚠ All 3 photos are required';}
-    showToast(t('err_photos'));return;
+    showToast(t('err_3_photos'));return;
   }
   setLoading(true);
   try{
     async function up(photo,label){
       return(photo&&photo.startsWith('data:'))?await sb.uploadPhoto('audit-photos',label,photo):photo;
     }
-    const [p1u,p2u]=await Promise.all([up(formState.p1,'hgt_'+plot+'_s1'),up(formState.p2,'hgt_'+plot+'_s2')]);
-    const p3u=null;
+    const [p1u,p2u,p3u]=await Promise.all([up(formState.p1,'hgt_'+plot+'_s1'),up(formState.p2,'hgt_'+plot+'_s2'),up(formState.p3,'hgt_'+plot+'_s3')]);
     const avg=calcAvg(formState.s1,formState.s2,formState.s3);
     const payload={
       nursery:formState.nursery,plot,batch:batch||null,

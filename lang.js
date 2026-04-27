@@ -99,6 +99,8 @@ const TRANSLATIONS = {
     plots_150:           'Plots ≥150cm',
     reached_pct:         'Reached %',
     photo_2_req:         '2 photos required — one per sample',
+    photo_3_req:         '3 photos required — one per sample',
+    err_3_photos:        '⚠ Please upload all 3 photos',
 
     /* === PAPAN AUDIT === */
     papan_title:         'Papan Tanda Audit',
@@ -460,6 +462,8 @@ const TRANSLATIONS = {
     plots_150:           'Plot ≥150sm',
     reached_pct:         'Peratus Capai',
     photo_2_req:         '2 gambar diperlukan — satu setiap sampel',
+    photo_3_req:         '3 gambar diperlukan — satu setiap sampel',
+    err_3_photos:        '⚠ Sila muat naik ketiga-tiga gambar',
 
     /* === PAPAN AUDIT === */
     papan_title:         'Audit Papan Tanda',

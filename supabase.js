@@ -3,8 +3,8 @@
    supabase.js
    ================================================================ */
 
-const SUPA_URL = 'https://kibqjztozokohqmhqqqf.supabase.co';
-const SUPA_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtpYnFqenRvem9rb2hxbWhxcXFmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQyMzQzNjIsImV4cCI6MjA4OTgxMDM2Mn0.J7qJUZhWXYf5b9oey4wXJkjdi66jomEMw_NeV9NWF7M';
+const SUPA_URL = 'https://slvjkcramxipooahjrbs.supabase.co';
+const SUPA_KEY = 'sb_publishable_cyPuEmjV7D39aZyIGLHh5g_QATIBWHT';
 
 async function sbFetch(path, options = {}) {
   const url = `${SUPA_URL}/rest/v1/${path}`;

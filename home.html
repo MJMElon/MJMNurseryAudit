@@ -186,6 +186,7 @@
           <div class="header-logo-sub">Audit System</div>
         </div>
       </div>
+      <button class="lang-toggle-btn" onclick="toggleLang()" style="height:32px;padding:0 12px;border-radius:20px;background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.2);color:#fff;font-size:12px;font-weight:700;cursor:pointer;margin-right:6px">BM</button>
       <div class="header-user-btn" onclick="showLogout()">
         <div class="notif-dot" id="notif-dot"></div>
         <div class="user-avatar" id="user-avatar">A</div>
@@ -203,7 +204,7 @@
   <div class="content">
 
     <!-- ALERT SUMMARY -->
-    <div class="section-head fade-in">⚠ Alert Summary</div>
+    <div class="section-head fade-in"><span data-t="home_alert_title">⚠ Alert Summary</span></div>
     <div class="alert-section fade-in" id="alert-section">
       <div class="alert-loading">
         <div class="alert-spinner"></div>
@@ -212,7 +213,7 @@
     </div>
 
     <!-- AUDIT MODULES -->
-    <div class="section-head fade-in">Audit Modules</div>
+    <div class="section-head fade-in"><span data-t="home_modules_title">Audit Modules</span></div>
     <div class="audit-cards">
 
       <!-- Module 1: Plot Condition -->
@@ -224,7 +225,7 @@
             <div class="card-arrow"><svg viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"/></svg></div>
           </div>
           <div class="card-label">Module 1</div>
-          <div class="card-title">Plot Condition Audit</div>
+          <div class="card-title" data-t="home_plot">Plot Condition Audit</div>
           <div class="card-desc">Record pest levels, rat activity, leaf disease, and leaf colour per plot across all nursery sites.</div>
           <div class="card-tags">
             <span class="card-tag">Pest Infestation</span>
@@ -244,7 +245,7 @@
             <div class="card-arrow"><svg viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"/></svg></div>
           </div>
           <div class="card-label">Module 2</div>
-          <div class="card-title">Seedling Height Audit</div>
+          <div class="card-title" data-t="home_height">Seedling Height Audit</div>
           <div class="card-desc">Measure and record seedling heights with 3 samples per plot. Auto-calculates average. Requires 3 photos per record.</div>
           <div class="card-tags">
             <span class="card-tag">Seedling Height</span>
@@ -261,7 +262,7 @@
             <div class="card-arrow"><svg viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"/></svg></div>
           </div>
           <div class="card-label">Module 3</div>
-          <div class="card-title">Papan Tanda Audit</div>
+          <div class="card-title" data-t="home_papan">Papan Tanda Audit</div>
           <div class="card-desc">Audit the condition of every papan tanda across all transplant plots.</div>
           <div class="card-tags">
             <span class="card-tag">Height 1.5M</span>
@@ -280,7 +281,7 @@
             <div class="card-arrow"><svg viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"/></svg></div>
           </div>
           <div class="card-label" style="color:#bfdbfe">Module 4</div>
-          <div class="card-title">Maintenance Audit</div>
+          <div class="card-title" data-t="home_maintenance">Maintenance Audit</div>
           <div class="card-desc">Audit completed maintenance tasks from workers. Verify work quality on-site with photo evidence.</div>
           <div class="card-tags">
             <span class="card-tag">Manuring</span>
@@ -335,14 +336,15 @@
 <div class="modal-overlay" id="logout-modal" onclick="hideLogout(event)">
   <div class="modal-box">
     <div class="modal-title">Sign Out?</div>
-    <div class="modal-msg">You will be returned to the login page.</div>
+    <div class="modal-msg" data-t="signout_msg">You will be returned to the login page.</div>
     <div class="modal-btns">
-      <button class="btn-stay" onclick="hideLogoutDirect()">Stay</button>
-      <button class="btn-logout" onclick="doLogout()">Sign Out</button>
+      <button class="btn-stay" onclick="hideLogoutDirect()" data-t="stay">Stay</button>
+      <button class="btn-logout" onclick="doLogout()" data-t="signout">Sign Out</button>
     </div>
   </div>
 </div>
 
+<script src="lang.js"></script>
 <script src="supabase.js"></script>
 <script>
 /* ── Auth ── */
@@ -352,7 +354,7 @@ else { document.body.style.opacity = '1'; }
 const user = userRaw ? JSON.parse(userRaw) : {name:'User',role:'',username:'u'};
 
 /* ── Greeting ── */
-function getGreeting(){const h=new Date().getHours();return h<12?'Good morning,':h<17?'Good afternoon,':'Good evening,';}
+function getGreeting(){const h=new Date().getHours();return h<12?t('home_greeting_morning'):h<17?t('home_greeting_afternoon'):t('home_greeting_evening');}
 function fmtDate(d){return d.toLocaleDateString('en-MY',{weekday:'long',day:'numeric',month:'long',year:'numeric'});}
 document.querySelector('.welcome-greeting').textContent = getGreeting();
 document.getElementById('welcome-name').innerHTML = user.name+' <span style="color:var(--g300)">👋</span>';

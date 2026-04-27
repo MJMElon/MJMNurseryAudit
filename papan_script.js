@@ -16,7 +16,7 @@ const NURSERY_PLOTS = {
 
 let batches=[], audits=[];
 let activeTab='audit', activeView='list';
-let editMode=false, editId=null, detailId=null, deleteTarget=null;
+let editMode=false, editId=null, detailId=null, deleteTarget=null, deleteType='audit';
 let auditFormBatchUid=null;
 let batchFormNursery='PN';
 let batchEditId=null;
@@ -57,7 +57,7 @@ function overallStatus(audit){
   if(v.every(x=>x==='Correct'||x==='Good'))return'pass';
   return'issue';
 }
-function statusLabel(s){return{pending:'Pending',pass:'Pass ✓',issue:'Issues',fail:'Fail ✗'}[s]||'Pending';}
+function statusLabel(s){return{pending:t('pending_s'),pass:t('pass_s'),issue:t('issues_s'),fail:t('fail_s')}[s]||t('pending_s');}
 function statusBadgeClass(s){return{pending:'badge-pending',pass:'badge-pass',issue:'badge-issue',fail:'badge-fail'}[s]||'badge-pending';}
 function valClass(v){if(['Good','Correct'].includes(v))return'val-ok';if(['Bad','Wrong'].includes(v))return'val-bad';if(v==='Empty')return'val-warn';return'';}
 function chipClass(v){if(['Good','Correct'].includes(v))return'cc-ok';if(['Bad','Wrong'].includes(v))return'cc-bad';if(v==='Empty')return'cc-warn';return'cc-na';}
@@ -383,12 +383,12 @@ async function saveBatch(){
   const dp=document.getElementById('bf-date-planted').value;
   const dt=document.getElementById('bf-date-transplant').value;
   const dm=document.getElementById('bf-date-mature').value;
-  if(!plot){showToast('⚠ Please select a plot');return;}
-  if(!batch){showToast('⚠ Please enter batch number');return;}
+  if(!plot){showToast(t('err_select_plot'));return;}
+  if(!batch){showToast(t('err_batch'));return;}
   if(!breed){showToast('⚠ Please enter breed/variety');return;}
-  if(!qty){showToast('⚠ Please enter plot amount');return;}
-  if(!dp){showToast('⚠ Please enter date planted');return;}
-  if(!dt){showToast('⚠ Date transplant is required');return;}
+  if(!qty){showToast(t('err_qty'));return;}
+  if(!dp){showToast(t('err_date_planted'));return;}
+  if(!dt){showToast(t('err_date_transplant'));return;}
   setLoading(true);
   try{
     const payload={
@@ -397,13 +397,13 @@ async function saveBatch(){
       date_planted:dp||null,date_transplant:dt,date_mature:dm||null
     };
     if(batchEditId){
-      await sb.update('batches',batchEditId,payload);showToast('✓ Batch updated');
+      await sb.update('batches',batchEditId,payload);showToast(t('batch_updated'));
     } else {
       payload.batch_id='BTH-'+batchFormNursery+'-'+batch+'-'+plot;
-      await sb.insert('batches',payload);showToast('✓ Batch saved');
+      await sb.insert('batches',payload);showToast(t('batch_saved'));
     }
     await loadAll();setView('list');selectTab('batch');
-  }catch(e){showToast('⚠ Save failed');console.error(e);setLoading(false);}
+  }catch(e){showToast(t('err_save'));console.error(e);setLoading(false);}
 }
 
 /* --- AUDIT FORM --- */
@@ -457,12 +457,12 @@ function triggerPapanPhoto(){
   const sheet=document.createElement('div');
   sheet.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:9999;display:flex;align-items:flex-end;justify-content:center';
   sheet.innerHTML=`<div style="background:#fff;border-radius:20px 20px 0 0;padding:20px 16px 36px;width:100%;max-width:480px">
-    <div style="font-size:14px;font-weight:700;color:#182018;margin-bottom:16px;text-align:center">Add Photo</div>
+    <div style="font-size:14px;font-weight:700;color:#182018;margin-bottom:16px;text-align:center">${t('add_photo')}</div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px">
-      <button onclick="document.getElementById('papan-photo-input').click();this.closest('[style]').remove()" style="height:64px;border-radius:12px;background:#1a4d1a;color:#fff;font-size:15px;font-weight:600;border:none;font-family:inherit;cursor:pointer">📷<br><span style="font-size:11px">Camera</span></button>
-      <button onclick="document.getElementById('papan-photo-gallery').click();this.closest('[style]').remove()" style="height:64px;border-radius:12px;background:#f4f6f4;color:#3d5c3d;font-size:15px;font-weight:600;border:1px solid #dde8dd;font-family:inherit;cursor:pointer">🖼<br><span style="font-size:11px">Gallery</span></button>
+      <button onclick="document.getElementById('papan-photo-input').click();this.closest('[style]').remove()" style="height:64px;border-radius:12px;background:#1a4d1a;color:#fff;font-size:15px;font-weight:600;border:none;font-family:inherit;cursor:pointer">📷<br><span style="font-size:11px">${t('cam')}</span></button>
+      <button onclick="document.getElementById('papan-photo-gallery').click();this.closest('[style]').remove()" style="height:64px;border-radius:12px;background:#f4f6f4;color:#3d5c3d;font-size:15px;font-weight:600;border:1px solid #dde8dd;font-family:inherit;cursor:pointer">🖼<br><span style="font-size:11px">${t('gal')}</span></button>
     </div>
-    <button onclick="this.closest('[style]').remove()" style="width:100%;height:44px;border-radius:12px;background:#f4f6f4;border:1px solid #dde8dd;color:#6b8a6b;font-size:14px;font-weight:600;font-family:inherit;cursor:pointer">Cancel</button>
+    <button onclick="this.closest('[style]').remove()" style="width:100%;height:44px;border-radius:12px;background:#f4f6f4;border:1px solid #dde8dd;color:#6b8a6b;font-size:14px;font-weight:600;font-family:inherit;cursor:pointer">${t('cancel')}</button>
   </div>`;
   sheet.addEventListener('click',e=>{if(e.target===sheet)sheet.remove();});
   document.body.appendChild(sheet);
@@ -501,9 +501,10 @@ function clearPhoto(e){
 }
 
 async function saveAudit(){
-  if(!formState.presence){showToast('⚠ Please select Presence & Condition');return;}
-  if(!formState.infoCorrect){showToast('⚠ Please select Correct Information');return;}
-  if(!formState.condition){showToast('⚠ Please select Height of Papan Tanda');return;}
+  if(!formState.presence){showToast(t('err_kehadiran'));return;}
+  if(!formState.infoCorrect){showToast(t('err_maklumat'));return;}
+  if(!formState.condition){showToast(t('err_keadaan'));return;}
+  if(!formState.photo){showToast(t('err_photo_required'));return;}
   const b=batches.find(x=>x.uid===auditFormBatchUid);if(!b)return;
   setLoading(true);
   try{
@@ -520,7 +521,7 @@ async function saveAudit(){
     const result = await smartSave('papan_audits', editMode?'update':'insert', editMode?payload:{...payload,audit_id:nextAuditID()}, editMode?editId:null);
     showToast(result?.offline ? '📴 Saved offline — will sync later' : editMode?'✓ Audit updated':'✓ Audit saved');
     await loadAll();setView('list');selectTab('audit');
-  }catch(e){showToast('⚠ Save failed');console.error(e);setLoading(false);}
+  }catch(e){showToast(t('err_save'));console.error(e);setLoading(false);}
 }
 
 /* --- DETAIL --- */
@@ -536,7 +537,7 @@ function openDetail(auditUid){
   document.getElementById('detail-id').textContent=audit.id;
   document.getElementById('detail-date').textContent=fmtDate(audit.date);
   document.getElementById('detail-plot').textContent=audit.plot;
-  document.getElementById('detail-sub').textContent='Batch: '+audit.batch+(b?' · '+b.breed:'');
+  document.getElementById('detail-sub').textContent=t('batch_lbl')+' '+audit.batch+(b?' · '+b.breed:'');
   const pv=document.getElementById('detail-presence-val');pv.textContent=audit.presence||'—';pv.className='detail-check-val '+valClass(audit.presence);
   const iv=document.getElementById('detail-info-val');iv.textContent=audit.infoCorrect||'—';iv.className='detail-check-val '+valClass(audit.infoCorrect);
   const cv=document.getElementById('detail-cond-val');cv.textContent=audit.condition||'—';cv.className='detail-check-val '+valClass(audit.condition);
@@ -555,6 +556,7 @@ function openDetail(auditUid){
 }
 function closeDetail(){setView('list');selectTab('audit');}
 function editFromDetail(){const audit=audits.find(a=>a.uid===detailId);if(audit)openAuditForm(audit.batchUid,true,audit.uid);}
+function deleteFromDetail(){if(detailId)confirmDelete(detailId);}
 
 /* --- DELETE --- */
 function confirmDelete(uid){deleteTarget=uid;deleteType='audit';document.getElementById('modal-overlay').classList.add('show');}
@@ -570,15 +572,15 @@ async function doDelete(){
       const linked=audits.find(a=>a.batchUid===deleteTarget);
       if(linked)await sb.delete('papan_audits',linked.uid);
       await sb.delete('batches',deleteTarget);
-      showToast('Batch deleted');
+      showToast(t('batch_deleted'));
     } else {
       await sb.delete('papan_audits',deleteTarget);
-      showToast('Audit deleted');
+      showToast(t('audit_deleted'));
     }
     deleteTarget=null;
     await loadAll();
     if(activeView==='detail'){setView('list');selectTab('audit');}
-  }catch(e){showToast('⚠ Delete failed');console.error(e);setLoading(false);}
+  }catch(e){showToast(t('err_delete'));console.error(e);setLoading(false);}
 }
 
 /* --- INIT --- */

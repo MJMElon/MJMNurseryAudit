@@ -70,7 +70,7 @@ async function loadRecords(){
     }));
     renderList();
     renderAlertStrip();
-  }catch(e){showToast('⚠ Failed to load');console.error(e);}
+  }catch(e){showToast(t('err_load'));console.error(e);}
   setLoading(false);
 }
 
@@ -100,9 +100,9 @@ function renderAlertStrip(){
         ${plots.map(r=>`<span style="font-size:11px;font-weight:600;padding:3px 10px;border-radius:20px;background:#f4f6f4;border:1px solid #dde8dd;color:#3d5c3d">${r.plot}</span>`).join('')}
       </div></div>`;
   }
-  if(ratPlots.length)    html+=alertRow('🐀','Animal Infestation',ratPlots,'#fff1f1','#b91c1c');
-  if(pestPlots.length)   html+=alertRow('🐛','Pest Infestation',pestPlots,'#fff7ed','#c2410c');
-  if(yellowPlots.length) html+=alertRow('🍂','Yellow Leaves',yellowPlots,'#fefce8','#854d0e');
+  if(ratPlots.length)    html+=alertRow('🐀',t('alert_rat'),ratPlots,'#fff1f1','#b91c1c');
+  if(pestPlots.length)   html+=alertRow('🐛',t('alert_pest'),pestPlots,'#fff7ed','#c2410c');
+  if(yellowPlots.length) html+=alertRow('🍂',t('alert_yellow'),yellowPlots,'#fefce8','#854d0e');
   html+='</div>';
   strip.innerHTML=html;
 }
@@ -111,7 +111,7 @@ function renderAlertStrip(){
 function renderList(){
   const recs=records.filter(r=>r.nursery===activeTab);
   document.getElementById('list-count').textContent=recs.length+' record'+(recs.length!==1?'s':'');
-  document.getElementById('list-heading').textContent='Plot Condition Audit — '+NURSERY_LABELS[activeTab];
+  document.getElementById('list-heading').textContent=t('plot_title')+' — '+NURSERY_LABELS[activeTab];
   document.querySelectorAll('.tab-item').forEach(t=>{
     const cnt=records.filter(r=>r.nursery===t.dataset.n).length;
     let b=t.querySelector('.tab-badge');
@@ -150,7 +150,7 @@ function openAddForm(){
   editMode=false;editId=null;
   formState={nursery:activeTab,ulat:null,tikus:null,bintik:null,warna:null,photo1:null,photo2:null};
   populateForm();setView('form');
-  document.getElementById('form-view-title').textContent='New Audit — '+NURSERY_LABELS[activeTab];
+  document.getElementById('form-view-title').textContent=t('new_audit')+' — '+NURSERY_LABELS[activeTab];
 }
 function openEdit(uid){
   const r=records.find(x=>x.uid===uid);if(!r)return;
@@ -165,7 +165,7 @@ function populateForm(r){
   document.getElementById('f-date').value=editMode?r.date:todayISO();
   document.getElementById('form-view-id').textContent=id;
   const ps=document.getElementById('f-plot');
-  ps.innerHTML='<option value="">— Select Plot —</option>';
+  ps.innerHTML='<option value="">'+t('select_plot')+'</option>';
   NURSERY_PLOTS[formState.nursery].forEach(p=>{
     const o=document.createElement('option');o.value=p;o.textContent=p;
     if(r&&r.plot===p)o.selected=true;ps.appendChild(o);
@@ -181,7 +181,7 @@ function populateForm(r){
   renderPlotSlot(1,formState.photo1||null);
   renderPlotSlot(2,formState.photo2||null);
   const note=document.getElementById('photo-req-note');
-  if(note){note.classList.remove('error');note.textContent='2 photos required';}
+  if(note){note.classList.remove('error');note.textContent=t('photo_req');}
 }
 
 const TRI_CLASS={'Banyak':'sel-b','Sedikit':'sel-s','Tidak Ada':'sel-t'};
@@ -216,7 +216,7 @@ async function handlePlotPhoto(n,input){
   renderPlotSlot(n,compressed);
   if(formState.photo1&&formState.photo2){
     const note=document.getElementById('photo-req-note');
-    if(note){note.classList.remove('error');note.textContent='2 photos required';}
+    if(note){note.classList.remove('error');note.textContent=t('photo_req');}
   }
   input.value='';
 }
@@ -245,16 +245,16 @@ function cancelForm(){setView('list');}
 async function saveRecord(){
   const plot=document.getElementById('f-plot').value;
   const batch=document.getElementById('f-batch').value.trim();
-  if(!plot)           {showToast('⚠ Please select a plot');return;}
-  if(!batch)          {showToast('⚠ Please enter batch number');return;}
-  if(!formState.ulat) {showToast('⚠ Please select Pest Infestation level');return;}
-  if(!formState.tikus){showToast('⚠ Please select Animal Infestation level');return;}
-  if(!formState.bintik){showToast('⚠ Please select Disease Infestation level');return;}
-  if(!formState.warna){showToast('⚠ Please select Leaf Condition');return;}
+  if(!plot)           {showToast(t('err_select_plot'));return;}
+  if(!batch)          {showToast(t('err_batch'));return;}
+  if(!formState.ulat) {showToast(t('err_pest'));return;}
+  if(!formState.tikus){showToast(t('err_animal'));return;}
+  if(!formState.bintik){showToast(t('err_disease'));return;}
+  if(!formState.warna){showToast(t('err_leaf'));return;}
   if(!formState.photo1||!formState.photo2){
     const note=document.getElementById('photo-req-note');
-    if(note){note.classList.add('error');note.textContent='⚠ Both photos are required';}
-    showToast('⚠ Please upload both photos');return;
+    if(note){note.classList.add('error');note.textContent=t('photo_both_req');}
+    showToast(t('photo_both_req'));return;
   }
   setLoading(true);
   try{
@@ -271,9 +271,9 @@ async function saveRecord(){
     const result=await smartSave('plot_audits',editMode?'update':'insert',
       editMode?payload:{...payload,audit_id:nextID(formState.nursery)},
       editMode?editId:null);
-    showToast(result?.offline?'📴 Saved offline — will sync later':editMode?'✓ Record updated':'✓ Record saved');
+    showToast(result?.offline?t('offline_saved'):editMode?t('record_updated'):t('record_saved'));
     await loadRecords();setView('list');
-  }catch(e){showToast('⚠ Save failed');console.error(e);setLoading(false);}
+  }catch(e){showToast(t('err_save'));console.error(e);setLoading(false);}
 }
 
 /* --- DETAIL --- */
@@ -296,8 +296,8 @@ function openDetail(uid){
   });
   const wb=document.getElementById('detail-warna-box');
   wb.style.background=WARNA_BG[r.warna]||'#888';
-  document.getElementById('detail-warna-label').textContent='Leaf Condition — '+(WARNA_LBL[r.warna]||'—');
-  document.getElementById('detail-warna-desc').textContent='Ranking '+r.warna+' of 5';
+  document.getElementById('detail-warna-label').textContent=t('leaf_cond')+' — '+(WARNA_LBL[r.warna]||'—');
+  document.getElementById('detail-warna-desc').textContent=t('ranking')+' '+r.warna+' '+t('of5');
   setView('detail');
 }
 function closeDetail(){setView('list');}
@@ -320,9 +320,9 @@ async function doDelete(){
   setLoading(true);
   try{
     await sb.delete('plot_audits',deleteTarget);deleteTarget=null;
-    await loadRecords();showToast('Record deleted');
+    await loadRecords();showToast(t('record_deleted'));
     if(activeView==='detail')setView('list');
-  }catch(e){showToast('⚠ Delete failed');console.error(e);setLoading(false);}
+  }catch(e){showToast(t('err_delete'));console.error(e);setLoading(false);}
 }
 
 /* --- INIT --- */

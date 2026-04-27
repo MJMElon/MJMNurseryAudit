@@ -22,6 +22,7 @@
       </div>
     </div>
     <div class="top-bar-actions">
+      <button class="lang-toggle-btn" onclick="toggleLang()" style="height:28px;padding:0 10px;border-radius:20px;background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.2);color:#fff;font-size:11px;font-weight:700;cursor:pointer">BM</button>
       <button class="top-bar-btn" onclick="loadAll()"><svg viewBox="0 0 24 24"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 11-2.12-9.36L23 10"/></svg></button>
     </div>
   </nav>
@@ -47,7 +48,7 @@
     <!-- To audit -->
     <div id="pending-wrap">
       <div class="list-header">
-        <span class="list-heading">To Audit</span>
+        <span class="list-heading" data-t="to_audit">To Audit</span>
         <span class="list-count" id="pending-count">0 tasks</span>
       </div>
       <div class="record-list" id="pending-list"></div>
@@ -90,10 +91,10 @@
 
     <!-- Audit result -->
     <div class="form-card">
-      <div class="form-section-head"><svg viewBox="0 0 24 24"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>Audit Result</div>
+      <div class="form-section-head"><svg viewBox="0 0 24 24"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg data-t="maint_result">Audit Result</div>
       <div class="form-inner">
         <div class="form-field">
-          <div class="field-label">Work Quality <span class="req">*</span></div>
+          <div class="field-label" data-t="work_quality">Work Quality <span class="req">*</span></div>
           <div class="tri-group" id="f-result-grp">
             <button class="tri-btn" data-val="Satisfactory"   onclick="pickResult('Satisfactory',this)">✓ Satisfactory</button>
             <button class="tri-btn" data-val="Unsatisfactory" onclick="pickResult('Unsatisfactory',this)">✗ Unsatisfactory</button>
@@ -130,8 +131,8 @@
     </div>
 
     <div class="form-actions">
-      <button class="btn btn-cancel" onclick="cancelForm()">Cancel</button>
-      <button class="btn btn-save"   onclick="saveAudit()">Save Audit</button>
+      <button class="btn btn-cancel" onclick="cancelForm()" data-t="cancel">Cancel</button>
+      <button class="btn btn-save"   onclick="saveAudit()" data-t="save">Save Audit</button>
     </div>
   </div>
 
@@ -177,7 +178,7 @@
     </button>
     <button class="tab-item" data-t="history" onclick="selectTab('history')">
       <div class="tab-icon"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></div>
-      <span class="tab-label">History</span>
+      <span class="tab-label" data-t="history">History</span>
     </button>
   </nav>
 
@@ -202,6 +203,7 @@
   <button class="lightbox-close" onclick="closeLightbox()">×</button>
 </div>
 
+<script src="lang.js"></script>
 <script src="supabase.js"></script>
 <script src="dexie_offline.js"></script>
 <script src="maintenance_script.js"></script>

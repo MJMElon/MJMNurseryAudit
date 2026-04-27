@@ -74,15 +74,15 @@ async function loadRecords(){
       date:r.date, createdAt:r.created_at
     }));
     renderList();
-  }catch(e){showToast('⚠ Failed to load');console.error(e);}
+  }catch(e){showToast(t('err_load'));console.error(e);}
   setLoading(false);
 }
 
 /* --- RENDER LIST --- */
 function renderList(){
   const recs=records.filter(r=>r.nursery===activeTab);
-  document.getElementById('list-count').textContent=recs.length+' record'+(recs.length!==1?'s':'');
-  document.getElementById('list-heading').textContent='Seedling Height Audit — '+NURSERY_LABELS[activeTab];
+  document.getElementById('list-count').textContent=recs.length+' '+(recs.length!==1?t('records'):t('record'));
+  document.getElementById('list-heading').textContent=t('height_title')+' — '+NURSERY_LABELS[activeTab];
 
   // Stat 1: This month's audits
   const now=new Date();
@@ -143,7 +143,7 @@ function renderList(){
 /* --- FORM --- */
 function openAddForm(){
   editMode=false;editId=null;
-  formState={nursery:activeTab,s1:'',s2:'',s3:'',p1:null,p2:null,p3:null};
+  formState={nursery:activeTab,s1:'',s2:'',s3:'',p1:null,p2:null,p3:null}; // p3 unused
   populateForm();setView('form');
   document.getElementById('form-view-title').textContent='New Record — '+NURSERY_LABELS[activeTab];
 }
@@ -152,7 +152,7 @@ function openEdit(uid){
   editMode=true;editId=uid;
   formState={nursery:r.nursery,s1:r.s1,s2:r.s2,s3:r.s3,p1:r.p1,p2:r.p2,p3:r.p3};
   populateForm(r);setView('form');
-  document.getElementById('form-view-title').textContent='Edit — '+r.id;
+  document.getElementById('form-view-title').textContent=t('edit_lbl')+' — '+r.id;
 }
 function populateForm(r){
   const id=editMode?r.id:nextID(formState.nursery);
@@ -160,7 +160,7 @@ function populateForm(r){
   document.getElementById('f-date').value=editMode?r.date:todayISO();
   document.getElementById('form-view-id').textContent=id;
   const ps=document.getElementById('f-plot');
-  ps.innerHTML='<option value="">— Select Plot —</option>';
+  ps.innerHTML='<option value="">'+t('select_plot')+'</option>';
   NURSERY_PLOTS[formState.nursery].forEach(p=>{
     const o=document.createElement('option');o.value=p;o.textContent=p;
     if(r&&r.plot===p)o.selected=true;ps.appendChild(o);
@@ -172,7 +172,7 @@ function populateForm(r){
   updateAvg();
   [1,2,3].forEach(n=>renderSlot(n,formState['p'+n]));
   const note=document.getElementById('photo-req-note');
-  if(note){note.classList.remove('error');note.textContent='3 photos required — one per sample';}
+  if(note){note.classList.remove('error');note.textContent=t('photo_2_req');}
 }
 function onHeightInput(n,el){
   formState['s'+n]=el.value.trim();updateAvg();
@@ -189,7 +189,7 @@ function renderSlot(n,src){
   if(src){
     slot.classList.add('has-photo');
     const img=document.createElement('img');img.src=src;img.alt='S'+n;slot.appendChild(img);
-    const lbl=document.createElement('span');lbl.className='detail-photo-num';lbl.textContent='S'+n;slot.appendChild(lbl);
+    const lbl=document.createElement('span');lbl.className='detail-photo-num';lbl.textContent=t('sample')+' '+n;slot.appendChild(lbl);
     const btn=document.createElement('button');btn.className='photo-slot-clear';btn.textContent='×';
     btn.onclick=e=>{e.stopPropagation();formState['p'+n]=null;renderSlot(n,null);};
     slot.appendChild(btn);
@@ -234,9 +234,9 @@ async function handlePhoto(n,input){
   const compressed=await compressPhoto(input.files[0]);
   formState['p'+n]=compressed;
   renderSlot(n,compressed);
-  if(formState.p1&&formState.p2&&formState.p3){
+  if(formState.p1&&formState.p2){
     const note=document.getElementById('photo-req-note');
-    if(note){note.classList.remove('error');note.textContent='3 photos required — one per sample';}
+    if(note){note.classList.remove('error');note.textContent=t('photo_2_req');}
   }
   input.value='';
 }
@@ -246,19 +246,20 @@ function cancelForm(){setView('list');}
 async function saveRecord(){
   const plot=document.getElementById('f-plot').value;
   const batch=document.getElementById('f-batch').value.trim();
-  if(!plot){showToast('⚠ Please select a plot');return;}
-  if(!formState.s1&&!formState.s2&&!formState.s3){showToast('⚠ Please enter at least one height');return;}
-  if(!formState.p1||!formState.p2||!formState.p3){
+  if(!plot){showToast(t('err_select_plot'));return;}
+  if(!formState.s1&&!formState.s2&&!formState.s3){showToast(t('err_height'));return;}
+  if(!formState.p1||!formState.p2){
     const note=document.getElementById('photo-req-note');
     if(note){note.classList.add('error');note.textContent='⚠ All 3 photos are required';}
-    showToast('⚠ Please upload all 3 photos');return;
+    showToast(t('err_photos'));return;
   }
   setLoading(true);
   try{
     async function up(photo,label){
       return(photo&&photo.startsWith('data:'))?await sb.uploadPhoto('audit-photos',label,photo):photo;
     }
-    const [p1u,p2u,p3u]=await Promise.all([up(formState.p1,'hgt_'+plot+'_s1'),up(formState.p2,'hgt_'+plot+'_s2'),up(formState.p3,'hgt_'+plot+'_s3')]);
+    const [p1u,p2u]=await Promise.all([up(formState.p1,'hgt_'+plot+'_s1'),up(formState.p2,'hgt_'+plot+'_s2')]);
+    const p3u=null;
     const avg=calcAvg(formState.s1,formState.s2,formState.s3);
     const payload={
       nursery:formState.nursery,plot,batch:batch||null,
@@ -272,7 +273,7 @@ async function saveRecord(){
     const result = await smartSave('height_records', editMode?'update':'insert', editMode?payload:{...payload,record_id:nextID(formState.nursery)}, editMode?editId:null);
     showToast(result?.offline ? '📴 Saved offline — will sync later' : editMode?'✓ Record updated':'✓ Record saved');
     await loadRecords();setView('list');
-  }catch(e){showToast('⚠ Save failed');console.error(e);setLoading(false);}
+  }catch(e){showToast(t('err_save'));console.error(e);setLoading(false);}
 }
 
 /* --- DETAIL --- */
@@ -284,7 +285,7 @@ function openDetail(uid){
     if(r['p'+n]){
       const img=document.createElement('img');img.src=r['p'+n];img.alt='S'+n;
       img.onclick=()=>openLightbox(r['p'+n]);el.appendChild(img);
-      const lbl=document.createElement('span');lbl.className='detail-photo-num';lbl.textContent='S'+n;el.appendChild(lbl);
+      const lbl=document.createElement('span');lbl.className='detail-photo-num';lbl.textContent=t('sample')+' '+n;el.appendChild(lbl);
     }else{
       const ph=document.createElement('div');ph.className='detail-photo-empty';
       ph.innerHTML='<svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="12" cy="12" r="3"/></svg>';
@@ -323,9 +324,9 @@ async function doDelete(){
   setLoading(true);
   try{
     await sb.delete('height_records',deleteTarget);
-    deleteTarget=null;await loadRecords();showToast('Record deleted');
+    deleteTarget=null;await loadRecords();showToast(t('record_deleted'));
     if(activeView==='detail')setView('list');
-  }catch(e){showToast('⚠ Delete failed');console.error(e);setLoading(false);}
+  }catch(e){showToast(t('err_delete'));console.error(e);setLoading(false);}
 }
 
 /* --- INIT --- */

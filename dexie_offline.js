@@ -1,311 +1,317 @@
 /* ================================================================
-   MJM NURSERY AUDIT — DEXIE OFFLINE STORAGE
-   dexie_offline.js — IndexedDB via Dexie.js
-   Auto-sync every 60 seconds when online
+   MJM NURSERY AUDIT — DEXIE OFFLINE STORAGE v2
+   dexie_offline.js
+   - Online: save directly to Supabase
+   - Offline / unstable: queue to IndexedDB, auto-sync every 60s
 ================================================================ */
 
 /* --- Load Dexie from CDN --- */
-const DEXIE_CDN = 'https://unpkg.com/dexie@3.2.4/dist/dexie.min.js';
-
 async function loadDexie(){
   if(window.Dexie) return;
   await new Promise((res,rej)=>{
     const s=document.createElement('script');
-    s.src=DEXIE_CDN;s.onload=res;s.onerror=rej;
+    s.src='https://unpkg.com/dexie@3.2.4/dist/dexie.min.js';
+    s.onload=res;s.onerror=rej;
     document.head.appendChild(s);
   });
 }
 
 /* ================================================================
-   DATABASE SETUP
+   DATABASE
 ================================================================ */
-let db = null;
+let db=null;
 
 async function initDB(){
+  if(db) return;
   await loadDexie();
-  db = new Dexie('MJMAuditDB');
+  db=new Dexie('MJMAuditDB');
   db.version(1).stores({
-    pending_records: '++id, table_name, method, created_at, synced',
-    photos:          '++id, record_key, slot, created_at'
+    pending_records:'++id,table_name,method,created_at,synced',
+    photos:'++id,record_key,slot,created_at'
   });
   await db.open();
-  console.log('[Dexie] Database opened');
 }
 
 /* ================================================================
-   PHOTO STORAGE — Store photos separately in IndexedDB
-   Avoids localStorage 5MB limit
+   PHOTO STORAGE
 ================================================================ */
-
-/* Save photo blob/base64 to IndexedDB */
-async function savePhotoOffline(recordKey, slot, base64Data){
+async function savePhotoOffline(recordKey,slot,base64){
   await initDB();
-  // Remove existing photo for this slot
-  await db.photos.where({record_key: recordKey, slot: String(slot)}).delete();
-  const id = await db.photos.add({
-    record_key: recordKey,
-    slot:       String(slot),
-    data:       base64Data,
-    created_at: new Date().toISOString()
-  });
-  console.log('[Dexie] Photo saved — key:', recordKey, 'slot:', slot, 'id:', id);
-  return id;
+  await db.photos.where({record_key:recordKey,slot:String(slot)}).delete();
+  return await db.photos.add({record_key:recordKey,slot:String(slot),data:base64,created_at:new Date().toISOString()});
 }
-
-/* Get photo from IndexedDB */
-async function getPhotoOffline(recordKey, slot){
+async function getPhotoOffline(recordKey,slot){
   await initDB();
-  const row = await db.photos.where({record_key: recordKey, slot: String(slot)}).first();
-  return row ? row.data : null;
+  const row=await db.photos.where({record_key:recordKey,slot:String(slot)}).first();
+  return row?row.data:null;
 }
-
-/* Delete photos for a record */
 async function deletePhotosOffline(recordKey){
   await initDB();
-  await db.photos.where({record_key: recordKey}).delete();
+  await db.photos.where({record_key:recordKey}).delete();
 }
 
 /* ================================================================
-   RECORD QUEUE — Store pending saves
+   RECORD QUEUE
 ================================================================ */
-
-async function queueRecord(tableName, method, payload, editId=null){
+async function queueRecord(tableName,method,payload,editId=null){
   await initDB();
-  const id = await db.pending_records.add({
-    table_name:  tableName,
-    method:      method,
-    payload:     JSON.stringify(payload),
-    edit_id:     editId ? String(editId) : null,
-    created_at:  new Date().toISOString(),
-    synced:      0,
-    retry_count: 0
+  const id=await db.pending_records.add({
+    table_name:tableName,method,
+    payload:JSON.stringify(payload),
+    edit_id:editId?String(editId):null,
+    created_at:new Date().toISOString(),
+    synced:0,retry_count:0
   });
-  console.log('[Dexie] Record queued — table:', tableName, 'id:', id);
   updateOfflineBadge();
   return id;
 }
-
 async function getPendingCount(){
   await initDB();
-  return await db.pending_records.where({synced: 0}).count();
+  return await db.pending_records.where({synced:0}).count();
 }
-
 async function getAllPending(){
   await initDB();
-  return await db.pending_records.where({synced: 0}).toArray();
+  return await db.pending_records.where({synced:0}).toArray();
 }
-
 async function markSynced(id){
   await initDB();
-  await db.pending_records.update(id, {synced: 1});
+  await db.pending_records.update(id,{synced:1});
 }
-
 async function deleteSynced(){
   await initDB();
-  await db.pending_records.where({synced: 1}).delete();
+  await db.pending_records.where({synced:1}).delete();
 }
 
 /* ================================================================
-   SMART SAVE — tries Supabase first, queues offline if fails
+   SMART SAVE
+   - If online: try Supabase directly (5s timeout)
+   - If offline OR Supabase fails: queue to IndexedDB
 ================================================================ */
-async function smartSave(tableName, method, payload, editId=null){
+async function smartSave(tableName,method,payload,editId=null){
+
+  /* Try direct Supabase save if online */
   if(navigator.onLine){
     try{
-      if(method === 'insert') return await sb.insert(tableName, payload);
-      if(method === 'update') return await sb.update(tableName, editId, payload);
+      // 8 second timeout — if line is unstable, fall through to queue
+      const result = await Promise.race([
+        method==='insert' ? sb.insert(tableName,payload) : sb.update(tableName,editId,payload),
+        new Promise((_,rej)=>setTimeout(()=>rej(new Error('timeout')),8000))
+      ]);
+      return result; // ✅ Saved directly
     }catch(e){
-      console.warn('[SmartSave] Online save failed, queuing offline:', e.message);
+      console.warn('[SmartSave] Direct save failed ('+e.message+'), queuing offline...');
+      // Fall through to queue below
     }
   }
-  // Offline — extract photos and store separately
-  const recordKey = 'pending_' + Date.now() + '_' + Math.random().toString(36).slice(2);
-  const payloadClean = {...payload};
-  // Store any base64 photos in Dexie instead of in the payload
+
+  /* Queue offline — extract photos into IndexedDB */
+  const recordKey='pending_'+Date.now()+'_'+Math.random().toString(36).slice(2);
+  const payloadClean={...payload};
+
   for(const key of Object.keys(payloadClean)){
-    if(payloadClean[key] && typeof payloadClean[key]==='string' && payloadClean[key].startsWith('data:')){
-      await savePhotoOffline(recordKey, key, payloadClean[key]);
-      payloadClean[key] = '__PHOTO__:' + recordKey + ':' + key;
+    const val=payloadClean[key];
+    if(val && typeof val==='string' && val.startsWith('data:')){
+      await savePhotoOffline(recordKey,key,val);
+      payloadClean[key]='__PHOTO__:'+recordKey+':'+key;
     }
   }
-  payloadClean._recordKey = recordKey;
-  await queueRecord(tableName, method, payloadClean, editId);
+  payloadClean._recordKey=recordKey;
+
+  await queueRecord(tableName,method,payloadClean,editId);
   showOfflineBadge();
-  return {offline: true, recordKey};
+  return {offline:true,recordKey};
 }
 
 /* ================================================================
-   SYNC ENGINE — uploads photos then records to Supabase
+   SYNC ENGINE
 ================================================================ */
-let isSyncing = false;
+let isSyncing=false;
 
 async function syncAll(){
   if(isSyncing) return;
   if(!navigator.onLine) return;
 
-  const pending = await getAllPending();
+  const pending=await getAllPending();
   if(!pending.length) return;
 
-  isSyncing = true;
-  console.log('[Sync] Starting sync of', pending.length, 'records...');
-
-  let synced = 0, failed = 0;
+  isSyncing=true;
+  console.log('[Sync] Syncing',pending.length,'records...');
+  let synced=0, failed=0;
 
   for(const rec of pending){
     try{
-      let payload = JSON.parse(rec.payload);
-      const recordKey = payload._recordKey;
+      let payload=JSON.parse(rec.payload);
+      const recordKey=payload._recordKey;
       delete payload._recordKey;
 
-      // Restore photos — upload to Supabase Storage
+      /* Upload photos */
       for(const key of Object.keys(payload)){
-        if(typeof payload[key]==='string' && payload[key].startsWith('__PHOTO__:')){
-          const parts = payload[key].split(':');
-          const rKey = parts[1];
-          const slot = parts[2];
-          const photoData = await getPhotoOffline(rKey, slot);
+        const val=payload[key];
+        if(typeof val!=='string') continue;
+
+        if(val.startsWith('__PHOTO__:')){
+          const parts=val.split(':');
+          const photoData=await getPhotoOffline(parts[1],parts[2]);
           if(photoData){
-            // Upload photo to Supabase storage
             try{
-              const uploadedUrl = await sb.uploadPhoto('audit-photos', slot + '_' + Date.now(), photoData);
-              payload[key] = uploadedUrl;
-              await deletePhotosOffline(rKey);
-            }catch(uploadErr){
-              console.warn('[Sync] Photo upload failed:', uploadErr);
-              payload[key] = null; // Save record without photo rather than fail
+              payload[key]=await sb.uploadPhoto('audit-photos',parts[2]+'_'+Date.now(),photoData);
+              await deletePhotosOffline(parts[1]);
+            }catch(e){
+              console.warn('[Sync] Photo upload failed:',e.message);
+              payload[key]=null;
             }
           } else {
-            payload[key] = null;
+            payload[key]=null;
+          }
+        } else if(val.startsWith('data:')){
+          try{
+            payload[key]=await sb.uploadPhoto('audit-photos',key+'_'+Date.now(),val);
+          }catch(e){
+            payload[key]=null;
           }
         }
       }
 
-      // Save record to Supabase
-      if(rec.method === 'insert') await sb.insert(rec.table_name, payload);
-      if(rec.method === 'update') await sb.update(rec.table_name, rec.edit_id, payload);
+      /* Save record */
+      if(rec.method==='insert') await sb.insert(rec.table_name,payload);
+      if(rec.method==='update') await sb.update(rec.table_name,rec.edit_id,payload);
 
       await markSynced(rec.id);
       synced++;
+
     }catch(e){
       failed++;
-      console.error('[Sync] Failed for record', rec.id, ':', e.message);
-      // Increment retry count
-      await db.pending_records.update(rec.id, {retry_count: (rec.retry_count||0) + 1});
+      console.error('[Sync] Failed:',rec.table_name,e.message);
+      const retries=(rec.retry_count||0)+1;
+      if(retries>=5){
+        console.warn('[Sync] Giving up on record',rec.id);
+        await markSynced(rec.id);
+      } else {
+        await db.pending_records.update(rec.id,{retry_count:retries});
+      }
     }
   }
 
-  // Clean up synced records
   await deleteSynced();
-
-  isSyncing = false;
+  isSyncing=false;
   updateOfflineBadge();
 
-  if(synced > 0){
-    console.log('[Sync] Synced', synced, 'records');
-    if(typeof showToast === 'function') showToast('✓ Synced ' + synced + ' offline record' + (synced>1?'s':''));
-    // Reload data in active module
-    if(typeof loadRecords === 'function')  loadRecords();
-    if(typeof loadAll     === 'function')  loadAll();
+  if(synced>0){
+    console.log('[Sync] Synced',synced,'records');
+    if(typeof showToast==='function') showToast('✓ Synced '+synced+' record'+(synced>1?'s':''));
+    if(typeof loadRecords==='function') loadRecords();
+    if(typeof loadAll==='function') loadAll();
   }
-  if(failed > 0){
-    console.warn('[Sync] Failed to sync', failed, 'records');
-    if(typeof showToast === 'function') showToast('⚠ ' + failed + ' record' + (failed>1?'s':'')+' failed to sync');
+  if(failed>0 && typeof showToast==='function'){
+    showToast('⚠ '+failed+' record'+(failed>1?'s':'')+' failed to sync');
   }
 }
 
 /* ================================================================
-   OFFLINE BADGE UI
+   OFFLINE BADGE
 ================================================================ */
 async function updateOfflineBadge(){
-  const n = await getPendingCount();
-  let badge = document.getElementById('offline-badge');
-  if(n > 0){
+  const n=await getPendingCount();
+  let badge=document.getElementById('offline-badge');
+  if(n>0){
     if(!badge){
-      badge = document.createElement('div');
-      badge.id = 'offline-badge';
-      badge.style.cssText = [
-        'position:fixed','top:0','left:50%','transform:translateX(-50%)',
-        'background:#f59e0b','color:#fff','font-size:11px','font-weight:700',
-        'padding:4px 16px','border-radius:0 0 10px 10px','z-index:99999',
-        'letter-spacing:.4px','white-space:nowrap','box-shadow:0 2px 8px rgba(0,0,0,.2)'
-      ].join(';');
+      badge=document.createElement('div');
+      badge.id='offline-badge';
+      badge.style.cssText='position:fixed;top:0;left:50%;transform:translateX(-50%);font-size:11px;font-weight:700;padding:5px 16px;border-radius:0 0 10px 10px;z-index:99999;letter-spacing:.4px;white-space:nowrap;box-shadow:0 2px 8px rgba(0,0,0,.2);cursor:pointer';
+      badge.onclick=()=>syncAll();
       document.body.appendChild(badge);
     }
-    const status = navigator.onLine ? '🔄 Syncing...' : '📴 Offline';
-    badge.textContent = status + ' — ' + n + ' record' + (n>1?'s':'') + ' pending';
-    badge.style.background = navigator.onLine ? '#3d9c3d' : '#f59e0b';
+    if(navigator.onLine){
+      badge.style.background='#3d9c3d';
+      badge.textContent='🔄 Syncing... — '+n+' pending (tap to sync)';
+    } else {
+      badge.style.background='#f59e0b';
+      badge.textContent='📴 Offline — '+n+' record'+(n>1?'s':'')+' pending';
+    }
   } else {
     if(badge) badge.remove();
   }
 }
-
 function showOfflineBadge(){updateOfflineBadge();}
 
 /* ================================================================
-   AUTO SYNC — every 60 seconds when online
+   PHOTO COMPRESSION
 ================================================================ */
-let syncInterval = null;
+function compressPhoto(file,maxWidth=1200,quality=0.75){
+  return new Promise((resolve)=>{
+    const reader=new FileReader();
+    reader.onload=e=>{
+      const img=new Image();
+      img.onload=()=>{
+        const canvas=document.createElement('canvas');
+        let w=img.width,h=img.height;
+        if(w>maxWidth){h=Math.round(h*maxWidth/w);w=maxWidth;}
+        canvas.width=w;canvas.height=h;
+        canvas.getContext('2d').drawImage(img,0,0,w,h);
+        resolve(canvas.toDataURL('image/jpeg',quality));
+      };
+      img.onerror=()=>resolve(e.target.result);
+      img.src=e.target.result;
+    };
+    reader.onerror=()=>resolve(null);
+    reader.readAsDataURL(file);
+  });
+}
+
+/* ================================================================
+   AUTO SYNC — every 60 seconds
+================================================================ */
+let syncInterval=null;
 
 function startAutoSync(){
-  // Sync immediately on first call
-  syncAll();
-  // Then every 60 seconds
+  syncAll(); // Sync immediately
   if(syncInterval) clearInterval(syncInterval);
-  syncInterval = setInterval(()=>{
-    if(navigator.onLine){
-      console.log('[AutoSync] Checking for pending records...');
-      syncAll();
-    }
-  }, 60 * 1000);
-  console.log('[AutoSync] Started — checking every 60 seconds');
+  syncInterval=setInterval(()=>{
+    if(navigator.onLine) syncAll();
+  },60*1000);
 }
 
 /* ================================================================
    INIT
 ================================================================ */
 async function initOffline(){
-  // Init Dexie DB
   await initDB();
 
   // Register Service Worker
   if('serviceWorker' in navigator){
     navigator.serviceWorker.register('./sw.js')
-      .then(reg => {
-        console.log('[SW] Registered:', reg.scope);
+      .then(reg=>{
         if(reg.waiting) reg.waiting.postMessage('skipWaiting');
-        reg.addEventListener('updatefound', ()=>{
-          const sw = reg.installing;
-          sw.addEventListener('statechange', ()=>{
-            if(sw.state==='installed' && navigator.serviceWorker.controller)
+        reg.addEventListener('updatefound',()=>{
+          const sw=reg.installing;
+          sw.addEventListener('statechange',()=>{
+            if(sw.state==='installed'&&navigator.serviceWorker.controller)
               sw.postMessage('skipWaiting');
           });
         });
       })
-      .catch(e => console.warn('[SW] Registration failed:', e));
+      .catch(e=>console.warn('[SW] Failed:',e));
   }
 
-  // Show badge if pending records
   updateOfflineBadge();
 
   // Online — start auto sync
-  window.addEventListener('online', ()=>{
-    console.log('[Offline] Back online!');
+  window.addEventListener('online',()=>{
+    console.log('[Offline] Back online');
     if(typeof showToast==='function') showToast('🔄 Back online — syncing...');
     updateOfflineBadge();
-    syncAll();
     startAutoSync();
   });
 
   // Offline
-  window.addEventListener('offline', ()=>{
+  window.addEventListener('offline',()=>{
     console.log('[Offline] Gone offline');
     if(typeof showToast==='function') showToast('📴 Offline — records will sync when connected');
-    updateOfflineBadge();
     if(syncInterval) clearInterval(syncInterval);
+    updateOfflineBadge();
   });
 
-  // Start auto sync if already online
   if(navigator.onLine) startAutoSync();
-  else updateOfflineBadge();
 }
 
-document.addEventListener('DOMContentLoaded', initOffline);
+document.addEventListener('DOMContentLoaded',initOffline);

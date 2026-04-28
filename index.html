@@ -564,32 +564,24 @@
     window.location.href = 'home.html';
   }
 
-  // Show offline warning if no internet
-  function checkOfflineStatus(){
-    const errEl = document.getElementById('error-msg');
+  // Show offline banner
+  function updateOfflineBar(){
+    let bar = document.getElementById('offline-bar');
     if(!navigator.onLine){
-      const user = localStorage.getItem('mjm_user');
-      if(user){
-        // Already logged in — redirect to home
-        window.location.href = 'home.html';
-      } else {
-        // Not logged in and offline — show message
-        errEl.textContent = '📴 You are offline. Please connect to the internet to login for the first time.';
-        errEl.classList.add('show');
-        document.getElementById('btn-login').disabled = true;
-        document.getElementById('btn-login').style.opacity = '0.5';
+      if(!bar){
+        bar = document.createElement('div');
+        bar.id = 'offline-bar';
+        bar.style.cssText = 'position:fixed;top:0;left:0;right:0;background:#f59e0b;color:#fff;text-align:center;font-size:12px;font-weight:700;padding:6px;z-index:9999;letter-spacing:.3px';
+        bar.textContent = '📴 Offline — login requires internet connection';
+        document.body.appendChild(bar);
       }
+    } else {
+      if(bar) bar.remove();
     }
   }
-
-  window.addEventListener('load', checkOfflineStatus);
-  window.addEventListener('online', () => {
-    const errEl = document.getElementById('error-msg');
-    errEl.classList.remove('show');
-    document.getElementById('btn-login').disabled = false;
-    document.getElementById('btn-login').style.opacity = '1';
-  });
-  window.addEventListener('offline', checkOfflineStatus);
+  window.addEventListener('load', updateOfflineBar);
+  window.addEventListener('online', updateOfflineBar);
+  window.addEventListener('offline', updateOfflineBar);
 
   function togglePw() {
     const input = document.getElementById('password');
@@ -619,35 +611,47 @@
 
     btn.classList.add('loading');
 
-    try {
-      // Sign in with Supabase Auth
-      const { data, error } = await _supa.auth.signInWithPassword({ email, password });
+    // OFFLINE LOGIN — use cached credentials
+    if (!navigator.onLine) {
+      const cached = localStorage.getItem('mjm_cached_creds');
+      if (cached) {
+        try {
+          const creds = JSON.parse(cached);
+          if (creds.email === email && creds.password === password) {
+            // Restore cached session
+            window.location.href = 'home.html';
+            return;
+          }
+        } catch(e) {}
+      }
+      btn.classList.remove('loading');
+      errEl.textContent = '📴 Offline — wrong email/password. Must login online at least once first.';
+      errEl.classList.add('show');
+      return;
+    }
 
+    try {
+      // ONLINE LOGIN — Supabase Auth
+      const { data, error } = await _supa.auth.signInWithPassword({ email, password });
       if (error) throw error;
 
       const userId = data.user.id;
 
-      // Fetch profile from profiles table
+      // Fetch profile
       const { data: profile, error: profileError } = await _supa
         .from('profiles')
         .select('full_name, role, email, phone')
         .eq('id', userId)
         .single();
 
-      if (profileError) throw profileError;
+      const name = profile?.full_name || email.split('@')[0];
+      const role = profile?.role || 'Auditor';
 
-      // Determine display name
-      const name = profile.full_name || email.split('@')[0];
-      const role = profile.role || 'Auditor';
+      const userObj = { id: userId, name, role, email, phone: profile?.phone || '' };
 
-      // Save session to localStorage
-      localStorage.setItem('mjm_user', JSON.stringify({
-        id:       userId,
-        name:     name,
-        role:     role,
-        email:    email,
-        phone:    profile.phone || ''
-      }));
+      // Save session + cache credentials for offline login
+      localStorage.setItem('mjm_user', JSON.stringify(userObj));
+      localStorage.setItem('mjm_cached_creds', JSON.stringify({ email, password }));
 
       window.location.href = 'home.html';
 
@@ -659,11 +663,7 @@
       } else if (msg.includes('Email not confirmed')) {
         errEl.textContent = 'Please verify your email before logging in.';
       } else {
-        if(!navigator.onLine){
-        errEl.textContent = '📴 No internet connection. Please connect and try again.';
-      } else {
         errEl.textContent = 'Login failed. Please check your connection and try again.';
-      }
       }
       errEl.classList.add('show');
       document.getElementById('password').value = '';

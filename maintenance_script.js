@@ -284,14 +284,11 @@ async function saveAudit(){
   const user=JSON.parse(localStorage.getItem('mjm_user')||'{}');
   setLoading(true);
   try{
-    let photoUrl=formState.photo;
-    if(photoUrl&&photoUrl.startsWith('data:'))
-      photoUrl=await sb.uploadPhoto('audit-photos','maint_'+t.plot+'_'+Date.now(),photoUrl);
     const payload={
       task_id:parseInt(formTaskId),
       nursery:t.nursery,plot:t.plot,task_type:t.type,
       result:formState.result,remarks:remarks||null,
-      photo_url:photoUrl||null,
+      photo_url:formState.photo||null,
       auditor_name:user.name||'',
       date:todayISO()
     };

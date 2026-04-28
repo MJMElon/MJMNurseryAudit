@@ -258,15 +258,10 @@ async function saveRecord(){
   }
   setLoading(true);
   try{
-    async function up(photo,label){return(photo&&photo.startsWith('data:'))?await sb.uploadPhoto('audit-photos',label,photo):photo;}
-    const [p1u,p2u]=await Promise.all([
-      up(formState.photo1,'plot_'+plot+'_1_'+Date.now()),
-      up(formState.photo2,'plot_'+plot+'_2_'+Date.now())
-    ]);
     const payload={
       nursery:formState.nursery,plot,batch,
       pest:formState.ulat,tikus:formState.tikus,disease:formState.bintik,
-      warna_daun:formState.warna,photo_url:p1u||null,photo_2_url:p2u||null,date:todayISO()
+      warna_daun:formState.warna,photo_url:formState.photo1||null,photo_2_url:formState.photo2||null,date:todayISO()
     };
     const result=await smartSave('plot_audits',editMode?'update':'insert',
       editMode?payload:{...payload,audit_id:nextID(formState.nursery)},

@@ -256,10 +256,6 @@ async function saveRecord(){
   }
   setLoading(true);
   try{
-    async function up(photo,label){
-      return(photo&&photo.startsWith('data:'))?await sb.uploadPhoto('audit-photos',label,photo):photo;
-    }
-    const [p1u,p2u,p3u]=await Promise.all([up(formState.p1,'hgt_'+plot+'_s1'),up(formState.p2,'hgt_'+plot+'_s2'),up(formState.p3,'hgt_'+plot+'_s3')]);
     const avg=calcAvg(formState.s1,formState.s2,formState.s3);
     const payload={
       nursery:formState.nursery,plot,batch:batch||null,
@@ -267,7 +263,7 @@ async function saveRecord(){
       sample_2:formState.s2?parseFloat(formState.s2):null,
       sample_3:formState.s3?parseFloat(formState.s3):null,
       avg_height:avg?parseFloat(avg):null,
-      photo_1_url:p1u||null,photo_2_url:p2u||null,photo_3_url:p3u||null,
+      photo_1_url:formState.p1||null,photo_2_url:formState.p2||null,photo_3_url:formState.p3||null,
       date:todayISO()
     };
     const result = await smartSave('height_records', editMode?'update':'insert', editMode?payload:{...payload,record_id:nextID(formState.nursery)}, editMode?editId:null);

@@ -519,21 +519,22 @@ async function saveAudit(){
   const b=batches.find(x=>x.uid===auditFormBatchUid);if(!b)return;
   setLoading(true);
   try{
-    // Pass photo as base64 — smartSave handles upload (online) or queues (offline)
     const payload={
       batch_ref:parseInt(auditFormBatchUid),
       nursery:b.nursery,plot:b.plot,batch_no:b.batch,
       presence:formState.presence,info_correct:formState.infoCorrect,
       condition:formState.condition,remarks:null,
-      photo_url:formState.photo||null,date:todayISO()
+      photo_url:formState.photo||null,date:todayISO(),
+      auditor_name:(JSON.parse(localStorage.getItem('mjm_user')||'{}').name||'')
     };
     const result=await smartSave('papan_audits',editMode?'update':'insert',
       editMode?payload:{...payload,audit_id:nextAuditID()},
       editMode?editId:null);
+    setLoading(false);
     showToast(result?.offline?t('offline_saved'):editMode?t('audit_updated'):t('audit_saved'));
     if(!result?.offline){await loadAll();}
     setView('list');selectTab('audit');
-  }catch(e){console.error('[Save]',e);showToast('⚠ '+(e.message||'Save failed'));setLoading(false);}
+  }catch(e){setLoading(false);console.error('[Save]',e);showToast('⚠ '+(e.message||t('err_save')));}
 }
 
 /* --- DETAIL --- */

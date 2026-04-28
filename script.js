@@ -261,14 +261,24 @@ async function saveRecord(){
     const payload={
       nursery:formState.nursery,plot,batch,
       pest:formState.ulat,tikus:formState.tikus,disease:formState.bintik,
-      warna_daun:formState.warna,photo_url:formState.photo1||null,photo_2_url:formState.photo2||null,date:todayISO()
+      warna_daun:formState.warna,
+      photo_url:formState.photo1||null,
+      photo_2_url:formState.photo2||null,
+      date:todayISO(),
+      auditor_name:(JSON.parse(localStorage.getItem('mjm_user')||'{}').name||'')
     };
     const result=await smartSave('plot_audits',editMode?'update':'insert',
       editMode?payload:{...payload,audit_id:nextID(formState.nursery)},
       editMode?editId:null);
+    setLoading(false);
     showToast(result?.offline?t('offline_saved'):editMode?t('record_updated'):t('record_saved'));
-    await loadRecords();setView('list');
-  }catch(e){showToast(t('err_save'));console.error(e);setLoading(false);}
+    if(!result?.offline){await loadRecords();}
+    setView('list');
+  }catch(e){
+    setLoading(false);
+    console.error('[Save]',e);
+    showToast('⚠ '+(e.message||t('err_save')));
+  }
 }
 
 /* --- DETAIL --- */

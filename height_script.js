@@ -256,6 +256,7 @@ async function saveRecord(){
   }
   setLoading(true);
   try{
+    // Pass photos as base64 — smartSave handles upload (online) or queues (offline)
     const avg=calcAvg(formState.s1,formState.s2,formState.s3);
     const payload={
       nursery:formState.nursery,plot,batch:batch||null,
@@ -263,13 +264,19 @@ async function saveRecord(){
       sample_2:formState.s2?parseFloat(formState.s2):null,
       sample_3:formState.s3?parseFloat(formState.s3):null,
       avg_height:avg?parseFloat(avg):null,
-      photo_1_url:formState.p1||null,photo_2_url:formState.p2||null,photo_3_url:formState.p3||null,
-      date:todayISO()
+      photo_1_url:formState.p1||null,
+      photo_2_url:formState.p2||null,
+      photo_3_url:formState.p3||null,
+      date:todayISO(),
+      auditor_name:(JSON.parse(localStorage.getItem('mjm_user')||'{}').name||'')
     };
-    const result = await smartSave('height_records', editMode?'update':'insert', editMode?payload:{...payload,record_id:nextID(formState.nursery)}, editMode?editId:null);
-    showToast(result?.offline ? '📴 Saved offline — will sync later' : editMode?'✓ Record updated':'✓ Record saved');
-    await loadRecords();setView('list');
-  }catch(e){showToast(t('err_save'));console.error(e);setLoading(false);}
+    const result=await smartSave('height_records',editMode?'update':'insert',
+      editMode?payload:{...payload,record_id:nextID(formState.nursery)},
+      editMode?editId:null);
+    showToast(result?.offline?t('offline_saved'):editMode?t('record_updated'):t('record_saved'));
+    if(!result?.offline){await loadRecords();}
+    setView('list');
+  }catch(e){console.error('[Save]',e);showToast('⚠ '+(e.message||'Save failed'));setLoading(false);}
 }
 
 /* --- DETAIL --- */

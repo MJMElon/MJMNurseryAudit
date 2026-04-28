@@ -296,6 +296,25 @@
         </div>
       </a>
 
+      <!-- Report -->
+      <a class="audit-card fade-in" href="report.html" style="background:linear-gradient(135deg,#1a3a1a 0%,#2d5a2d 100%);border-radius:var(--r-xl);overflow:hidden;box-shadow:var(--shadow-card);cursor:pointer;text-decoration:none;display:block;transition:transform .18s,box-shadow .18s;-webkit-tap-highlight-color:transparent;position:relative">
+        <div class="audit-card-blob" style="background:#3d8c3d"></div>
+        <div class="audit-card-body">
+          <div class="card-icon-row">
+            <div class="card-icon"><svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg></div>
+            <div class="card-arrow"><svg viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"/></svg></div>
+          </div>
+          <div class="card-label" style="color:#b5dfb5">Monthly Report</div>
+          <div class="card-title">Audit Report</div>
+          <div class="card-desc">Generate monthly audit summary by nursery and module. Printable PDF format.</div>
+          <div class="card-tags">
+            <span class="card-tag">PN</span>
+            <span class="card-tag">Main Nursery</span>
+            <span class="card-tag">Print PDF</span>
+          </div>
+        </div>
+      </a>
+
     </div><!-- /audit-cards -->
 
     <!-- INFO STRIP -->
@@ -348,8 +367,8 @@
   </div>
 </div>
 
-<script src="lang.js?v=1"></script>
-<script src="supabase.js?v=1"></script>
+<script src="lang.js"></script>
+<script src="supabase.js"></script>
 <script>
 /* ── Auth ── */
 const userRaw = localStorage.getItem('mjm_user');
@@ -568,6 +587,6 @@ loadAlerts();
 requestNotifPermission();
 setInterval(loadAlerts, 5 * 60 * 1000);
 </script>
-<script src="dexie_offline.js?v=1"></script>
+<script src="dexie_offline.js"></script>
 </body>
 </html>

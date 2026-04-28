@@ -62,6 +62,7 @@ self.addEventListener('activate', e => {
 self.addEventListener('fetch', e => {
   if(e.request.method !== 'GET') return;
   const url = e.request.url;
+  if(!url.startsWith('http')) return;
 
   // Supabase API — network only, no cache
   if(url.includes('supabase.co')){

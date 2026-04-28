@@ -323,7 +323,7 @@ function renderBatchTable(){
       </div>
       <div class="audit-item-actions">
         <button class="btn-view-audit" onclick="openEditBatch('${b.uid}')">Edit</button>
-        <button class="btn-audit-now" style="background:var(--danger-text)" onclick="confirmDeleteBatch('${b.uid}')">Delete</button>
+        ${isAdmin()?`<button class="btn-audit-now" style="background:var(--danger-text)" onclick="confirmDeleteBatch('${b.uid}')">Delete</button>`:''}
       </div>
     </div>`;
   }).join('');
@@ -572,10 +572,11 @@ function editFromDetail(){const audit=audits.find(a=>a.uid===detailId);if(audit)
 function deleteFromDetail(){if(detailId)confirmDelete(detailId);}
 
 /* --- DELETE --- */
-function confirmDelete(uid){deleteTarget=uid;deleteType='audit';document.getElementById('modal-overlay').classList.add('show');}
-function confirmDeleteBatch(uid){deleteTarget=uid;deleteType='batch';document.getElementById('modal-overlay').classList.add('show');}
+function confirmDelete(uid){if(!isAdmin()){showToast('⚠ Only admin can delete');return;}deleteTarget=uid;deleteType='audit';document.getElementById('modal-overlay').classList.add('show');}
+function confirmDeleteBatch(uid){if(!isAdmin()){showToast('⚠ Only admin can delete');return;}deleteTarget=uid;deleteType='batch';document.getElementById('modal-overlay').classList.add('show');}
 function cancelDelete(){deleteTarget=null;document.getElementById('modal-overlay').classList.remove('show');}
 async function doDelete(){
+  if(!isAdmin()){showToast('⚠ Only admin can delete');return;}
   if(!deleteTarget)return;
   document.getElementById('modal-overlay').classList.remove('show');
   setLoading(true);

@@ -13,6 +13,8 @@ let formTaskId=null;
 let formState={result:null,remarks:'',photo:null};
 let toastTimer=null;
 
+function isAdmin(){try{const u=JSON.parse(localStorage.getItem('mjm_user')||'{}');const role=(u.role||'').toLowerCase();return role==='admin'||role==='administrator';}catch(e){return false;}}
+
 /* --- HELPERS --- */
 function pad(n){return String(n).padStart(3,'0');}
 function todayISO(){return new Date().toISOString().split('T')[0];}
@@ -342,9 +344,10 @@ function openLightbox(src){document.getElementById('lightbox-img').src=src;docum
 function closeLightbox(){document.getElementById('lightbox').classList.remove('open');}
 
 /* --- DELETE --- */
-function confirmDelete(uid){deleteTarget=uid;document.getElementById('modal-overlay').classList.add('show');}
+function confirmDelete(uid){if(!isAdmin()){showToast('⚠ Only admin can delete');return;}deleteTarget=uid;document.getElementById('modal-overlay').classList.add('show');}
 function cancelDelete(){deleteTarget=null;document.getElementById('modal-overlay').classList.remove('show');}
 async function doDelete(){
+  if(!isAdmin()){showToast('⚠ Only admin can delete');return;}
   if(!deleteTarget)return;
   document.getElementById('modal-overlay').classList.remove('show');
   setLoading(true);

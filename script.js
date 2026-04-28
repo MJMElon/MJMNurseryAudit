@@ -326,6 +326,7 @@ function closeLightbox(){document.getElementById('lightbox').classList.remove('o
 function confirmDelete(uid){if(!isAdmin()){showToast('⚠ Only admin can delete');return;}deleteTarget=uid;document.getElementById('modal-overlay').classList.add('show');}
 function cancelDelete(){deleteTarget=null;document.getElementById('modal-overlay').classList.remove('show');}
 async function doDelete(){
+  if(!isAdmin()){showToast('⚠ Only admin can delete');return;}
   if(!deleteTarget)return;
   document.getElementById('modal-overlay').classList.remove('show');
   setLoading(true);

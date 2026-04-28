@@ -275,10 +275,11 @@ async function saveRecord(){
     const result=await smartSave('height_records',editMode?'update':'insert',
       editMode?payload:{...payload,record_id:nextID(formState.nursery)},
       editMode?editId:null);
+    setLoading(false);
     showToast(result?.offline?t('offline_saved'):editMode?t('record_updated'):t('record_saved'));
     if(!result?.offline){await loadRecords();}
     setView('list');
-  }catch(e){console.error('[Save]',e);showToast('⚠ '+(e.message||'Save failed'));setLoading(false);}
+  }catch(e){setLoading(false);console.error('[Save]',e);showToast('⚠ '+(e.message||'Save failed'));}
 }
 
 /* --- DETAIL --- */

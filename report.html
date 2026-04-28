@@ -89,6 +89,23 @@ select.input:focus{border-color:var(--g400);background:var(--white)}
 /* MODULE BADGE */
 .mod-badge{display:inline-block;font-size:10px;font-weight:700;padding:2px 8px;border-radius:20px;background:var(--g100);color:var(--g700);margin-right:4px;margin-bottom:2px}
 
+/* MODULE BREAKDOWN (per-nursery case counts) */
+.module-breakdown{display:grid;grid-template-columns:repeat(2,1fr);gap:6px;padding:12px;background:var(--white);border-bottom:1px solid var(--border)}
+.mod-stat{display:flex;justify-content:space-between;align-items:center;background:var(--g50);border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:12px;font-weight:600;color:var(--text2);min-width:0}
+.mod-stat-label{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.mod-stat-count{font-weight:800;color:var(--g800);font-size:14px;flex-shrink:0;margin-left:8px}
+
+/* DETAIL RECORD CARDS */
+.detail-records-wrap{padding:8px 10px;background:var(--surface)}
+.detail-record{background:var(--white);border:1px solid var(--border);border-radius:8px;padding:10px 12px;margin-bottom:6px}
+.detail-record:last-child{margin-bottom:0}
+.detail-record-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:4px}
+.detail-record-date{font-size:11px;font-weight:700;color:var(--text2)}
+.detail-record-auditor{font-size:11px;font-weight:600;color:var(--g700);background:var(--g50);padding:2px 8px;border-radius:10px}
+.detail-record-loc{font-size:13px;font-weight:700;color:var(--text1);margin-bottom:6px}
+.detail-record-results{display:flex;flex-wrap:wrap;gap:4px}
+.detail-pill{font-size:10px;font-weight:600;padding:2px 8px;border-radius:10px;background:var(--surface);border:1px solid var(--border);color:var(--text2)}
+
 /* EMPTY */
 .empty-report{text-align:center;padding:3rem 1rem;color:var(--text4)}
 .empty-report svg{width:48px;height:48px;stroke:var(--g200);fill:none;stroke-width:1.2;margin:0 auto 12px;display:block}
@@ -171,6 +188,12 @@ select.input:focus{border-color:var(--g400);background:var(--white)}
         </div>
       </div>
     </div>
+    <div class="filter-label" style="margin-bottom:8px">Nursery Group</div>
+    <div class="module-checks" id="scope-checks" style="margin-bottom:14px">
+      <label class="mod-check checked" data-scope="all" onclick="setScope('all')">Both</label>
+      <label class="mod-check" data-scope="pn" onclick="setScope('pn')">🌱 Pre Nursery</label>
+      <label class="mod-check" data-scope="mn" onclick="setScope('mn')">🌳 Main Nursery</label>
+    </div>
     <div class="filter-label" style="margin-bottom:8px">Modules to Include</div>
     <div class="module-checks">
       <label class="mod-check checked" id="mc-plot" onclick="toggleMod(this,'plot')"><input type="checkbox" checked/>📋 Plot Condition</label>
@@ -207,9 +230,9 @@ select.input:focus{border-color:var(--g400);background:var(--white)}
 
 </div>
 
-<script src="lang.js"></script>
-<script src="supabase.js"></script>
-<script src="dexie_offline.js"></script>
+<script src="lang.js?v=4"></script>
+<script src="supabase.js?v=4"></script>
+<script src="dexie_offline.js?v=4"></script>
 <script>
 'use strict';
 
@@ -255,6 +278,15 @@ function toggleMod(el, mod){
   }
 }
 
+/* ── Nursery scope ── */
+let selectedScope = 'all';
+function setScope(s){
+  selectedScope = s;
+  document.querySelectorAll('#scope-checks .mod-check').forEach(el=>{
+    el.classList.toggle('checked', el.dataset.scope === s);
+  });
+}
+
 /* ── Date helpers ── */
 function monthRange(month, year){
   const start = `${year}-${String(month).padStart(2,'0')}-01`;
@@ -270,13 +302,13 @@ async function fetchData(month, year){
 
   const fetches = {};
   if(selectedMods.has('plot'))
-    fetches.plot = sb.select('plot_audits', `select=nursery,auditor_name,date&${dateFilter}`).catch(()=>[]);
+    fetches.plot = sb.select('plot_audits', `select=nursery,plot,batch,auditor_name,pest,tikus,disease,warna_daun,date&${dateFilter}`).catch(()=>[]);
   if(selectedMods.has('height'))
-    fetches.height = sb.select('height_records', `select=nursery,auditor_name,date&${dateFilter}`).catch(()=>[]);
+    fetches.height = sb.select('height_records', `select=nursery,plot,batch,auditor_name,sample_1,sample_2,sample_3,avg_height,date&${dateFilter}`).catch(()=>[]);
   if(selectedMods.has('papan'))
-    fetches.papan = sb.select('papan_audits', `select=nursery,auditor_name,date&${dateFilter}`).catch(()=>[]);
+    fetches.papan = sb.select('papan_audits', `select=nursery,plot,batch_no,auditor_name,presence,info_correct,condition,date&${dateFilter}`).catch(()=>[]);
   if(selectedMods.has('maint'))
-    fetches.maint = sb.select('maintenance_audits', `select=nursery,auditor_name,date&${dateFilter}`).catch(()=>[]);
+    fetches.maint = sb.select('maintenance_audits', `select=nursery,plot,task_type,result,auditor_name,date&${dateFilter}`).catch(()=>[]);
 
   const keys = Object.keys(fetches);
   const results = await Promise.all(Object.values(fetches));
@@ -347,6 +379,81 @@ function buildTable(counts){
   return html;
 }
 
+/* ── Per-nursery module case counts ── */
+function buildModuleBreakdown(data, nurseries){
+  const mods = [...selectedMods];
+  const labels = {plot:'📋 Plot Condition',height:'📏 Seedling Height',papan:'🪧 Papan Tanda',maint:'🔧 Maintenance'};
+  const cells = mods.map(m=>{
+    const n = (data[m]||[]).filter(r=>nurseries.includes(r.nursery)).length;
+    return `<div class="mod-stat"><span class="mod-stat-label">${labels[m]}</span><span class="mod-stat-count">${n}</span></div>`;
+  }).join('');
+  return `<div class="module-breakdown">${cells}</div>`;
+}
+
+/* ── Build detailed per-record sections ── */
+function buildDetailsHTML(data, nurseries, headerColor){
+  const mods = [...selectedMods];
+  const modLabels = {plot:'Plot Condition',height:'Seedling Height',papan:'Papan Tanda',maint:'Maintenance'};
+  const modIcons  = {plot:'📋',height:'📏',papan:'🪧',maint:'🔧'};
+
+  let html = '<div style="margin-top:14px">';
+  let any = false;
+
+  mods.forEach(mod=>{
+    const rows = (data[mod] || []).filter(r=>nurseries.includes(r.nursery));
+    if(!rows.length) return;
+    any = true;
+
+    html += `<div class="nursery-section">
+      <div class="nursery-section-head" style="background:${headerColor||'var(--g700)'}">
+        <div><div class="nursery-section-title">${modIcons[mod]} ${modLabels[mod]}</div></div>
+        <span class="nursery-section-count">${rows.length} record${rows.length>1?'s':''}</span>
+      </div>
+      <div class="detail-records-wrap">`;
+
+    const sorted = [...rows].sort((a,b)=>(b.date||'').localeCompare(a.date||''));
+
+    sorted.forEach(r=>{
+      const d = r.date ? r.date.split('T')[0] : '—';
+      const auditor = r.auditor_name || 'Unknown';
+      const batch = mod==='papan' ? r.batch_no : r.batch;
+      let pills = '';
+      if(mod==='plot'){
+        pills = `<span class="detail-pill">Pest: ${r.pest||'—'}</span>
+          <span class="detail-pill">Animal: ${r.tikus||'—'}</span>
+          <span class="detail-pill">Disease: ${r.disease||'—'}</span>
+          <span class="detail-pill">Leaf: ${r.warna_daun||'—'}</span>`;
+      } else if(mod==='height'){
+        pills = `<span class="detail-pill">S1: ${r.sample_1??'—'} cm</span>
+          <span class="detail-pill">S2: ${r.sample_2??'—'} cm</span>
+          <span class="detail-pill">S3: ${r.sample_3??'—'} cm</span>
+          <span class="detail-pill" style="background:var(--g100);color:var(--g700);border-color:var(--g200)">Avg: ${r.avg_height??'—'} cm</span>`;
+      } else if(mod==='papan'){
+        pills = `<span class="detail-pill">Presence: ${r.presence||'—'}</span>
+          <span class="detail-pill">Info: ${r.info_correct||'—'}</span>
+          <span class="detail-pill">Condition: ${r.condition||'—'}</span>`;
+      } else if(mod==='maint'){
+        pills = `<span class="detail-pill">Task: ${r.task_type||'—'}</span>
+          <span class="detail-pill" style="background:var(--g100);color:var(--g700);border-color:var(--g200)">${r.result||'—'}</span>`;
+      }
+
+      html += `<div class="detail-record">
+        <div class="detail-record-top">
+          <span class="detail-record-date">${d}</span>
+          <span class="detail-record-auditor">${auditor}</span>
+        </div>
+        <div class="detail-record-loc">${r.nursery} · ${r.plot}${batch?' · Batch '+batch:''}</div>
+        <div class="detail-record-results">${pills}</div>
+      </div>`;
+    });
+
+    html += `</div></div>`;
+  });
+
+  html += '</div>';
+  return any ? html : '';
+}
+
 /* ── GENERATE REPORT ── */
 async function generateReport(){
   const month = parseInt(document.getElementById('f-month').value);
@@ -356,6 +463,9 @@ async function generateReport(){
   setLoading(true);
   try{
     const data = await fetchData(month, year);
+
+    const showPN = selectedScope === 'all' || selectedScope === 'pn';
+    const showMN = selectedScope === 'all' || selectedScope === 'mn';
 
     const pnCounts = tally(data, PN_NURSERIES);
     const mnCounts = tally(data, MN_NURSERIES);
@@ -389,6 +499,7 @@ async function generateReport(){
         <div class="sum-card"><div class="sum-val" style="color:#1565c0">${mnTotal}</div><div class="sum-label">Main Nursery</div></div>
       </div>
 
+      ${showPN?`
       <!-- PN Section -->
       <div class="nursery-section">
         <div class="nursery-section-head">
@@ -398,11 +509,15 @@ async function generateReport(){
           </div>
           <span class="nursery-section-count">${pnTotal} audits</span>
         </div>
-        ${buildTable(pnCounts)}
+        ${buildModuleBreakdown(data, PN_NURSERIES)}
+        ${selectedScope==='all'?buildTable(pnCounts):''}
       </div>
+      ${buildDetailsHTML(data, PN_NURSERIES, 'var(--g700)')}
+      `:''}
 
+      ${showMN?`
       <!-- MN Section -->
-      <div class="nursery-section">
+      <div class="nursery-section" style="margin-top:18px">
         <div class="nursery-section-head" style="background:#1565c0">
           <div>
             <div class="nursery-section-title">Main Nursery (BNN + UNN1 + UNN2)</div>
@@ -410,8 +525,11 @@ async function generateReport(){
           </div>
           <span class="nursery-section-count">${mnTotal} audits</span>
         </div>
-        ${buildTable(mnCounts)}
+        ${buildModuleBreakdown(data, MN_NURSERIES)}
+        ${selectedScope==='all'?buildTable(mnCounts):''}
       </div>
+      ${buildDetailsHTML(data, MN_NURSERIES, '#1565c0')}
+      `:''}
     `;
 
     document.getElementById('report-output').innerHTML = html;

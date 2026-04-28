@@ -262,3 +262,20 @@ textarea.input{height:auto;padding:10px 12px;resize:vertical;line-height:1.5}
 .nursery-filter-btn:not(.active):active{
   background:var(--g50);
 }
+
+/* NURSERY FILTER BUTTONS — inside dark header */
+.nursery-filter-btn{
+  height:36px;border-radius:var(--r-md);
+  font-size:12px;font-weight:700;font-family:'DM Sans',sans-serif;
+  border:1.5px solid rgba(255,255,255,.25);
+  background:rgba(255,255,255,.1);
+  color:rgba(255,255,255,.8);
+  cursor:pointer;transition:all .15s;
+  -webkit-tap-highlight-color:transparent;
+}
+.nursery-filter-btn.active{
+  background:#fff;color:var(--g800);border-color:#fff;
+}
+.nursery-filter-btn:not(.active):active{
+  background:rgba(255,255,255,.2);
+}

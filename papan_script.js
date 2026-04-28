@@ -15,6 +15,7 @@ const NURSERY_PLOTS = {
 
 
 let batches=[], audits=[];
+let activeNursery='PN';
 let activeTab='audit', activeView='list';
 let editMode=false, editId=null, detailId=null, deleteTarget=null, deleteType='audit';
 let auditFormBatchUid=null;
@@ -90,20 +91,29 @@ function selectTab(tab){
   if(fab)fab.classList.toggle('hidden',tab!=='batch'||activeView!=='list');
 }
 
+function selectNursery(nursery, el){
+  activeNursery=nursery;
+  document.querySelectorAll('.nursery-filter-btn').forEach(b=>b.classList.remove('active'));
+  el.classList.add('active');
+  document.getElementById('topbar-nursery').textContent=NURSERY_LABELS[nursery];
+  renderAuditList();
+}
+
 /* --- STATS --- */
 function updateStats(){
-  const latest=getLatestBatchPerPlot();
+  const latest=getLatestBatchPerPlot().filter(b=>b.nursery===activeNursery);
   document.getElementById('stat-total').textContent=latest.length;
   const pending=latest.filter(b=>!getAuditForBatch(b.uid)).length;
   const passed=latest.filter(b=>{const a=getAuditForBatch(b.uid);return a&&overallStatus(a)==='pass';}).length;
   document.getElementById('stat-pending').textContent=pending;
   document.getElementById('stat-pass').textContent=passed;
-  // Badge on audit tab
+  // Badge on audit tab — total pending across ALL nurseries
+  const allPending=getLatestBatchPerPlot().filter(b=>!getAuditForBatch(b.uid)).length;
   const auditTab=document.querySelector('[data-t="audit"]');
-  let badge=auditTab.querySelector('.tab-badge');
-  if(pending>0){
+  let badge=auditTab?auditTab.querySelector('.tab-badge'):null;
+  if(allPending>0&&auditTab){
     if(!badge){badge=document.createElement('span');badge.className='tab-badge';auditTab.appendChild(badge);}
-    badge.textContent=pending;
+    badge.textContent=allPending;
   } else if(badge) badge.remove();
 }
 
@@ -214,7 +224,8 @@ function renderAuditList(){
   const listEl=document.getElementById('audit-list');
   const compListEl=document.getElementById('completion-list');
   const compSection=document.getElementById('completion-section');
-  const latest=getLatestBatchPerPlot();
+  // Filter by active nursery tab
+  const latest=getLatestBatchPerPlot().filter(b=>b.nursery===activeNursery);
 
   if(!latest.length){
     listEl.innerHTML=`<div class="empty-state">
@@ -508,20 +519,21 @@ async function saveAudit(){
   const b=batches.find(x=>x.uid===auditFormBatchUid);if(!b)return;
   setLoading(true);
   try{
-    let photoUrl=formState.photo;
-    if(photoUrl&&photoUrl.startsWith('data:'))
-      photoUrl=await sb.uploadPhoto('audit-photos','papan_'+b.plot+'_'+Date.now(),photoUrl);
+    // Pass photo as base64 — smartSave handles upload (online) or queues (offline)
     const payload={
       batch_ref:parseInt(auditFormBatchUid),
       nursery:b.nursery,plot:b.plot,batch_no:b.batch,
       presence:formState.presence,info_correct:formState.infoCorrect,
       condition:formState.condition,remarks:null,
-      photo_url:photoUrl||null,date:todayISO()
+      photo_url:formState.photo||null,date:todayISO()
     };
-    const result = await smartSave('papan_audits', editMode?'update':'insert', editMode?payload:{...payload,audit_id:nextAuditID()}, editMode?editId:null);
-    showToast(result?.offline ? '📴 Saved offline — will sync later' : editMode?'✓ Audit updated':'✓ Audit saved');
-    await loadAll();setView('list');selectTab('audit');
-  }catch(e){showToast(t('err_save'));console.error(e);setLoading(false);}
+    const result=await smartSave('papan_audits',editMode?'update':'insert',
+      editMode?payload:{...payload,audit_id:nextAuditID()},
+      editMode?editId:null);
+    showToast(result?.offline?t('offline_saved'):editMode?t('audit_updated'):t('audit_saved'));
+    if(!result?.offline){await loadAll();}
+    setView('list');selectTab('audit');
+  }catch(e){console.error('[Save]',e);showToast('⚠ '+(e.message||'Save failed'));setLoading(false);}
 }
 
 /* --- DETAIL --- */

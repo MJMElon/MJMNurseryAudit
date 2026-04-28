@@ -2,7 +2,7 @@
    MJM NURSERY AUDIT — SERVICE WORKER v3
    sw.js — Full PWA offline support
 ================================================================ */
-const CACHE = 'mjm-audit-v7';
+const CACHE = 'mjm-audit-v8';
 
 const FILES = [
   './',

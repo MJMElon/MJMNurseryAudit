@@ -13,7 +13,7 @@
 <meta name="apple-mobile-web-app-title" content="MJM Audit"/>
 <meta name="theme-color" content="#1a4d1a"/>
 <title>Plot Condition Audit — MJM Nursery</title>
-<link rel="stylesheet" href="styles.css?v=4"/>
+<link rel="stylesheet" href="styles.css?v=5"/>
 </head>
 <body>
 <div id="app">
@@ -165,6 +165,10 @@
       </div>
       <div class="detail-plot" id="detail-plot">—</div>
       <div class="detail-batch" id="detail-batch"></div>
+      <div id="detail-photo-2-wrap" style="display:none;margin-bottom:10px">
+        <div style="font-size:11px;font-weight:700;text-transform:uppercase;color:var(--text3,#6b8a6b);margin-bottom:6px;letter-spacing:.5px">Photo 2</div>
+        <img id="detail-photo-2" src="" alt="Photo 2" style="width:100%;max-height:280px;object-fit:cover;border-radius:8px;cursor:pointer;display:block" onclick="openLightbox(this.src)"/>
+      </div>
       <div class="detail-grid">
         <div class="detail-cell"><div class="detail-cell-label" data-t="pest">Pest</div><div class="detail-cell-val" id="detail-ulat-val">—</div></div>
         <div class="detail-cell"><div class="detail-cell-label" data-t="animal">Animal</div><div class="detail-cell-val" id="detail-tikus-val">—</div></div>
@@ -226,9 +230,9 @@
   <button class="lightbox-close" onclick="closeLightbox()">×</button>
 </div>
 
-<script src="lang.js?v=4"></script>
-<script src="supabase.js?v=4"></script>
-<script src="dexie_offline.js?v=4"></script>
-<script src="script.js?v=4"></script>
+<script src="lang.js?v=5"></script>
+<script src="supabase.js?v=5"></script>
+<script src="dexie_offline.js?v=5"></script>
+<script src="script.js?v=5"></script>
 </body>
 </html>

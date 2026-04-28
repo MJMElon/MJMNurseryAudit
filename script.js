@@ -19,6 +19,8 @@ let editMode=false, editId=null, detailId=null, deleteTarget=null;
 let formState={nursery:'PN',ulat:null,tikus:null,bintik:null,warna:null,photo1:null,photo2:null};
 let toastTimer=null;
 
+function isAdmin(){try{const u=JSON.parse(localStorage.getItem('mjm_user')||'{}');const role=(u.role||'').toLowerCase();return role==='admin'||role==='administrator';}catch(e){return false;}}
+
 function pad(n){return String(n).padStart(3,'0');}
 function todayISO(){return new Date().toISOString().split('T')[0];}
 function fmtDate(iso){
@@ -140,7 +142,7 @@ function renderList(){
       </div>
       <div class="record-actions" onclick="event.stopPropagation()">
         <button class="icon-btn edit-btn" onclick="openEdit('${r.uid}')"><svg viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>
-        <button class="icon-btn del-btn"  onclick="confirmDelete('${r.uid}')"><svg viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/><path d="M10 11v6M14 11v6M9 6V4a1 1 0 011-1h4a1 1 0 011 1v2"/></svg></button>
+        ${isAdmin()?`<button class="icon-btn del-btn"  onclick="confirmDelete('${r.uid}')"><svg viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/><path d="M10 11v6M14 11v6M9 6V4a1 1 0 011-1h4a1 1 0 011 1v2"/></svg></button>`:''}
       </div>
     </div>`).join('');
 }
@@ -289,6 +291,10 @@ function openDetail(uid){
   const heroPh=document.getElementById('detail-hero-placeholder');
   if(r.photo){heroImg.src=r.photo;heroImg.style.display='block';heroPh.style.display='none';}
   else{heroImg.style.display='none';heroPh.style.display='flex';}
+  const photo2Wrap=document.getElementById('detail-photo-2-wrap');
+  const photo2Img=document.getElementById('detail-photo-2');
+  if(r.photo2){photo2Img.src=r.photo2;photo2Wrap.style.display='block';}
+  else{photo2Wrap.style.display='none';}
   document.getElementById('detail-nursery-tag').textContent=NURSERY_LABELS[r.nursery];
   document.getElementById('detail-id').textContent=r.id;
   document.getElementById('detail-date').textContent=fmtDate(r.date);
@@ -317,7 +323,7 @@ function openLightbox(src){
 function closeLightbox(){document.getElementById('lightbox').classList.remove('open');}
 
 /* --- DELETE --- */
-function confirmDelete(uid){deleteTarget=uid;document.getElementById('modal-overlay').classList.add('show');}
+function confirmDelete(uid){if(!isAdmin()){showToast('⚠ Only admin can delete');return;}deleteTarget=uid;document.getElementById('modal-overlay').classList.add('show');}
 function cancelDelete(){deleteTarget=null;document.getElementById('modal-overlay').classList.remove('show');}
 async function doDelete(){
   if(!deleteTarget)return;

@@ -1,103 +1,96 @@
 /* ================================================================
-   MJM NURSERY AUDIT — SERVICE WORKER v3
-   sw.js — Full PWA offline support
+   MJM NURSERY AUDIT — SERVICE WORKER v6
+   Strategy: Network first for HTML, cache first for assets
 ================================================================ */
-const CACHE = 'mjm-audit-v4';
+const CACHE = 'mjm-v6';
 
-const FILES = [
-  './',
-  './index.html',
-  './home.html',
-  './plot_audit.html',
-  './styles.css',
-  './script.js',
-  './height_index.html',
-  './height_styles.css',
-  './height_script.js',
-  './papan_index.html',
-  './papan_styles.css',
-  './papan_script.js',
-  './maintenance_index.html',
-  './maintenance_styles.css',
-  './maintenance_script.js',
-  './supabase.js',
+const STATIC = [
+  './dexie.min.js',
   './dexie_offline.js',
   './lang.js',
+  './supabase.js',
+  './styles.css',
+  './height_styles.css',
+  './papan_styles.css',
+  './maintenance_styles.css',
+  './script.js',
+  './height_script.js',
+  './papan_script.js',
+  './maintenance_script.js',
   './manifest.json',
   './icon-192.png',
   './icon-512.png',
-  'https://unpkg.com/dexie@3.2.4/dist/dexie.min.js',
-  'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2',
-  'https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&display=swap'
 ];
 
-/* INSTALL */
+/* INSTALL — only cache static assets */
 self.addEventListener('install', e => {
-  console.log('[SW] Installing v3...');
   e.waitUntil(
-    caches.open(CACHE).then(cache =>
-      Promise.allSettled(FILES.map(url =>
-        cache.add(url).catch(err => console.warn('[SW] Cache miss:', url, err.message))
+    caches.open(CACHE)
+      .then(cache => Promise.allSettled(
+        STATIC.map(url => cache.add(url).catch(err => console.warn('[SW] Skip:', url)))
       ))
-    ).then(() => {
-      console.log('[SW] Installed');
-      return self.skipWaiting();
-    })
+      .then(() => self.skipWaiting())
   );
 });
 
-/* ACTIVATE */
+/* ACTIVATE — delete old caches */
 self.addEventListener('activate', e => {
   e.waitUntil(
-    caches.keys().then(keys =>
-      Promise.all(keys.filter(k => k !== CACHE).map(k => caches.delete(k)))
-    ).then(() => {
-      console.log('[SW] Activated v3');
-      return self.clients.claim();
-    })
+    caches.keys()
+      .then(keys => Promise.all(
+        keys.filter(k => k !== CACHE).map(k => caches.delete(k))
+      ))
+      .then(() => self.clients.claim())
   );
 });
 
 /* FETCH */
 self.addEventListener('fetch', e => {
-  if(e.request.method !== 'GET') return;
   const url = e.request.url;
-  if(!url.startsWith('http')) return;
+  if(e.request.method !== 'GET') return;
 
-  // Supabase API — network only, no cache
+  // Supabase API — always network, never cache
   if(url.includes('supabase.co')){
     e.respondWith(
       fetch(e.request).catch(() =>
-        new Response(JSON.stringify({error:'offline'}), {
-          headers: {'Content-Type':'application/json'}
-        })
+        new Response(JSON.stringify({error:'offline'}),
+          {headers:{'Content-Type':'application/json'}})
       )
     );
     return;
   }
 
-  // Everything else — cache first, then network
+  // HTML pages — network first, fall back to cache
+  if(e.request.headers.get('accept')?.includes('text/html') || url.endsWith('.html')){
+    e.respondWith(
+      fetch(e.request)
+        .then(res => {
+          // Cache the fresh version
+          const clone = res.clone();
+          caches.open(CACHE).then(c => c.put(e.request, clone));
+          return res;
+        })
+        .catch(() => caches.match(e.request))
+    );
+    return;
+  }
+
+  // Static assets (JS/CSS/images) — cache first, then network
   e.respondWith(
     caches.match(e.request).then(cached => {
       if(cached) return cached;
       return fetch(e.request).then(res => {
-        if(res && res.status === 200 && res.type !== 'opaque'){
+        if(res && res.status === 200){
           const clone = res.clone();
           caches.open(CACHE).then(c => c.put(e.request, clone));
         }
         return res;
-      }).catch(() => {
-        // Offline fallback for HTML pages
-        if(e.request.headers.get('accept')?.includes('text/html')){
-          return caches.match('./index.html');
-        }
-        return new Response('Offline', {status: 503});
-      });
+      }).catch(() => new Response('Offline', {status:503}));
     })
   );
 });
 
-/* MESSAGE */
+/* Force update on message */
 self.addEventListener('message', e => {
   if(e.data === 'skipWaiting') self.skipWaiting();
 });

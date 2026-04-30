@@ -626,20 +626,29 @@
     }
   }
 
+  // Always listen — catches the event when it fires, whenever that is
+  _supa.auth.onAuthStateChange((event, session) => {
+    if (event === 'PASSWORD_RECOVERY' || (event === 'SIGNED_IN' && session && _auditIsRecovery)) {
+      _showRecoveryModal();
+    }
+  });
+
   if (_auditIsRecovery) {
     sessionStorage.setItem('mjm_audit_session', '1');
-    // Fire on whichever auth event arrives first (PASSWORD_RECOVERY for implicit, SIGNED_IN for PKCE)
-    _supa.auth.onAuthStateChange((event, session) => {
-      if (event === 'PASSWORD_RECOVERY' || (event === 'SIGNED_IN' && session)) {
-        _showRecoveryModal();
-      }
-    });
-    // Fallback: if no event has fired after 2s, try anyway (the SDK may have processed the URL before our listener attached)
-    setTimeout(() => {
+    // Poll for the session in case the SDK fired its event before our listener attached.
+    // Once a session appears (or we've polled for 5s), show the modal.
+    let _pollCount = 0;
+    const _poll = setInterval(() => {
+      _pollCount++;
       _supa.auth.getSession().then(({ data }) => {
-        if (data && data.session) _showRecoveryModal();
+        if (data && data.session) {
+          clearInterval(_poll);
+          _showRecoveryModal();
+        } else if (_pollCount >= 50) {
+          clearInterval(_poll);
+        }
       });
-    }, 2000);
+    }, 100);
   } else if (sessionStorage.getItem('mjm_audit_session')) {
     // Already logged in this session — go straight to home
     window.location.href = 'home.html';

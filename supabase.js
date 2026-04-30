@@ -4,7 +4,7 @@
    ================================================================ */
 
 const SUPA_URL = 'https://kibqjztozokohqmhqqqf.supabase.co';
-const SUPA_KEY = 'sb_publishable_cyPuEmjV7D39aZyIGLHh5g_QATIBWHT';
+const SUPA_KEY = 'sb_publishable_Eqa20kX-1ZsH4BC9xRmSbg_7iFcjPWo';
 
 async function sbFetch(path, options = {}) {
   const url = `${SUPA_URL}/rest/v1/${path}`;

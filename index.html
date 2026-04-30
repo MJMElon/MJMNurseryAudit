@@ -524,6 +524,21 @@
     </div>
   </div>
 
+  <!-- SET NEW PASSWORD MODAL (for reset flow) -->
+  <div class="modal-bg" id="reset-modal">
+    <div class="modal-sheet">
+      <div class="modal-title">Set New Password</div>
+      <div class="modal-sub">Enter your new password below.</div>
+      <div class="modal-error" id="reset-error"></div>
+      <div class="modal-success" id="reset-success"></div>
+      <div class="modal-field">
+        <label class="modal-label">New Password</label>
+        <input class="modal-input" id="reset-password" type="password" placeholder="Min. 6 characters" autocomplete="new-password"/>
+      </div>
+      <button class="modal-btn" id="reset-btn" onclick="doSetNewPassword()">Save New Password</button>
+    </div>
+  </div>
+
   <!-- SIGN UP MODAL -->
   <div class="modal-bg" id="signup-modal" onclick="if(event.target===this)hideSignUp()">
     <div class="modal-sheet">
@@ -556,33 +571,75 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
   const SUPA_URL = 'https://kibqjztozokohqmhqqqf.supabase.co';
-  const SUPA_KEY = 'sb_publishable_cyPuEmjV7D39aZyIGLHh5g_QATIBWHT';
-  const _supa = supabase.createClient(SUPA_URL, SUPA_KEY);
+  const SUPA_KEY = 'sb_publishable_Eqa20kX-1ZsH4BC9xRmSbg_7iFcjPWo';
+  const _supa = supabase.createClient(SUPA_URL, SUPA_KEY, {
+    auth: { flowType: 'implicit' }
+  });
 
-  // ── Detect password recovery link ──
-  const _auditHash = window.location.hash;
-  const _auditIsRecovery = _auditHash.includes('type=recovery') || _auditHash.includes('access_token');
+  // ── Detect password recovery link (hash for implicit flow, ?code= for PKCE) ──
+  const _auditHash  = window.location.hash;
+  const _auditQuery = window.location.search;
+  const _auditIsRecovery =
+    _auditHash.includes('type=recovery') ||
+    _auditHash.includes('access_token')  ||
+    _auditQuery.includes('code=')        ||
+    new URLSearchParams(_auditQuery).get('type') === 'recovery';
+
+  let _recoveryShown = false;
+  function _showRecoveryModal() {
+    if (_recoveryShown) return;
+    _recoveryShown = true;
+    const modal = document.getElementById('reset-modal');
+    if (modal) {
+      modal.classList.add('show');
+      const inp = document.getElementById('reset-password');
+      if (inp) { inp.value = ''; setTimeout(() => inp.focus(), 100); }
+    }
+  }
+
+  async function doSetNewPassword() {
+    const pw    = document.getElementById('reset-password').value;
+    const errEl = document.getElementById('reset-error');
+    const okEl  = document.getElementById('reset-success');
+    const btn   = document.getElementById('reset-btn');
+    errEl.classList.remove('show');
+    okEl.classList.remove('show');
+    if (!pw || pw.length < 6) {
+      errEl.textContent = 'Password must be at least 6 characters.';
+      errEl.classList.add('show');
+      return;
+    }
+    btn.classList.add('loading');
+    btn.textContent = 'Saving...';
+    try {
+      const { error } = await _supa.auth.updateUser({ password: pw });
+      if (error) throw error;
+      okEl.textContent = '✓ Password updated! Redirecting to login...';
+      okEl.classList.add('show');
+      await _supa.auth.signOut();
+      setTimeout(() => { window.location.href = window.location.pathname; }, 1200);
+    } catch (e) {
+      errEl.textContent = e.message || 'Failed to update password.';
+      errEl.classList.add('show');
+      btn.classList.remove('loading');
+      btn.textContent = 'Save New Password';
+    }
+  }
 
   if (_auditIsRecovery) {
-    // Show recovery form immediately
     sessionStorage.setItem('mjm_audit_session', '1');
-    // Wait for onAuthStateChange to fire PASSWORD_RECOVERY then show form
+    // Fire on whichever auth event arrives first (PASSWORD_RECOVERY for implicit, SIGNED_IN for PKCE)
     _supa.auth.onAuthStateChange((event, session) => {
-      if (event === 'PASSWORD_RECOVERY') {
-        // Show a simple password reset prompt
-        const newPw = prompt('Enter your new password (min 6 characters):');
-        if (newPw && newPw.length >= 6) {
-          _supa.auth.updateUser({ password: newPw }).then(({ error }) => {
-            if (error) { alert('Error: ' + error.message); }
-            else {
-              alert('Password updated successfully! Please log in.');
-              window.location.hash = '';
-              window.location.reload();
-            }
-          });
-        }
+      if (event === 'PASSWORD_RECOVERY' || (event === 'SIGNED_IN' && session)) {
+        _showRecoveryModal();
       }
     });
+    // Fallback: if no event has fired after 2s, try anyway (the SDK may have processed the URL before our listener attached)
+    setTimeout(() => {
+      _supa.auth.getSession().then(({ data }) => {
+        if (data && data.session) _showRecoveryModal();
+      });
+    }, 2000);
   } else if (sessionStorage.getItem('mjm_audit_session')) {
     // Already logged in this session — go straight to home
     window.location.href = 'home.html';
@@ -717,7 +774,7 @@
     btn.textContent = t('sending');
     try{
       const { error } = await _supa.auth.resetPasswordForEmail(email, {
-        redirectTo: window.location.href.split('?')[0].split('#')[0]
+        redirectTo: 'https://mjmelon.github.io/MJMNurseryAudit/index.html'
       });
       if(error) throw error;
       okEl.textContent = t('reset_sent');

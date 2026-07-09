@@ -1,0 +1,593 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no"/>
+  <link rel="manifest" href="manifest.json"/>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+<meta name="apple-mobile-web-app-title" content="MJM Audit"/>
+<link rel="apple-touch-icon" href="icon-192.png"/>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+<meta name="apple-mobile-web-app-title" content="MJM Audit"/>
+<meta name="theme-color" content="#0f2e0f"/>
+  <title>MJM Nursery — Dashboard</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&family=DM+Serif+Display&display=swap" rel="stylesheet"/>
+
+  <!-- Anti-flicker auth guard: accepts mjm_user from either audit login or main portal -->
+  <script>if(!localStorage.getItem('mjm_user')){window.location.replace('index.html');}</script>
+  <style>body{opacity:0;transition:opacity 0.2s ease;}</style>
+
+  <style>
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+    img{display:block;max-width:100%}
+    :root{
+      --g900:#0a1f0a;--g800:#1a4d1a;--g700:#236023;--g600:#2d7a2d;
+      --g500:#3d9c3d;--g400:#5aab5a;--g300:#81c784;--g200:#b5dfb5;--g100:#e0f2e0;--g50:#f2faf2;
+      --teal800:#0f4c52;--teal600:#177a83;--teal100:#d0f4f7;--teal50:#edfbfc;
+      --amber800:#7c2d12;--amber600:#c2410c;--amber100:#ffedd5;--amber50:#fff7ed;
+      --red50:#fff1f1;--red100:#fca5a5;--red600:#dc2626;--red800:#991b1b;
+      --surface:#f3f6f3;--white:#fff;--border:#dde8dd;
+      --text1:#182018;--text2:#3d5c3d;--text3:#6b8a6b;--text4:#9db09d;
+      --r-lg:16px;--r-xl:20px;
+      --shadow-sm:0 2px 8px rgba(0,0,0,.07),0 1px 3px rgba(0,0,0,.05);
+      --shadow-card:0 8px 32px rgba(0,0,0,.11),0 2px 8px rgba(0,0,0,.06);
+    }
+    html,body{height:100%;font-family:'DM Sans',sans-serif;font-size:16px;background:var(--surface);color:var(--text1);-webkit-font-smoothing:antialiased}
+    #app{max-width:480px;margin:0 auto;min-height:100vh;background:var(--surface)}
+
+    /* HEADER */
+    .header{background:var(--g900);position:relative;overflow:hidden;padding:0 18px;padding-bottom:40px}
+    .header::before{content:'';position:absolute;top:-40px;right:-40px;width:200px;height:200px;border-radius:50%;background:rgba(45,122,45,.18)}
+    .header::after{content:'';position:absolute;bottom:-20px;left:-30px;width:140px;height:140px;border-radius:50%;background:rgba(26,77,26,.2)}
+    .header-top{height:60px;display:flex;align-items:center;justify-content:space-between;position:relative;z-index:1}
+    .header-logo{display:flex;align-items:center;gap:10px}
+    .header-logo-icon{width:34px;height:34px;border-radius:9px;background:rgba(255,255,255,.1);display:flex;align-items:center;justify-content:center;flex-shrink:0}
+    .header-logo-icon svg{width:18px;height:18px;stroke:var(--g300);fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+    .header-logo-text{font-size:15px;font-weight:700;color:#fff}
+    .header-logo-sub{font-size:10px;color:rgba(255,255,255,.45);margin-top:1px}
+    .header-user-btn{display:flex;align-items:center;gap:8px;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.12);border-radius:24px;padding:5px 12px 5px 6px;cursor:pointer;transition:background .15s;text-decoration:none;position:relative}
+    .header-user-btn:hover{background:rgba(255,255,255,.13)}
+    .user-avatar{width:28px;height:28px;border-radius:50%;background:var(--g600);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:#fff;flex-shrink:0}
+    .user-name{font-size:12px;font-weight:600;color:rgba(255,255,255,.85)}
+    .notif-dot{position:absolute;top:2px;right:2px;width:10px;height:10px;border-radius:50%;background:#ef4444;border:2px solid var(--g900);display:none}
+    .notif-dot.active{display:block}
+    .header-welcome{position:relative;z-index:1;padding-bottom:8px}
+    .welcome-greeting{font-size:13px;color:rgba(255,255,255,.5);margin-bottom:4px}
+    .welcome-name{font-family:'DM Serif Display',serif;font-size:26px;color:#fff;margin-bottom:6px;line-height:1.2}
+    .welcome-name span{color:var(--g300)}
+    .welcome-date{font-size:12px;color:rgba(255,255,255,.4)}
+
+    /* CONTENT */
+    .content{position:relative;z-index:2;margin-top:-28px;padding:0 14px 2rem}
+
+    /* ALERT SUMMARY */
+    .alert-section{margin-bottom:20px}
+    .alert-loading{background:var(--white);border:1px solid var(--border);border-radius:var(--r-lg);padding:20px;text-align:center;font-size:13px;color:var(--text4)}
+    .alert-spinner{width:20px;height:20px;border:2px solid var(--border);border-top-color:var(--g600);border-radius:50%;animation:spin .7s linear infinite;margin:0 auto 8px}
+    @keyframes spin{to{transform:rotate(360deg)}}
+
+    .alert-card{background:var(--white);border:1px solid var(--border);border-radius:var(--r-lg);overflow:hidden;box-shadow:var(--shadow-sm);margin-bottom:8px}
+    .alert-card-header{display:flex;align-items:center;gap:10px;padding:12px 14px;cursor:pointer;-webkit-tap-highlight-color:transparent}
+    .alert-icon{width:36px;height:36px;border-radius:10px;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:18px}
+    .alert-icon-rat{background:#fff1f1}
+    .alert-icon-pest{background:#fff7ed}
+    .alert-icon-leaf{background:#fefce8}
+    .alert-card-info{flex:1;min-width:0}
+    .alert-card-title{font-size:13px;font-weight:700;color:var(--text1);margin-bottom:2px}
+    .alert-card-sub{font-size:11px;color:var(--text3)}
+    .alert-count-badge{font-size:12px;font-weight:700;padding:3px 10px;border-radius:20px;flex-shrink:0}
+    .badge-red{background:var(--red50);color:var(--red600)}
+    .badge-amber{background:var(--amber50);color:var(--amber600)}
+    .badge-yellow{background:#fefce8;color:#854d0e}
+    .badge-ok{background:var(--g50);color:var(--g700)}
+    .alert-chevron{width:16px;height:16px;stroke:var(--text4);fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;transition:transform .2s;flex-shrink:0}
+    .alert-card.open .alert-chevron{transform:rotate(90deg)}
+    .alert-plots{display:none;padding:0 14px 12px;flex-wrap:wrap;gap:6px}
+    .alert-card.open .alert-plots{display:flex}
+    .plot-pill{font-size:11px;font-weight:600;padding:3px 10px;border-radius:20px;background:var(--surface);border:1px solid var(--border);color:var(--text2)}
+    .all-clear{background:var(--g50);border:1px solid var(--g200);border-radius:var(--r-lg);padding:14px 16px;display:flex;align-items:center;gap:10px;box-shadow:var(--shadow-sm)}
+    .all-clear-icon{width:36px;height:36px;border-radius:50%;background:var(--g100);display:flex;align-items:center;justify-content:center;flex-shrink:0}
+    .all-clear-icon svg{width:18px;height:18px;stroke:var(--g600);fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+    .all-clear-text{font-size:13px;font-weight:600;color:var(--g700)}
+    .all-clear-sub{font-size:11px;color:var(--text3)}
+
+    /* SECTION HEAD */
+    .section-head{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:var(--text3);margin-bottom:12px;padding-left:2px}
+
+    /* AUDIT CARDS */
+    .audit-cards{display:flex;flex-direction:column;gap:14px;margin-bottom:24px}
+    .audit-card{border-radius:var(--r-xl);overflow:hidden;box-shadow:var(--shadow-card);cursor:pointer;text-decoration:none;display:block;transition:transform .18s,box-shadow .18s;-webkit-tap-highlight-color:transparent;position:relative}
+    .audit-card:hover{transform:translateY(-3px);box-shadow:0 12px 36px rgba(0,0,0,.14),0 3px 10px rgba(0,0,0,.08)}
+    .audit-card:active{transform:scale(.98)}
+    .audit-card-body{padding:22px 20px 20px;position:relative;z-index:1}
+    .audit-card-blob{position:absolute;top:-30px;right:-30px;width:150px;height:150px;border-radius:50%;opacity:.15;z-index:0}
+    .card-icon-row{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
+    .card-icon{width:50px;height:50px;border-radius:14px;background:rgba(255,255,255,.15);display:flex;align-items:center;justify-content:center}
+    .card-icon svg{width:26px;height:26px;stroke:#fff;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+    .card-arrow{width:34px;height:34px;border-radius:50%;background:rgba(255,255,255,.15);display:flex;align-items:center;justify-content:center}
+    .card-arrow svg{width:16px;height:16px;stroke:#fff;fill:none;stroke-width:2.5;stroke-linecap:round;stroke-linejoin:round}
+    .card-label{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;margin-bottom:4px}
+    .card-title{font-size:20px;font-weight:700;line-height:1.2;margin-bottom:8px;color:#fff}
+    .card-desc{font-size:13px;line-height:1.5;opacity:.75;color:rgba(255,255,255,.75);margin-bottom:16px}
+    /* tag pills as circles */
+    .card-tags{display:flex;flex-wrap:wrap;gap:8px}
+    .card-tag{font-size:10px;font-weight:600;padding:5px 11px;border-radius:20px;background:rgba(255,255,255,.15);color:rgba(255,255,255,.9);text-align:center;line-height:1.3}
+
+    /* card themes */
+    .card-audit{background:linear-gradient(135deg,#1a4d1a 0%,#2d7a2d 100%)}
+    .card-audit .card-label{color:var(--g200)}
+    .card-audit .audit-card-blob{background:#5aab5a}
+    .card-height{background:linear-gradient(135deg,#0f4c52 0%,#177a83 100%)}
+    .card-height .card-label{color:var(--teal100)}
+    .card-height .audit-card-blob{background:#26b5c2}
+    .card-papan{background:linear-gradient(135deg,#7c2d12 0%,#c2410c 100%)}
+    .card-papan .card-label{color:#fed7aa}
+    .card-papan .audit-card-blob{background:#fb923c}
+
+    /* INFO STRIP */
+    .info-strip{background:var(--white);border:1px solid var(--border);border-radius:var(--r-lg);padding:14px 16px;display:flex;align-items:center;gap:12px;box-shadow:var(--shadow-sm)}
+    .info-strip-icon{width:36px;height:36px;border-radius:9px;background:var(--g50);display:flex;align-items:center;justify-content:center;flex-shrink:0}
+    .info-strip-icon svg{width:18px;height:18px;stroke:var(--g600);fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+    .info-strip-title{font-size:13px;font-weight:600;color:var(--text2);margin-bottom:2px}
+    .info-strip-sub{font-size:11px;color:var(--text4)}
+
+    /* LOGOUT MODAL */
+    .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:300;display:flex;align-items:flex-end;justify-content:center;opacity:0;pointer-events:none;transition:opacity .25s}
+    .modal-overlay.show{opacity:1;pointer-events:all}
+    .modal-box{background:var(--white);border-radius:20px 20px 0 0;padding:24px 20px 36px;width:100%;max-width:480px;transform:translateY(24px);transition:transform .25s ease}
+    .modal-overlay.show .modal-box{transform:translateY(0)}
+    .modal-title{font-size:17px;font-weight:700;color:var(--text1);margin-bottom:8px}
+    .modal-msg{font-size:13px;color:var(--text3);margin-bottom:22px;line-height:1.5}
+    .modal-btns{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+    .btn-stay{height:46px;border-radius:12px;background:var(--surface);border:1px solid var(--border);color:var(--text2);font-size:14px;font-weight:600;font-family:'DM Sans',sans-serif;cursor:pointer}
+    .btn-logout{height:46px;border-radius:12px;background:#b91c1c;border:none;color:#fff;font-size:14px;font-weight:600;font-family:'DM Sans',sans-serif;cursor:pointer}
+
+    /* ANIMATIONS */
+    .fade-in{opacity:0;transform:translateY(14px);animation:fadeUp .45s ease forwards}
+    .fade-in:nth-child(1){animation-delay:.05s}
+    .fade-in:nth-child(2){animation-delay:.13s}
+    .fade-in:nth-child(3){animation-delay:.21s}
+    .fade-in:nth-child(4){animation-delay:.29s}
+    .fade-in:nth-child(5){animation-delay:.37s}
+    @keyframes fadeUp{to{opacity:1;transform:translateY(0)}}
+
+    /* INSTALL BANNER */
+    .install-banner{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:480px;background:var(--g900);padding:14px 16px;display:flex;align-items:center;gap:12px;z-index:9000;box-shadow:0 -4px 20px rgba(0,0,0,.3);animation:slideUp .3s ease}
+    @keyframes slideUp{from{transform:translateX(-50%) translateY(100%)}to{transform:translateX(-50%) translateY(0)}}
+    .install-banner-icon{width:40px;height:40px;border-radius:10px;background:var(--g600);display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:20px}
+    .install-banner-text{flex:1;min-width:0}
+    .install-banner-title{font-size:13px;font-weight:700;color:#fff;margin-bottom:2px}
+    .install-banner-sub{font-size:11px;color:rgba(255,255,255,.55)}
+    .install-banner-btn{height:36px;padding:0 16px;border-radius:20px;background:var(--g500);border:none;color:#fff;font-size:13px;font-weight:700;font-family:'DM Sans',sans-serif;cursor:pointer;flex-shrink:0;white-space:nowrap}
+    .install-banner-close{width:28px;height:28px;border-radius:50%;background:rgba(255,255,255,.1);border:none;color:rgba(255,255,255,.6);font-size:16px;display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0}
+    .ios-install-modal{position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:9001;display:flex;align-items:flex-end;justify-content:center}
+    .ios-install-box{background:#fff;border-radius:20px 20px 0 0;padding:24px 20px 40px;width:100%;max-width:480px;text-align:center}
+    .ios-install-box h3{font-size:17px;font-weight:700;color:#182018;margin-bottom:8px}
+    .ios-install-box p{font-size:13px;color:#6b8a6b;line-height:1.6;margin-bottom:20px}
+    .ios-steps{text-align:left;background:#f4f6f4;border-radius:12px;padding:14px 16px;margin-bottom:20px}
+    .ios-step{display:flex;align-items:center;gap:10px;padding:6px 0;font-size:13px;color:#3d5c3d}
+    .ios-step-num{width:22px;height:22px;border-radius:50%;background:#1a4d1a;color:#fff;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+    .ios-close-btn{width:100%;height:44px;border-radius:12px;background:#1a4d1a;border:none;color:#fff;font-size:14px;font-weight:600;font-family:'DM Sans',sans-serif;cursor:pointer}
+
+  </style>
+</head>
+<body>
+<a href="../index.html" style="position:fixed;top:12px;left:12px;z-index:999;display:inline-flex;align-items:center;gap:6px;background:rgba(5,20,12,.85);border:1px solid rgba(52,211,153,.3);border-radius:10px;padding:7px 14px;font-size:11px;font-weight:700;color:#6ee7b7;text-decoration:none;letter-spacing:.06em;text-transform:uppercase;backdrop-filter:blur(8px);" onmouseover="this.style.borderColor='#10b981'" onmouseout="this.style.borderColor='rgba(52,211,153,.3)'">&#8592; Portal</a>
+<div id="app">
+
+  <!-- HEADER -->
+  <div class="header">
+    <div class="header-top">
+      <div class="header-logo">
+        <div class="header-logo-icon">
+          <svg viewBox="0 0 24 24"><path d="M12 22V12"/><path d="M12 12C12 12 7 10 5 6c3 0 6 2 7 6z"/><path d="M12 12C12 12 17 10 19 6c-3 0-6 2-7 6z"/><path d="M12 12C12 12 8 14 7 18c2.5-.5 4.5-2.5 5-6z"/><path d="M12 12C12 12 16 14 17 18c-2.5-.5-4.5-2.5-5-6z"/></svg>
+        </div>
+        <div>
+          <div class="header-logo-text">MJM Nursery</div>
+          <div class="header-logo-sub">Audit System</div>
+        </div>
+      </div>
+      <button class="lang-toggle-btn" onclick="toggleLang()" style="height:32px;padding:0 12px;border-radius:20px;background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.2);color:#fff;font-size:12px;font-weight:700;cursor:pointer;margin-right:6px">BM</button>
+      <div class="header-user-btn" onclick="showLogout()">
+        <div class="notif-dot" id="notif-dot"></div>
+        <div class="user-avatar" id="user-avatar">A</div>
+        <span class="user-name" id="user-name">Admin</span>
+      </div>
+    </div>
+    <div class="header-welcome">
+      <div class="welcome-greeting">Good morning,</div>
+      <div class="welcome-name" id="welcome-name">Welcome back <span>👋</span></div>
+      <div class="welcome-date" id="welcome-date"></div>
+    </div>
+  </div>
+
+  <!-- MAIN CONTENT -->
+  <div class="content">
+
+    <!-- ALERT SUMMARY -->
+    <div class="section-head fade-in"><span data-t="home_alert_title">⚠ Alert Summary</span></div>
+    <div class="alert-section fade-in" id="alert-section">
+      <div class="alert-loading">
+        <div class="alert-spinner"></div>
+        Loading latest audit data...
+      </div>
+    </div>
+
+    <!-- AUDIT MODULES -->
+    <div class="section-head fade-in"><span data-t="home_modules_title">Audit Modules</span></div>
+    <div class="audit-cards">
+
+      <!-- Module 1: Plot Condition -->
+      <a class="audit-card card-audit fade-in" href="plot_audit.html">
+        <div class="audit-card-blob"></div>
+        <div class="audit-card-body">
+          <div class="card-icon-row">
+            <div class="card-icon"><svg viewBox="0 0 24 24"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="1"/><path d="M9 12l2 2 4-4"/></svg></div>
+            <div class="card-arrow"><svg viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"/></svg></div>
+          </div>
+          <div class="card-label">Module 1</div>
+          <div class="card-title" data-t="home_plot">Plot Condition Audit</div>
+          <div class="card-desc">Record pest levels, rat activity, leaf disease, and leaf colour per plot across all nursery sites.</div>
+          <div class="card-tags">
+            <span class="card-tag">Pest Infestation</span>
+            <span class="card-tag">Animal Infestation</span>
+            <span class="card-tag">Disease Infestation</span>
+            <span class="card-tag">Leaf Condition</span>
+          </div>
+        </div>
+      </a>
+
+      <!-- Module 2: Seedling Height -->
+      <a class="audit-card card-height fade-in" href="height_index.html">
+        <div class="audit-card-blob"></div>
+        <div class="audit-card-body">
+          <div class="card-icon-row">
+            <div class="card-icon"><svg viewBox="0 0 24 24"><line x1="12" y1="20" x2="12" y2="4"/><path d="M12 4C12 4 8 8 8 10"/><path d="M12 4C12 4 16 8 16 10"/><path d="M12 10C12 10 9 13 9 15"/><path d="M12 10C12 10 15 13 15 15"/></svg></div>
+            <div class="card-arrow"><svg viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"/></svg></div>
+          </div>
+          <div class="card-label">Module 2</div>
+          <div class="card-title" data-t="home_height">Seedling Height Audit</div>
+          <div class="card-desc">Measure and record seedling heights with 3 samples per plot. Auto-calculates average. Requires 3 photos per record.</div>
+          <div class="card-tags">
+            <span class="card-tag">Seedling Height</span>
+          </div>
+        </div>
+      </a>
+
+      <!-- Module 3: Papan Tanda -->
+      <a class="audit-card card-papan fade-in" href="papan_index.html">
+        <div class="audit-card-blob"></div>
+        <div class="audit-card-body">
+          <div class="card-icon-row">
+            <div class="card-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 9h6M9 12h6M9 15h4"/></svg></div>
+            <div class="card-arrow"><svg viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"/></svg></div>
+          </div>
+          <div class="card-label">Module 3</div>
+          <div class="card-title" data-t="home_papan">Papan Tanda Audit</div>
+          <div class="card-desc">Audit the condition of every papan tanda across all transplant plots.</div>
+          <div class="card-tags">
+            <span class="card-tag">Height 1.5M</span>
+            <span class="card-tag">Data Correct</span>
+            <span class="card-tag">Clear &amp; Visible</span>
+          </div>
+        </div>
+      </a>
+
+      <!-- Module 4: Maintenance Audit -->
+      <a class="audit-card fade-in" href="maintenance_index.html" style="background:linear-gradient(135deg,#1e3a5f 0%,#2d5986 100%);border-radius:var(--r-xl);overflow:hidden;box-shadow:var(--shadow-card);cursor:pointer;text-decoration:none;display:block;transition:transform .18s,box-shadow .18s;-webkit-tap-highlight-color:transparent;position:relative">
+        <div class="audit-card-blob" style="background:#4a90d9"></div>
+        <div class="audit-card-body">
+          <div class="card-icon-row">
+            <div class="card-icon"><svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 000 1.4l1.6 1.6a1 1 0 001.4 0l3.77-3.77a6 6 0 01-7.94 7.94l-6.91 6.91a2.12 2.12 0 01-3-3l6.91-6.91a6 6 0 017.94-7.94l-3.76 3.76z"/></svg></div>
+            <div class="card-arrow"><svg viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"/></svg></div>
+          </div>
+          <div class="card-label" style="color:#bfdbfe">Module 4</div>
+          <div class="card-title" data-t="home_maintenance">Maintenance Audit</div>
+          <div class="card-desc">Audit completed maintenance tasks from workers. Verify work quality on-site with photo evidence.</div>
+          <div class="card-tags">
+            <span class="card-tag">Manuring</span>
+            <span class="card-tag">Weeding</span>
+            <span class="card-tag">Racun</span>
+            <span class="card-tag">Interrow Spray</span>
+          </div>
+        </div>
+      </a>
+
+      <!-- Report -->
+      <a class="audit-card fade-in" href="report.html" style="background:linear-gradient(135deg,#1a3a1a 0%,#2d5a2d 100%);border-radius:var(--r-xl);overflow:hidden;box-shadow:var(--shadow-card);cursor:pointer;text-decoration:none;display:block;transition:transform .18s,box-shadow .18s;-webkit-tap-highlight-color:transparent;position:relative">
+        <div class="audit-card-blob" style="background:#3d8c3d"></div>
+        <div class="audit-card-body">
+          <div class="card-icon-row">
+            <div class="card-icon"><svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg></div>
+            <div class="card-arrow"><svg viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"/></svg></div>
+          </div>
+          <div class="card-label" style="color:#b5dfb5">Monthly Report</div>
+          <div class="card-title">Audit Report</div>
+          <div class="card-desc">Generate monthly audit summary by nursery and module. Printable PDF format.</div>
+          <div class="card-tags">
+            <span class="card-tag">PN</span>
+            <span class="card-tag">Main Nursery</span>
+            <span class="card-tag">Print PDF</span>
+          </div>
+        </div>
+      </a>
+
+    </div><!-- /audit-cards -->
+
+    <!-- INFO STRIP -->
+    <div class="info-strip fade-in">
+      <div class="info-strip-icon"><svg viewBox="0 0 24 24"><path d="M12 22V12"/><path d="M12 12C12 12 7 10 5 6c3 0 6 2 7 6z"/><path d="M12 12C12 12 17 10 19 6c-3 0-6 2-7 6z"/></svg></div>
+      <div>
+        <div class="info-strip-title">MJM Nursery — Miri, Sarawak</div>
+        <div class="info-strip-sub">PN · BNN · UNN 1 · UNN 2</div>
+      </div>
+    </div>
+
+  </div><!-- /content -->
+
+<!-- INSTALL BANNER -->
+<div class="install-banner" id="install-banner" style="display:none">
+  <div class="install-banner-icon">🌿</div>
+  <div class="install-banner-text">
+    <div class="install-banner-title">Install MJM Audit App</div>
+    <div class="install-banner-sub">Use offline in the field</div>
+  </div>
+  <button class="install-banner-btn" id="install-btn" onclick="handleInstall()">Install</button>
+  <button class="install-banner-close" onclick="dismissInstall()">×</button>
+</div>
+
+<!-- iOS Install Instructions Modal -->
+<div class="ios-install-modal" id="ios-modal" style="display:none">
+  <div class="ios-install-box">
+    <h3>Install MJM Audit App 🌿</h3>
+    <p>Add to your home screen to use the app offline in the field — no internet needed!</p>
+    <div class="ios-steps">
+      <div class="ios-step"><span class="ios-step-num">1</span>Tap the <strong>Share</strong> button at the bottom of Safari</div>
+      <div class="ios-step"><span class="ios-step-num">2</span>Scroll down and tap <strong>"Add to Home Screen"</strong></div>
+      <div class="ios-step"><span class="ios-step-num">3</span>Tap <strong>"Add"</strong> — done! ✅</div>
+    </div>
+    <button class="ios-close-btn" onclick="closeIosModal()">Got it!</button>
+  </div>
+</div>
+
+</div><!-- /#app -->
+
+<!-- LOGOUT MODAL -->
+<div class="modal-overlay" id="logout-modal" onclick="hideLogout(event)">
+  <div class="modal-box">
+    <div class="modal-title">Sign Out?</div>
+    <div class="modal-msg" data-t="signout_msg">You will be returned to the login page.</div>
+    <div class="modal-btns">
+      <button class="btn-stay" onclick="hideLogoutDirect()" data-t="stay">Stay</button>
+      <button class="btn-logout" onclick="doLogout()" data-t="signout">Sign Out</button>
+    </div>
+  </div>
+</div>
+
+<script src="lang.js?v=8"></script>
+<script src="supabase.js?v=8"></script>
+<script>
+/* ── Auth ── */
+const userRaw = localStorage.getItem('mjm_user');
+if (!userRaw) { window.location.replace('index.html'); }
+else { document.body.style.opacity = '1'; }
+const user = userRaw ? JSON.parse(userRaw) : {name:'User',role:'',username:'u'};
+
+/* ── Greeting ── */
+function getGreeting(){const h=new Date().getHours();return h<12?t('home_greeting_morning'):h<17?t('home_greeting_afternoon'):t('home_greeting_evening');}
+function fmtDate(d){return d.toLocaleDateString('en-MY',{weekday:'long',day:'numeric',month:'long',year:'numeric'});}
+document.querySelector('.welcome-greeting').textContent = getGreeting();
+document.getElementById('welcome-name').innerHTML = user.name+' <span style="color:var(--g300)">👋</span>';
+document.getElementById('welcome-date').textContent = fmtDate(new Date());
+const initials = user.name.split(' ').map(w=>w[0]).join('').toUpperCase().slice(0,2);
+document.getElementById('user-avatar').textContent = initials;
+document.getElementById('user-name').textContent   = user.name.split(' ')[0];
+
+/* ── Logout ── */
+function showLogout(){document.getElementById('logout-modal').classList.add('show');}
+function hideLogout(e){if(e.target===document.getElementById('logout-modal'))hideLogoutDirect();}
+function hideLogoutDirect(){document.getElementById('logout-modal').classList.remove('show');}
+async function doLogout(){
+  localStorage.removeItem('mjm_user');
+  // Also sign out from Supabase Auth if available
+  try{
+    if(typeof sb !== 'undefined' && sb._client){
+      await sb._client.auth.signOut();
+    } else {
+      // Fallback: use supabase-js directly
+      const s=window._supaClient;if(s)await s.auth.signOut();
+    }
+  }catch(e){}
+  window.location.href='index.html';
+}
+
+/* ── ALERT SYSTEM ── */
+const ALERT_KEY = 'mjm_last_alerts';
+
+function toggleAlert(card){card.classList.toggle('open');}
+
+async function loadAlerts(){
+  const section = document.getElementById('alert-section');
+  try {
+    // Fetch plot_audits and papan_audits in parallel
+    const [plotRows, papanRows] = await Promise.all([
+      sb.select('audit_plot_audits','select=plot,nursery,pest,tikus,warna_daun,created_at'),
+      sb.select('audit_papan_audits','select=plot,nursery,presence,info_correct,condition,created_at')
+    ]);
+
+    // Plot audit — latest per plot
+    const latestPerPlot = {};
+    plotRows.forEach(r => {
+      const key = r.nursery + '_' + r.plot;
+      if (!latestPerPlot[key] || r.created_at > latestPerPlot[key].created_at) latestPerPlot[key] = r;
+    });
+    const latest = Object.values(latestPerPlot);
+
+    const ratPlots    = latest.filter(r => r.tikus === 'Banyak' || r.tikus === 'Sedikit');
+    const pestPlots   = latest.filter(r => r.pest  === 'Banyak');
+    const yellowPlots = latest.filter(r => r.warna_daun === '5');
+
+    // Papan audit — latest per plot
+    const latestPapan = {};
+    papanRows.forEach(r => {
+      const key = r.nursery + '_' + r.plot;
+      if (!latestPapan[key] || r.created_at > latestPapan[key].created_at) latestPapan[key] = r;
+    });
+    const latestPapanList = Object.values(latestPapan);
+    const papanBadPlots    = latestPapanList.filter(r => r.presence==='Bad'    || r.info_correct==='Wrong'   || r.condition==='Wrong');
+    const papanEmptyPlots  = latestPapanList.filter(r => r.presence==='Empty'  || r.info_correct==='Empty'   || r.condition==='Empty');
+
+    const totalAlerts = ratPlots.length + pestPlots.length + yellowPlots.length + papanBadPlots.length + papanEmptyPlots.length;
+
+    // Notify if alerts changed
+    const prevAlerts = localStorage.getItem(ALERT_KEY);
+    const currAlerts = JSON.stringify({
+      rat: ratPlots.map(r=>r.plot).sort(),
+      pest: pestPlots.map(r=>r.plot).sort(),
+      yellow: yellowPlots.map(r=>r.plot).sort(),
+      papanBad: papanBadPlots.map(r=>r.plot).sort(),
+      papanEmpty: papanEmptyPlots.map(r=>r.plot).sort()
+    });
+    if (prevAlerts && prevAlerts !== currAlerts && totalAlerts > 0) {
+      sendNotification(ratPlots, pestPlots, yellowPlots, papanBadPlots, papanEmptyPlots);
+    }
+    localStorage.setItem(ALERT_KEY, currAlerts);
+
+    if (totalAlerts > 0) document.getElementById('notif-dot').classList.add('active');
+    else document.getElementById('notif-dot').classList.remove('active');
+
+    if (totalAlerts === 0) {
+      section.innerHTML = `
+        <div class="all-clear">
+          <div class="all-clear-icon"><svg viewBox="0 0 24 24"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg></div>
+          <div>
+            <div class="all-clear-text">All Clear</div>
+            <div class="all-clear-sub">No alerts from the latest audit data</div>
+          </div>
+        </div>`;
+      return;
+    }
+
+    function plotPills(plots){
+      return plots.map(r=>`<span class="plot-pill">${r.nursery} · ${r.plot}</span>`).join('');
+    }
+    function alertCard(icon, iconClass, title, sub, count, badgeClass, plots){
+      return `<div class="alert-card" onclick="toggleAlert(this)">
+        <div class="alert-card-header">
+          <div class="alert-icon ${iconClass}">${icon}</div>
+          <div class="alert-card-info">
+            <div class="alert-card-title">${title}</div>
+            <div class="alert-card-sub">${sub}</div>
+          </div>
+          <span class="alert-count-badge ${badgeClass}">${count}</span>
+          <svg class="alert-chevron" viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"/></svg>
+        </div>
+        <div class="alert-plots">${plotPills(plots)}</div>
+      </div>`;
+    }
+
+    let html = '';
+    if (ratPlots.length)       html += alertCard('🐀','alert-icon-rat','Rat Detection',`${ratPlots.length} plot${ratPlots.length>1?'s':''} — Sedikit & Banyak`,ratPlots.length,'badge-red',ratPlots);
+    if (pestPlots.length)      html += alertCard('🐛','alert-icon-pest','Pest Infection',`${pestPlots.length} plot${pestPlots.length>1?'s':''} — Banyak only`,pestPlots.length,'badge-amber',pestPlots);
+    if (yellowPlots.length)    html += alertCard('🍂','alert-icon-leaf','Yellow Leaves',`${yellowPlots.length} plot${yellowPlots.length>1?'s':''} — Warna Daun 5`,yellowPlots.length,'badge-yellow',yellowPlots);
+    if (papanBadPlots.length)  html += alertCard('🪧','alert-icon-rat','Papan Tanda — Bad / Wrong',`${papanBadPlots.length} plot${papanBadPlots.length>1?'s':''} with issues`,papanBadPlots.length,'badge-red',papanBadPlots);
+    if (papanEmptyPlots.length)html += alertCard('🪧','alert-icon-pest','Papan Tanda — Empty',`${papanEmptyPlots.length} plot${papanEmptyPlots.length>1?'s':''} with empty papan`,papanEmptyPlots.length,'badge-amber',papanEmptyPlots);
+
+    section.innerHTML = html;
+
+  } catch(e) {
+    console.error('Alert load failed:', e);
+    section.innerHTML = '<div class="alert-loading">⚠ Failed to load alert data</div>';
+  }
+}
+
+/* ── BROWSER NOTIFICATION ── */
+function sendNotification(rat, pest, yellow, papanBad=[], papanEmpty=[]){
+  if (!('Notification' in window)) return;
+  const parts = [];
+  if (rat.length)        parts.push(`🐀 Rat: ${rat.map(r=>r.plot).join(', ')}`);
+  if (pest.length)       parts.push(`🐛 Pest: ${pest.map(r=>r.plot).join(', ')}`);
+  if (yellow.length)     parts.push(`🍂 Yellow: ${yellow.map(r=>r.plot).join(', ')}`);
+  if (papanBad.length)   parts.push(`🪧 Papan Bad: ${papanBad.map(r=>r.plot).join(', ')}`);
+  if (papanEmpty.length) parts.push(`🪧 Papan Empty: ${papanEmpty.map(r=>r.plot).join(', ')}`);
+  const body = parts.join(' | ');
+
+  if (Notification.permission === 'granted') {
+    new Notification('⚠ MJM Nursery Alert', { body, icon: '' });
+  } else if (Notification.permission !== 'denied') {
+    Notification.requestPermission().then(p => {
+      if (p === 'granted') new Notification('⚠ MJM Nursery Alert', { body, icon: '' });
+    });
+  }
+}
+
+/* ── Request notification permission on load ── */
+function requestNotifPermission(){
+  if ('Notification' in window && Notification.permission === 'default') {
+    Notification.requestPermission();
+  }
+}
+
+
+/* --- INSTALL BANNER --- */
+let deferredPrompt = null;
+const INSTALL_DISMISSED = 'mjm_install_dismissed';
+
+function isIOS(){return /iphone|ipad|ipod/i.test(navigator.userAgent);}
+function isInStandaloneMode(){return window.matchMedia('(display-mode:standalone)').matches || window.navigator.standalone;}
+
+function showInstallBanner(){
+  if(isInStandaloneMode()) return; // already installed
+  if(localStorage.getItem(INSTALL_DISMISSED)) return; // dismissed before
+  document.getElementById('install-banner').style.display='flex';
+}
+function dismissInstall(){
+  document.getElementById('install-banner').style.display='none';
+  localStorage.setItem(INSTALL_DISMISSED, '1');
+}
+function handleInstall(){
+  if(isIOS()){
+    document.getElementById('install-banner').style.display='none';
+    document.getElementById('ios-modal').style.display='flex';
+    return;
+  }
+  if(deferredPrompt){
+    deferredPrompt.prompt();
+    deferredPrompt.userChoice.then(r=>{
+      if(r.outcome==='accepted') dismissInstall();
+      deferredPrompt=null;
+    });
+  }
+}
+function closeIosModal(){
+  document.getElementById('ios-modal').style.display='none';
+  document.getElementById('install-banner').style.display='none';
+  localStorage.setItem(INSTALL_DISMISSED,'1');
+}
+
+// Chrome/Android — capture install prompt
+window.addEventListener('beforeinstallprompt', e=>{
+  e.preventDefault();
+  deferredPrompt=e;
+  showInstallBanner();
+});
+
+// iOS — show banner after 2s if not installed
+if(isIOS() && !isInStandaloneMode()){
+  setTimeout(showInstallBanner, 2000);
+}
+// Android without prompt (already installable via browser)
+setTimeout(()=>{if(!deferredPrompt&&!isIOS()&&!isInStandaloneMode())showInstallBanner();}, 3000);
+
+/* ── Auto-refresh alerts every 5 minutes ── */
+loadAlerts();
+requestNotifPermission();
+setInterval(loadAlerts, 5 * 60 * 1000);
+</script>
+<script src="dexie_offline.js?v=8"></script>
+</body>
+</html>

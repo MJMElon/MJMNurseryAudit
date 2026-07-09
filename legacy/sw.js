@@ -1,15 +1,8 @@
 /* ================================================================
-   MJM NURSERY AUDIT — SERVICE WORKER v4
+   MJM NURSERY AUDIT — SERVICE WORKER v3
    sw.js — Full PWA offline support
-
-   Strategy (v12 cache):
-   - HTML pages: NETWORK FIRST (always get the latest deploy),
-     fallback to cache when offline
-   - JS/CSS/images/fonts: cache first (fast load), fill cache on miss
-   - Supabase storage (photos): cache first so they show offline
-   - Supabase REST API: network only, never cached
 ================================================================ */
-const CACHE = 'mjm-audit-v12';
+const CACHE = 'mjm-audit-v11';
 
 const FILES = [
   './',
@@ -41,7 +34,7 @@ const FILES = [
 
 /* INSTALL */
 self.addEventListener('install', e => {
-  console.log('[SW] Installing v4...');
+  console.log('[SW] Installing v3...');
   e.waitUntil(
     caches.open(CACHE).then(cache =>
       Promise.allSettled(FILES.map(url =>
@@ -60,7 +53,7 @@ self.addEventListener('activate', e => {
     caches.keys().then(keys =>
       Promise.all(keys.filter(k => k !== CACHE).map(k => caches.delete(k)))
     ).then(() => {
-      console.log('[SW] Activated v4');
+      console.log('[SW] Activated v3');
       return self.clients.claim();
     })
   );
@@ -101,27 +94,7 @@ self.addEventListener('fetch', e => {
     return;
   }
 
-  // HTML pages — NETWORK FIRST so a new deploy is picked up on the
-  // next visit; fall back to cache only when offline. (Cache-first
-  // HTML in v3 could pin clients to a stale version forever.)
-  if(url.endsWith('.html') || url.endsWith('/') ||
-     e.request.headers.get('accept')?.includes('text/html')){
-    e.respondWith(
-      fetch(e.request).then(res => {
-        if(res && res.status === 200){
-          const clone = res.clone();
-          caches.open(CACHE).then(c => c.put(e.request, clone));
-        }
-        return res;
-      }).catch(() =>
-        caches.match(e.request, {ignoreSearch: true})
-          .then(cached => cached || caches.match('./index.html', {ignoreSearch: true}))
-      )
-    );
-    return;
-  }
-
-  // Everything else (JS/CSS/images/fonts) — cache first, then network
+  // Everything else — cache first, then network
   e.respondWith(
     caches.match(e.request, {ignoreSearch: true}).then(cached => {
       if(cached) return cached;
@@ -131,7 +104,13 @@ self.addEventListener('fetch', e => {
           caches.open(CACHE).then(c => c.put(e.request, clone));
         }
         return res;
-      }).catch(() => new Response('Offline', {status: 503}));
+      }).catch(() => {
+        // Offline fallback for HTML pages
+        if(e.request.headers.get('accept')?.includes('text/html')){
+          return caches.match('./index.html', {ignoreSearch: true});
+        }
+        return new Response('Offline', {status: 503});
+      });
     })
   );
 });

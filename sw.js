@@ -1,142 +1,34 @@
 /* ================================================================
-   MJM NURSERY AUDIT — SERVICE WORKER v4
-   sw.js — Full PWA offline support
+   MJM NURSERY AUDIT — RETIRED
 
-   Strategy (v12 cache):
-   - HTML pages: NETWORK FIRST (always get the latest deploy),
-     fallback to cache when offline
-   - JS/CSS/images/fonts: cache first (fast load), fill cache on miss
-   - Supabase storage (photos): cache first so they show offline
-   - Supabase REST API: network only, never cached
+   The audit app now lives in the portal, at
+   https://ai.mjmnursery.com/audit/. This repository no longer serves it.
+
+   Phones that installed the old PWA registered the previous version of
+   this file and cached the whole app, so they would keep opening the old
+   audit offline forever and never see the redirect. This replacement
+   worker exists only to take itself down: it drops every cache, stops
+   answering fetches, unregisters, and reloads whatever is open so the
+   next load comes from the network.
 ================================================================ */
-const CACHE = 'mjm-audit-v12';
 
-const FILES = [
-  './',
-  './index.html',
-  './home.html',
-  './plot_audit.html',
-  './styles.css',
-  './script.js',
-  './height_index.html',
-  './height_styles.css',
-  './height_script.js',
-  './papan_index.html',
-  './papan_styles.css',
-  './papan_script.js',
-  './maintenance_index.html',
-  './maintenance_styles.css',
-  './maintenance_script.js',
-  './report.html',
-  './supabase.js',
-  './dexie_offline.js',
-  './lang.js',
-  './manifest.json',
-  './icon-192.png',
-  './icon-512.png',
-  'https://unpkg.com/dexie@3.2.4/dist/dexie.min.js',
-  'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2',
-  'https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&display=swap'
-];
-
-/* INSTALL */
-self.addEventListener('install', e => {
-  console.log('[SW] Installing v4...');
-  e.waitUntil(
-    caches.open(CACHE).then(cache =>
-      Promise.allSettled(FILES.map(url =>
-        cache.add(url).catch(err => console.warn('[SW] Cache miss:', url, err.message))
-      ))
-    ).then(() => {
-      console.log('[SW] Installed');
-      return self.skipWaiting();
-    })
-  );
+self.addEventListener('install', function () {
+  self.skipWaiting();
 });
 
-/* ACTIVATE */
-self.addEventListener('activate', e => {
+self.addEventListener('activate', function (e) {
   e.waitUntil(
-    caches.keys().then(keys =>
-      Promise.all(keys.filter(k => k !== CACHE).map(k => caches.delete(k)))
-    ).then(() => {
-      console.log('[SW] Activated v4');
-      return self.clients.claim();
-    })
-  );
-});
-
-/* FETCH */
-self.addEventListener('fetch', e => {
-  if(e.request.method !== 'GET') return;
-  const url = e.request.url;
-  if(!url.startsWith('http')) return;
-
-  // Supabase storage (photos) — cache-first so they show offline
-  if(url.includes('supabase.co') && url.includes('/storage/')){
-    e.respondWith(
-      caches.match(e.request).then(cached => {
-        if(cached) return cached;
-        return fetch(e.request).then(res => {
-          if(res && res.status === 200){
-            const clone = res.clone();
-            caches.open(CACHE).then(c => c.put(e.request, clone));
-          }
-          return res;
-        });
+    caches.keys()
+      .then(function (keys) {
+        return Promise.all(keys.map(function (k) { return caches.delete(k); }));
       })
-    );
-    return;
-  }
-
-  // Supabase REST API — network only, no cache
-  if(url.includes('supabase.co')){
-    e.respondWith(
-      fetch(e.request).catch(() =>
-        new Response(JSON.stringify({error:'offline'}), {
-          headers: {'Content-Type':'application/json'}
-        })
-      )
-    );
-    return;
-  }
-
-  // HTML pages — NETWORK FIRST so a new deploy is picked up on the
-  // next visit; fall back to cache only when offline. (Cache-first
-  // HTML in v3 could pin clients to a stale version forever.)
-  if(url.endsWith('.html') || url.endsWith('/') ||
-     e.request.headers.get('accept')?.includes('text/html')){
-    e.respondWith(
-      fetch(e.request).then(res => {
-        if(res && res.status === 200){
-          const clone = res.clone();
-          caches.open(CACHE).then(c => c.put(e.request, clone));
-        }
-        return res;
-      }).catch(() =>
-        caches.match(e.request, {ignoreSearch: true})
-          .then(cached => cached || caches.match('./index.html', {ignoreSearch: true}))
-      )
-    );
-    return;
-  }
-
-  // Everything else (JS/CSS/images/fonts) — cache first, then network
-  e.respondWith(
-    caches.match(e.request, {ignoreSearch: true}).then(cached => {
-      if(cached) return cached;
-      return fetch(e.request).then(res => {
-        if(res && res.status === 200 && res.type !== 'opaque'){
-          const clone = res.clone();
-          caches.open(CACHE).then(c => c.put(e.request, clone));
-        }
-        return res;
-      }).catch(() => new Response('Offline', {status: 503}));
-    })
+      .then(function () { return self.registration.unregister(); })
+      .then(function () { return self.clients.matchAll({ type: 'window' }); })
+      .then(function (clients) {
+        clients.forEach(function (c) { c.navigate(c.url); });
+      })
+      .catch(function () {})
   );
 });
 
-/* MESSAGE */
-self.addEventListener('message', e => {
-  if(e.data === 'skipWaiting') self.skipWaiting();
-});
+/* Answer nothing — every request goes straight to the network. */

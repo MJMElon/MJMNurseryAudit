@@ -1,0 +1,50 @@
+# Keeps this repository's copy of the audit app identical to the source of
+# truth in MJMElon/mjm-ai-system (audit/ plus shared/*.js). This repository
+# only SERVES the app on audit.mjmnursery.com; it is never edited by hand —
+# see README.md.
+name: sync audit mirror
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '25 * * * *'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: sync-audit-mirror
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out this repository
+        uses: actions/checkout@v4
+
+      - name: Check out the source of truth
+        uses: actions/checkout@v4
+        with:
+          repository: MJMElon/mjm-ai-system
+          path: _portal
+
+      - name: Mirror audit/ and shared/*.js
+        run: |
+          rm -rf audit shared
+          mkdir -p audit shared
+          cp -a _portal/audit/. audit/
+          cp _portal/shared/*.js shared/
+          rm -rf _portal
+
+      - name: Commit and push only if something changed
+        run: |
+          git add -A audit shared
+          if git diff --cached --quiet; then
+            echo "Mirror already matches mjm-ai-system — nothing to commit."
+            exit 0
+          fi
+          git config user.name  "audit-mirror"
+          git config user.email "actions@users.noreply.github.com"
+          git commit -m "Mirror audit app from mjm-ai-system"
+          git push

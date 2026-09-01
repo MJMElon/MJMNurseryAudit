@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
+  <meta name="theme-color" content="#1a4d1a"/>
+  <link rel="manifest" href="audit_manifest.json"/>
+  <title>Choose Nursery — MJM Nursery</title>
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 32 32%27%3E%3Crect width=%2732%27 height=%2732%27 rx=%277%27 fill=%27%234a7a2e%27/%3E%3Ctext x=%2716%27 y=%2722%27 font-family=%27system-ui,sans-serif%27 font-size=%2715%27 font-weight=%27900%27 fill=%27%23fff%27 text-anchor=%27middle%27%3EAI%3C/text%3E%3C/svg%3E">
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400..800;1,9..40,700..1000&family=DM+Serif+Display&family=Outfit:wght@400;700;800;900&display=swap" rel="stylesheet"/>
+
+  <!-- Shared FC-style top ribbon (same file used by audit_admin +
+       audit_home). -->
+  <link rel="stylesheet" href="audit_ribbon.css?v=20260826a"/>
+
+  <script src="audit_lang.js?v=20260825b"></script>
+  <script src="audit_login_guard.js?v=20260827a"></script>
+  <!-- The nursery chooser was cancelled: sign-in now lands straight on
+       the to-do list, and the Switch pill on that page toggles PN ↔ MN.
+       This page stays on disk so old bookmarks and PWA start_urls that
+       still point at it do not 404 — they are forwarded on instead.
+       Decided in the head so the redirect happens before the page
+       renders, rather than flashing the chooser for a beat first. -->
+  <script>
+    (function(){
+      var here = location.pathname.split('/').pop();
+      /* Only forward if the browser actually asked for this page. Guards
+         against a future include mistake pulling this script into a
+         different document. */
+      if (here === 'audit_nursery_select.html') {
+        location.replace('audit_home.html');
+      } else {
+        MJMAuditLogin.requireSignIn();
+      }
+    })();
+  </script>
+  <style>body{opacity:0;transition:opacity .2s ease}</style>
+
+  <style>
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+    :root{
+      --bg:#f1f5f9; --card:#fff; --line:#e6ecf2;
+      --ink:#16323f; --ink2:#5b7280; --ink3:#94a7b4;
+      --green:#22a34a;
+    }
+    html,body{min-height:100%;font-family:'DM Sans',sans-serif;font-size:16px;
+              background:var(--bg);color:var(--ink);-webkit-font-smoothing:antialiased}
+    #app{min-height:100vh;display:flex;flex-direction:column}
+
+    .header{background:var(--card);border-bottom:1px solid var(--line);padding:0 20px 16px}
+    .header-top{height:60px;display:flex;align-items:center;gap:6px;
+                max-width:900px;margin:0 auto;width:100%}
+    .header-logo{display:flex;align-items:center;gap:10px}
+    .header-logo-icon{width:34px;height:34px;border-radius:9px;background:#eaf6ea;flex-shrink:0;
+                      display:flex;align-items:center;justify-content:center}
+    .header-logo-icon svg{width:18px;height:18px;stroke:#2d7a2d;fill:none;stroke-width:1.8;
+                          stroke-linecap:round;stroke-linejoin:round}
+    .header-logo-text{font-size:16px;font-weight:800}
+    .header-logo-sub{font-size:9px;font-weight:800;color:var(--green);
+                     text-transform:uppercase;letter-spacing:1.1px;margin-top:1px}
+    .hbtn{height:32px;padding:0 13px;border-radius:20px;background:#f4f7fa;
+          border:1px solid var(--line);color:var(--ink2);font-size:12px;font-weight:700;
+          cursor:pointer;font-family:inherit;text-decoration:none;
+          display:flex;align-items:center;gap:5px}
+    .hbtn:hover{background:#eaeff5}
+    .hbtn svg{width:14px;height:14px;stroke:currentColor;fill:none;stroke-width:2.5;
+              stroke-linecap:round;stroke-linejoin:round}
+    .lang-toggle-btn{height:32px;padding:0 13px;border-radius:20px;background:#f4f7fa;
+                     border:1px solid var(--line);color:var(--ink2);font-size:12px;
+                     font-weight:700;cursor:pointer;font-family:inherit;flex-shrink:0}
+    .lang-toggle-btn:hover{background:#eaeff5}
+    .user-chip{display:flex;align-items:center;gap:8px;background:#f4f7fa;
+               border:1px solid var(--line);border-radius:24px;padding:5px 12px 5px 6px}
+    .avatar{width:28px;height:28px;border-radius:50%;background:#2d7a2d;color:#fff;
+            display:flex;align-items:center;justify-content:center;
+            font-size:12px;font-weight:700;flex-shrink:0}
+    .uname{font-size:12px;font-weight:700}
+
+    /* ── HEADER ON A NARROW SCREEN ──
+       On a phone this band broke: "MJM Nursery" wrapped onto three lines,
+       "Audit System" onto two, and the user chip was pushed off the right
+       edge. The title was allowed to wrap while the buttons were allowed to
+       grow, so the row solved its overflow in the worst available way.
+
+       Same discipline as the shared ribbon: the title is the only thing that
+       gives, truncating rather than wrapping; the buttons keep their size;
+       and labels step aside before anything leaves the screen. */
+    .header-logo{min-width:0}
+    .header-logo>div{min-width:0}
+    .header-logo-text,.header-logo-sub{white-space:nowrap;overflow:hidden;
+                                       text-overflow:ellipsis}
+    .header-actions{flex-shrink:0}
+
+    /* Below ~380px the header fits only exactly — logo plus buttons landing
+       on the bar's edge to the pixel. One more character in a name and it
+       breaks, so trim the chrome rather than leave it balanced on the edge. */
+    @media (max-width:380px){
+      .header-top{gap:6px}
+      .header-logo{gap:6px}
+      .header-logo-icon{width:26px;height:26px;border-radius:7px}
+      .header-logo-icon svg{width:14px;height:14px}
+      .header-logo-text{font-size:12.5px}
+      .header-logo-sub{display:none}
+      .hbtn{padding:0 7px}
+      .lang-toggle-btn{padding:0 8px;font-size:10.5px}
+    }
+    @media (max-width:640px){
+      .header-top{height:54px;gap:8px}
+      .header-actions{gap:5px}
+      .header-logo{gap:8px}
+      .header-logo-icon{width:30px;height:30px;border-radius:8px}
+      .header-logo-icon svg{width:16px;height:16px}
+      .header-logo-text{font-size:13.5px}
+      .header-logo-sub{font-size:8px;letter-spacing:.8px}
+      /* Icon-only, the way the ribbon shows a bare back arrow. */
+      .hbtn{height:30px;padding:0 9px;font-size:11px}
+      .hbtn span{display:none}
+      .lang-toggle-btn{height:30px;padding:0 11px;font-size:11px}
+      .avatar{width:26px;height:26px;font-size:11px}
+      .user-chip{padding:4px}
+      .uname{display:none}
+    }
+
+    .welcome{max-width:900px;margin:0 auto;width:100%;padding-top:10px}
+    .w-hi{font-size:12px;color:var(--ink3)}
+    .w-name{font-family:'DM Serif Display',serif;font-size:24px;line-height:1.2;margin:4px 0 6px}
+    .w-date{font-size:11px;color:var(--ink3)}
+
+    .content{max-width:900px;margin:0 auto;width:100%;padding:30px 24px 3rem;flex:1}
+    .ask{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;
+         color:var(--ink3);margin-bottom:14px;padding-left:2px}
+
+    /* ── THE TWO CHOICES ──
+       Deliberately the only thing on the page. This screen exists to ask one
+       question, so it gets big targets a thumb can hit in a nursery. */
+    .picks{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px}
+    .pick{display:flex;flex-direction:column;align-items:flex-start;background:var(--card);
+          border:1.5px solid var(--line);border-radius:20px;padding:30px 26px 26px;
+          text-decoration:none;cursor:pointer;font-family:inherit;text-align:left;width:100%;
+          box-shadow:0 1px 3px rgba(16,40,60,.05);
+          transition:box-shadow .18s,transform .18s,border-color .18s}
+    .pick:hover{transform:translateY(-3px);box-shadow:0 14px 32px rgba(16,40,60,.12)}
+    .pick:active{transform:translateY(-1px)}
+    .pick-ico{width:76px;height:76px;border-radius:20px;margin-bottom:20px;
+              display:flex;align-items:center;justify-content:center}
+    .pick-ico svg{width:42px;height:42px;fill:none;stroke-width:1.7;
+                  stroke-linecap:round;stroke-linejoin:round}
+    .pick-ttl{font-size:22px;font-weight:800;text-transform:uppercase;letter-spacing:.4px;
+              line-height:1.15}
+    .pick-code{font-size:10px;font-weight:800;letter-spacing:1.2px;margin-top:6px;
+               color:var(--ink3);text-transform:uppercase;flex:1}
+    .pick-go{display:inline-flex;align-items:center;gap:7px;margin-top:20px;
+             font-size:11.5px;font-weight:800;letter-spacing:.9px;text-transform:uppercase}
+    .pick-go svg{width:15px;height:15px;fill:none;stroke:currentColor;stroke-width:2.2;
+                 stroke-linecap:round;stroke-linejoin:round;transition:transform .18s}
+    .pick:hover .pick-go svg{transform:translateX(4px)}
+
+    .pn{--tint:#e7f6ea;--accent:#1f7a3d}
+    .mn{--tint:#e4eefb;--accent:#1558a8}
+    .pn:hover{border-color:#a9dbb8}
+    .mn:hover{border-color:#a8c8ea}
+
+    .note{margin-top:26px;font-size:11.5px;color:var(--ink3);line-height:1.6;padding-left:2px}
+
+    @media (max-width:640px){
+      .header{padding:0 14px 14px}
+      .content{padding:20px 14px 3rem}
+      .picks{grid-template-columns:1fr;gap:14px}
+      .pick{padding:24px 20px 22px}
+      .pick-ico{width:64px;height:64px;border-radius:17px;margin-bottom:16px}
+      .pick-ico svg{width:35px;height:35px}
+      .pick-ttl{font-size:19px}
+      .w-name{font-size:21px}
+      .uname{display:none}
+    }
+  </style>
+  <!-- Shared a11y + motion overlay (keyboard focus + reduced-motion). -->
+  <link rel="stylesheet" href="audit_a11y.css"/>
+</head>
+<body>
+<div id="app">
+
+  <!-- FC-style shared ribbon (see audit_ribbon.css). The optional
+       Back-End button that used to sit on this row is now surfaced from
+       the greeting section below, so it only shows when the account
+       actually has that role. -->
+  <nav class="fcr" role="navigation" aria-label="Auditor Portal">
+    <a class="fcr-back" href="https://ai.mjmnursery.com/index.html" aria-label="Back to portal" title="Back to portal">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19 12H5"/><path d="m12 19-7-7 7-7"/></svg>
+    </a>
+    <div class="fcr-brand">
+      <div class="fcr-brand-name">555</div>
+      <div class="fcr-brand-org">MJM Nursery</div>
+      <div class="fcr-brand-sub" data-t="auditor_portal">Auditor Portal</div>
+    </div>
+    <div class="fcr-right">
+      <span class="fcr-welcome" id="fcr-welcome">Welcome, Auditor</span>
+      <button class="fcr-lang" onclick="toggleLang()" aria-label="Toggle language">
+        <span class="fcr-globe" aria-hidden="true">🌐</span>
+        <span id="lang-toggle-label">BM</span>
+      </button>
+      <button class="fcr-signout" onclick="MJMAuditLogin.signOut()" aria-label="Sign out" title="Sign out">
+        <span class="fcr-signout-icon" aria-hidden="true">⏻</span>
+        <span class="fcr-signout-label" data-t="signout">Sign Out</span>
+      </button>
+    </div>
+  </nav>
+
+  <div class="content">
+    <div class="ask" data-t="ask_nursery">Which nursery are you auditing today?</div>
+
+    <div class="picks">
+
+      <button class="pick pn" id="pick-pn" onclick="choose('PN')">
+        <div class="pick-ico" style="background:var(--tint)">
+          <!-- A seedling cupped in an open hand -->
+          <svg viewBox="0 0 48 48" style="stroke:var(--accent)">
+            <path d="M24 26.5c0-6.2 5-11.2 11.2-11.2C35.2 21.5 30.2 26.5 24 26.5z"/>
+            <path d="M24 26.5c0-5.3-4.3-9.6-9.6-9.6 0 5.3 4.3 9.6 9.6 9.6z"/>
+            <path d="M24 26.5V32"/>
+            <path d="M8.5 30.5c-2.3 0-4.2 1.9-4.2 4.2 0 1.1.4 2.2 1.2 3l4.4 4.4c1.5 1.5 3.6 2.4 5.8 2.4h11.7c2.2 0 4.3-1 5.7-2.8l6-7.6c1.1-1.4.9-3.5-.5-4.7-1.3-1.1-3.3-1-4.5.3l-4.8 5"/>
+            <path d="M29.3 34.4h-8.2c-1.1 0-2.2-.4-3-1.2l-2.5-2.5c-.8-.8-1.9-1.2-3-1.2H8.5"/>
+          </svg>
+        </div>
+        <div class="pick-ttl" data-t="pre_nursery">Pre Nursery</div>
+        <div class="pick-code">PN</div>
+        <div class="pick-go" style="color:var(--accent)">
+          <span data-t="enter">Enter</span>
+          <svg viewBox="0 0 24 24"><line x1="4" y1="12" x2="19" y2="12"/><polyline points="13 6 19 12 13 18"/></svg>
+        </div>
+      </button>
+
+      <button class="pick mn" id="pick-mn" onclick="choose('MN')">
+        <div class="pick-ico" style="background:var(--tint)">
+          <!-- A four-leaf seedling planted beside a garden spade -->
+          <svg viewBox="0 0 48 48" style="stroke:var(--accent)">
+            <path d="M16 42V16.5"/>
+            <path d="M16 30c0-4.7 3.8-8.5 8.5-8.5 0 4.7-3.8 8.5-8.5 8.5z"/>
+            <path d="M16 30c0-4.2-3.4-7.6-7.6-7.6C8.4 26.6 11.8 30 16 30z"/>
+            <path d="M16 21c0-3.5 2.9-6.4 6.4-6.4 0 3.5-2.9 6.4-6.4 6.4z"/>
+            <path d="M16 21c0-3.2-2.6-5.7-5.7-5.7 0 3.2 2.6 5.7 5.7 5.7z"/>
+            <path d="M36 7v12.5"/>
+            <path d="M32 7h8"/>
+            <path d="M30 19.5h12v11.8c0 5.2-2.7 9.4-6 9.4s-6-4.2-6-9.4V19.5z"/>
+            <path d="M5 42h38"/>
+          </svg>
+        </div>
+        <div class="pick-ttl" data-t="main_nursery">Main Nursery</div>
+        <div class="pick-code">MN · BNN · UNN 1 · UNN 2</div>
+        <div class="pick-go" style="color:var(--accent)">
+          <span data-t="enter">Enter</span>
+          <svg viewBox="0 0 24 24"><line x1="4" y1="12" x2="19" y2="12"/><polyline points="13 6 19 12 13 18"/></svg>
+        </div>
+      </button>
+
+    </div>
+
+    <div class="note" id="note" data-t="switch_note">You can switch nursery at any time from the audit menu.</div>
+  </div>
+</div>
+
+<script src="audit_supabase.js"></script>
+<script src="audit_ribbon.js?v=20260826a"></script>
+<script>
+/* ── WHICH NURSERY THIS SESSION IS FOR ────────────────────────────────
+   The to-do list carried both nurseries at once, so an auditor walking
+   the pre nursery read past three main-nursery rows to reach theirs.
+   This asks once and audit_home shows only that half.
+
+   Stored per account, not per browser: a shared phone in the nursery
+   office would otherwise hand the next person the last person's choice.
+   ─────────────────────────────────────────────────────────────────── */
+const user = JSON.parse(localStorage.getItem('mjm_user') || '{"name":"Auditor"}');
+
+function choose(scope){
+  MJMAuditLogin.setScope(scope);
+  /* Only leave if the choice actually stuck. setScope swallows storage
+     failures — blocked or full localStorage, private browsing — and
+     audit_home sends anyone without a choice straight back here, so
+     navigating on a failed write would put the two pages in a redirect
+     loop, hammering the API on every pass. Say so instead. */
+  if (MJMAuditLogin.scope() !== scope) {
+    const n = document.getElementById('note');
+    if (n) {
+      n.removeAttribute('data-t');       // stop applyTranslations overwriting it
+      n.textContent = currentLang === 'ms'
+        ? 'Pelayar ini tidak membenarkan pilihan anda disimpan, jadi senarai ' +
+          'audit tidak dapat dibuka. Matikan pelayaran peribadi, atau benarkan ' +
+          'data laman, dan cuba lagi.'
+        : 'This browser is not letting the app save your choice, so it cannot ' +
+          'open the audit list. Turn off private browsing, or allow site data, ' +
+          'and try again.';
+      n.style.color = '#b91c1c';
+      n.style.fontWeight = '700';
+    }
+    return;
+  }
+  window.location.href = 'audit_home.html';
+}
+
+const allowed = MJMAuditLogin.allowedScopes();
+
+/* Always ask. This is the first screen of the day for a normal account, and
+   it is where they say which nursery they are walking — not something to be
+   decided for them behind a redirect. */
+document.body.style.opacity = '1';
+
+if (allowed.indexOf('PN') === -1) document.getElementById('pick-pn').style.display = 'none';
+if (allowed.indexOf('MN') === -1) document.getElementById('pick-mn').style.display = 'none';
+
+/* Greeting section retired: the FC-style ribbon already carries
+   "Welcome, <name>" (via audit_ribbon.js) and the ask below —
+   "Which nursery are you auditing today?" — is the actual purpose of
+   this screen. */
+</script>
+
+<!-- Nelos floating To-Do dock — the round button in the corner.
+     See shared/shared_nelos_dock.js -->
+<script src="../shared/shared_nelos_dock.js"></script>
+</body>
+</html>

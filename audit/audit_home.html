@@ -1,0 +1,3036 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate"/>
+<meta http-equiv="Pragma" content="no-cache"/>
+<meta http-equiv="Expires" content="0"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no"/>
+  <link rel="manifest" href="audit_manifest.json"/>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+<meta name="apple-mobile-web-app-title" content="MJM Audit"/>
+<!-- The login cover's mark: MJM Nursery, the 555 logotype, Auditor
+     Portal — so the home screen shows the book you are opening. -->
+<link rel="apple-touch-icon" sizes="180x180" href="audit_apple-touch-icon.png"/>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+<meta name="apple-mobile-web-app-title" content="MJM Audit"/>
+<meta name="theme-color" content="#0f2e0f"/>
+  <title>MJM Nursery — Dashboard</title>
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 32 32%27%3E%3Crect width=%2732%27 height=%2732%27 rx=%277%27 fill=%27%234a7a2e%27/%3E%3Ctext x=%2716%27 y=%2722%27 font-family=%27system-ui,sans-serif%27 font-size=%2715%27 font-weight=%27900%27 fill=%27%23fff%27 text-anchor=%27middle%27%3EAI%3C/text%3E%3C/svg%3E">
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400..800;1,9..40,700..1000&family=DM+Serif+Display&family=Outfit:wght@400;700;800;900&display=swap" rel="stylesheet"/>
+
+  <!-- Shared FC-style top ribbon (same file used by audit_admin +
+       audit_nursery_select). Replaces the audit-specific header band
+       that used to sit under the standardised #mjm-ribbon; the two
+       were doing overlapping work. -->
+  <link rel="stylesheet" href="audit_ribbon.css?v=20260826a"/>
+
+  <!-- Anti-flicker auth guard -->
+  <script src="audit_login_guard.js?v=20260827a"></script>
+  <script>MJMAuditLogin.requireSignIn();</script>
+  <style>body{opacity:0;transition:opacity 0.2s ease;}</style>
+
+  <style>
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+    img{display:block;max-width:100%}
+    :root{
+      --g900:#0a1f0a;--g800:#1a4d1a;--g700:#236023;--g600:#2d7a2d;
+      --g500:#3d9c3d;--g400:#5aab5a;--g300:#81c784;--g200:#b5dfb5;--g100:#e0f2e0;--g50:#f2faf2;
+      --teal800:#0f4c52;--teal600:#177a83;--teal100:#d0f4f7;--teal50:#edfbfc;
+      --amber800:#7c2d12;--amber600:#c2410c;--amber100:#ffedd5;--amber50:#fff7ed;
+      --red50:#fff1f1;--red100:#fca5a5;--red600:#dc2626;--red800:#991b1b;
+      --surface:#f3f6f3;--white:#fff;--border:#dde8dd;
+      --text1:#182018;--text2:#3d5c3d;--text3:#6b8a6b;--text4:#9db09d;
+      --r-lg:16px;--r-xl:20px;
+      --shadow-sm:0 2px 8px rgba(0,0,0,.07),0 1px 3px rgba(0,0,0,.05);
+      --shadow-card:0 8px 32px rgba(0,0,0,.11),0 2px 8px rgba(0,0,0,.06);
+    }
+    html,body{height:100%;font-family:'DM Sans',sans-serif;font-size:16px;background:var(--surface);color:var(--text1);-webkit-font-smoothing:antialiased}
+    #app{max-width:480px;margin:0 auto;min-height:100vh;background:var(--surface)}
+
+    /* HEADER */
+    .header{background:var(--g900);position:relative;overflow:hidden;padding:0 18px;padding-bottom:40px}
+    .header::before{content:'';position:absolute;top:-40px;right:-40px;width:200px;height:200px;border-radius:50%;background:rgba(45,122,45,.18)}
+    .header::after{content:'';position:absolute;bottom:-20px;left:-30px;width:140px;height:140px;border-radius:50%;background:rgba(26,77,26,.2)}
+    .header-top{height:60px;display:flex;align-items:center;justify-content:space-between;position:relative;z-index:1;max-width:1100px;margin:0 auto;width:100%}
+    .header-welcome{max-width:1100px;margin:0 auto;width:100%}
+    .header-logo{display:flex;align-items:center;gap:10px}
+    .header-logo-icon{width:34px;height:34px;border-radius:9px;background:rgba(255,255,255,.1);display:flex;align-items:center;justify-content:center;flex-shrink:0}
+    .header-logo-icon svg{width:18px;height:18px;stroke:var(--g300);fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+    .header-logo-text{font-size:15px;font-weight:700;color:#fff}
+    .header-logo-sub{font-size:10px;color:rgba(255,255,255,.45);margin-top:1px}
+    .header-user-btn{display:flex;align-items:center;gap:8px;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.12);border-radius:24px;padding:5px 12px 5px 6px;cursor:pointer;transition:background .15s;text-decoration:none;position:relative}
+    .header-user-btn:hover{background:rgba(255,255,255,.13)}
+    .user-avatar{width:28px;height:28px;border-radius:50%;background:var(--g600);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:#fff;flex-shrink:0}
+    .user-name{font-size:12px;font-weight:600;color:rgba(255,255,255,.85)}
+    .notif-dot{position:absolute;top:2px;right:2px;width:10px;height:10px;border-radius:50%;background:#ef4444;border:2px solid var(--g900);display:none}
+    .notif-dot.active{display:block}
+    .header-welcome{position:relative;z-index:1;padding-bottom:8px}
+    .welcome-greeting{font-size:13px;color:rgba(255,255,255,.5);margin-bottom:4px}
+    .welcome-name{font-family:'DM Serif Display',serif;font-size:26px;color:#fff;margin-bottom:6px;line-height:1.2}
+    .welcome-name span{color:var(--g300)}
+    .welcome-date{font-size:12px;color:rgba(255,255,255,.4)}
+
+    /* CONTENT */
+    .content{position:relative;z-index:2;margin-top:-28px;padding:0 14px 2rem}
+
+    /* ALERT SUMMARY */
+    .alert-section{margin-bottom:20px}
+    .alert-loading{background:var(--white);border:1px solid var(--border);border-radius:var(--r-lg);padding:20px;text-align:center;font-size:13px;color:var(--text4)}
+    .alert-spinner{width:20px;height:20px;border:2px solid var(--border);border-top-color:var(--g600);border-radius:50%;animation:spin .7s linear infinite;margin:0 auto 8px}
+    @keyframes spin{to{transform:rotate(360deg)}}
+
+    .alert-card{background:var(--white);border:1px solid var(--border);border-radius:var(--r-lg);overflow:hidden;box-shadow:var(--shadow-sm);margin-bottom:8px}
+    .alert-card-header{display:flex;align-items:center;gap:10px;padding:12px 14px;cursor:pointer;-webkit-tap-highlight-color:transparent}
+    .alert-icon{width:36px;height:36px;border-radius:10px;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:18px}
+    .alert-icon-rat{background:#fff1f1}
+    .alert-icon-pest{background:#fff7ed}
+    .alert-icon-leaf{background:#fefce8}
+    .alert-card-info{flex:1;min-width:0}
+    .alert-card-title{font-size:13px;font-weight:700;color:var(--text1);margin-bottom:2px}
+    .alert-card-sub{font-size:11px;color:var(--text3)}
+    .alert-count-badge{font-size:12px;font-weight:700;padding:3px 10px;border-radius:20px;flex-shrink:0}
+    .badge-red{background:var(--red50);color:var(--red600)}
+    .badge-amber{background:var(--amber50);color:var(--amber600)}
+    .badge-yellow{background:#fefce8;color:#854d0e}
+    .badge-ok{background:var(--g50);color:var(--g700)}
+    .alert-chevron{width:16px;height:16px;stroke:var(--text4);fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;transition:transform .2s;flex-shrink:0}
+    .alert-card.open .alert-chevron{transform:rotate(90deg)}
+    .alert-plots{display:none;padding:0 14px 12px;flex-wrap:wrap;gap:6px}
+    .alert-card.open .alert-plots{display:flex}
+    .plot-pill{font-size:11px;font-weight:600;padding:3px 10px;border-radius:20px;background:var(--surface);border:1px solid var(--border);color:var(--text2)}
+    .all-clear{background:var(--g50);border:1px solid var(--g200);border-radius:var(--r-lg);padding:14px 16px;display:flex;align-items:center;gap:10px;box-shadow:var(--shadow-sm)}
+    .all-clear-icon{width:36px;height:36px;border-radius:50%;background:var(--g100);display:flex;align-items:center;justify-content:center;flex-shrink:0}
+    .all-clear-icon svg{width:18px;height:18px;stroke:var(--g600);fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+    .all-clear-text{font-size:13px;font-weight:600;color:var(--g700)}
+    .all-clear-sub{font-size:11px;color:var(--text3)}
+
+    /* SECTION HEAD */
+    .section-head{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:var(--text3);margin-bottom:12px;padding-left:2px}
+
+    /* AUDIT CARDS */
+    .audit-cards{display:flex;flex-direction:column;gap:14px;margin-bottom:24px}
+    .audit-card{border-radius:var(--r-xl);overflow:hidden;box-shadow:var(--shadow-card);cursor:pointer;text-decoration:none;display:block;transition:transform .18s,box-shadow .18s;-webkit-tap-highlight-color:transparent;position:relative}
+    .audit-card:hover{transform:translateY(-3px);box-shadow:0 12px 36px rgba(0,0,0,.14),0 3px 10px rgba(0,0,0,.08)}
+    .audit-card:active{transform:scale(.98)}
+    .audit-card-body{padding:22px 20px 20px;position:relative;z-index:1}
+    .audit-card-blob{position:absolute;top:-30px;right:-30px;width:150px;height:150px;border-radius:50%;opacity:.15;z-index:0}
+    .card-icon-row{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
+    .card-icon{width:50px;height:50px;border-radius:14px;background:rgba(255,255,255,.15);display:flex;align-items:center;justify-content:center}
+    .card-icon svg{width:26px;height:26px;stroke:#fff;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+    .card-arrow{width:34px;height:34px;border-radius:50%;background:rgba(255,255,255,.15);display:flex;align-items:center;justify-content:center}
+    .card-arrow svg{width:16px;height:16px;stroke:#fff;fill:none;stroke-width:2.5;stroke-linecap:round;stroke-linejoin:round}
+    .card-label{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;margin-bottom:4px}
+    .card-title{font-size:20px;font-weight:700;line-height:1.2;margin-bottom:8px;color:#fff}
+    .card-desc{font-size:13px;line-height:1.5;opacity:.75;color:rgba(255,255,255,.75);margin-bottom:16px}
+    /* tag pills as circles */
+    .card-tags{display:flex;flex-wrap:wrap;gap:8px}
+    .card-tag{font-size:10px;font-weight:600;padding:5px 11px;border-radius:20px;background:rgba(255,255,255,.15);color:rgba(255,255,255,.9);text-align:center;line-height:1.3}
+
+    /* card themes */
+    .card-audit{background:linear-gradient(135deg,#1a4d1a 0%,#2d7a2d 100%)}
+    .card-audit .card-label{color:var(--g200)}
+    .card-audit .audit-card-blob{background:#5aab5a}
+    .card-height{background:linear-gradient(135deg,#0f4c52 0%,#177a83 100%)}
+    .card-height .card-label{color:var(--teal100)}
+    .card-height .audit-card-blob{background:#26b5c2}
+    .card-papan{background:linear-gradient(135deg,#7c2d12 0%,#c2410c 100%)}
+    .card-papan .card-label{color:#fed7aa}
+    .card-papan .audit-card-blob{background:#fb923c}
+
+    /* INFO STRIP */
+    .info-strip{background:var(--white);border:1px solid var(--border);border-radius:var(--r-lg);padding:14px 16px;display:flex;align-items:center;gap:12px;box-shadow:var(--shadow-sm)}
+    .info-strip-icon{width:36px;height:36px;border-radius:9px;background:var(--g50);display:flex;align-items:center;justify-content:center;flex-shrink:0}
+    .info-strip-icon svg{width:18px;height:18px;stroke:var(--g600);fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+    .info-strip-title{font-size:13px;font-weight:600;color:var(--text2);margin-bottom:2px}
+    .info-strip-sub{font-size:11px;color:var(--text4)}
+
+    /* LOGOUT MODAL */
+    .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:300;display:flex;align-items:flex-end;justify-content:center;opacity:0;pointer-events:none;transition:opacity .25s}
+    .modal-overlay.show{opacity:1;pointer-events:all}
+    .modal-box{background:var(--white);border-radius:20px 20px 0 0;padding:24px 20px 36px;width:100%;max-width:480px;transform:translateY(24px);transition:transform .25s ease}
+    .modal-overlay.show .modal-box{transform:translateY(0)}
+    .modal-title{font-size:17px;font-weight:700;color:var(--text1);margin-bottom:8px}
+    .modal-msg{font-size:13px;color:var(--text3);margin-bottom:22px;line-height:1.5}
+    .modal-btns{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+    .btn-stay{height:46px;border-radius:12px;background:var(--surface);border:1px solid var(--border);color:var(--text2);font-size:14px;font-weight:600;font-family:'DM Sans',sans-serif;cursor:pointer}
+    .btn-logout{height:46px;border-radius:12px;background:#b91c1c;border:none;color:#fff;font-size:14px;font-weight:600;font-family:'DM Sans',sans-serif;cursor:pointer}
+
+    /* ANIMATIONS */
+    .fade-in{opacity:0;transform:translateY(14px);animation:fadeUp .45s ease forwards}
+    .fade-in:nth-child(1){animation-delay:.05s}
+    .fade-in:nth-child(2){animation-delay:.13s}
+    .fade-in:nth-child(3){animation-delay:.21s}
+    .fade-in:nth-child(4){animation-delay:.29s}
+    .fade-in:nth-child(5){animation-delay:.37s}
+    @keyframes fadeUp{to{opacity:1;transform:translateY(0)}}
+
+    /* INSTALL BANNER */
+    .install-banner{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:480px;background:var(--g900);padding:14px 16px;display:flex;align-items:center;gap:12px;z-index:9000;box-shadow:0 -4px 20px rgba(0,0,0,.3);animation:slideUp .3s ease}
+    @keyframes slideUp{from{transform:translateX(-50%) translateY(100%)}to{transform:translateX(-50%) translateY(0)}}
+    .install-banner-icon{width:40px;height:40px;border-radius:10px;background:var(--g600);display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:20px}
+    .install-banner-text{flex:1;min-width:0}
+    .install-banner-title{font-size:13px;font-weight:700;color:#fff;margin-bottom:2px}
+    .install-banner-sub{font-size:11px;color:rgba(255,255,255,.55)}
+    .install-banner-btn{height:36px;padding:0 16px;border-radius:20px;background:var(--g500);border:none;color:#fff;font-size:13px;font-weight:700;font-family:'DM Sans',sans-serif;cursor:pointer;flex-shrink:0;white-space:nowrap}
+    .install-banner-close{width:28px;height:28px;border-radius:50%;background:rgba(255,255,255,.1);border:none;color:rgba(255,255,255,.6);font-size:16px;display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0}
+    .ios-install-modal{position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:9001;display:flex;align-items:flex-end;justify-content:center}
+    .ios-install-box{background:#fff;border-radius:20px 20px 0 0;padding:24px 20px 40px;width:100%;max-width:480px;text-align:center}
+    .ios-install-box h3{font-size:17px;font-weight:700;color:#182018;margin-bottom:8px}
+    .ios-install-box p{font-size:13px;color:#6b8a6b;line-height:1.6;margin-bottom:20px}
+    .ios-steps{text-align:left;background:#f4f6f4;border-radius:12px;padding:14px 16px;margin-bottom:20px}
+    .ios-step{display:flex;align-items:center;gap:10px;padding:6px 0;font-size:13px;color:#3d5c3d}
+    .ios-step-num{width:22px;height:22px;border-radius:50%;background:#1a4d1a;color:#fff;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+    .ios-close-btn{width:100%;height:44px;border-radius:12px;background:#1a4d1a;border:none;color:#fff;font-size:14px;font-weight:600;font-family:'DM Sans',sans-serif;cursor:pointer}
+
+
+    /* ── DESKTOP RESPONSIVE ── */
+    /* Back to Portal — always visible */
+    .back-to-portal {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      background: rgba(255,255,255,.12);
+      border: 1px solid rgba(255,255,255,.2);
+      color: rgba(255,255,255,.85);
+      font-size: 11px;
+      font-weight: 600;
+      padding: 5px 12px;
+      border-radius: 20px;
+      text-decoration: none;
+      cursor: pointer;
+      font-family: 'DM Sans', sans-serif;
+      transition: background .15s;
+      white-space: nowrap;
+      margin-right: 6px;
+    }
+    .back-to-portal:hover { background: rgba(255,255,255,.2); color: #fff; }
+    .back-to-portal svg { width: 13px; height: 13px; stroke: currentColor; fill: none; stroke-width: 2.5; stroke-linecap: round; stroke-linejoin: round; flex-shrink:0; }
+
+    @media (min-width: 768px) {
+      body { background: #0a1f0a !important; }
+      #app {
+        max-width: 100% !important;
+        margin: 0 !important;
+        min-height: 100vh;
+        background: var(--surface);
+      }
+      .header {
+        padding: 0 calc((100vw - 1100px)/2 + 32px) !important;
+        padding-right: calc((100vw - 1100px)/2 + 32px) !important;
+        padding-bottom: 40px !important;
+      }
+      .content {
+        max-width: 1100px;
+        margin: 0 auto;
+        padding: 28px 32px !important;
+      }
+      .audit-cards {
+        display: grid !important;
+        grid-template-columns: repeat(4, 1fr) !important;
+        gap: 16px !important;
+      }
+      .alert-section {
+        display: grid !important;
+        grid-template-columns: repeat(3, 1fr) !important;
+        gap: 10px !important;
+      }
+      .section-head { max-width: 100%; }
+    }
+    @media (min-width: 768px) and (max-width: 1199px) {
+      .audit-cards { grid-template-columns: repeat(4, 1fr) !important; }
+      .alert-section { grid-template-columns: repeat(2, 1fr) !important; }
+      .header { padding: 0 32px !important; padding-bottom: 40px !important; }
+    }
+  </style>
+
+  <!-- ================================================================
+       FC PORTAL SKIN
+
+       The audit home was a dark green hero with six full-width gradient
+       tiles: one module per screenful, so finding a module meant
+       scrolling and reading paragraphs. This re-skins it to match the FC
+       Portal — white surface, one compact row per module, the name doing
+       the work instead of the colour. Same links, same permissions, same
+       to-do list; only the surface changed.
+  ================================================================ -->
+  <style>
+    :root{
+      --fc-bg:#f1f5f9; --fc-card:#fff; --fc-line:#e6ecf2;
+      --fc-ink:#16323f; --fc-ink2:#5b7280; --fc-ink3:#94a7b4;
+      --fc-green:#22a34a;
+    }
+    html,body{background:var(--fc-bg)}
+    #app{background:var(--fc-bg)}
+
+    /* ── HEADER: white bar, not a dark hero ── */
+    .header{background:var(--fc-card);border-bottom:1px solid var(--fc-line);
+            padding:0 20px 16px}
+    .header::before,.header::after{display:none}   /* the decorative blobs */
+    .header-logo-icon{background:#eaf6ea}
+    .header-logo-icon svg{stroke:#2d7a2d}
+    .header-logo-text{color:var(--fc-ink);font-weight:800;font-size:16px}
+    .header-logo-sub{color:var(--fc-green);font-size:9px;font-weight:800;
+                     text-transform:uppercase;letter-spacing:1.1px}
+
+    .back-to-portal{background:#f4f7fa!important;border:1px solid var(--fc-line)!important;
+                    color:var(--fc-ink2)!important;border-radius:20px;height:32px;
+                    display:flex;align-items:center;gap:5px;padding:0 12px;
+                    font-size:12px;font-weight:700;text-decoration:none}
+    .back-to-portal svg{width:14px;height:14px;stroke:var(--fc-ink2);fill:none;stroke-width:2.5}
+    .lang-toggle-btn{height:32px;padding:0 13px;border-radius:20px;background:#f4f7fa;
+                     border:1px solid var(--fc-line);color:var(--fc-ink2);font-size:12px;
+                     font-weight:800;cursor:pointer;font-family:inherit}
+    .header-user-btn{background:#f4f7fa;border:1px solid var(--fc-line)}
+    .header-user-btn:hover{background:#eaeff5}
+    .user-name{color:var(--fc-ink)}
+    .notif-dot{border-color:#fff}
+
+    .header-welcome{padding-top:10px;padding-bottom:0}
+    .welcome-greeting{color:var(--fc-ink3);font-size:12px}
+    .welcome-name{color:var(--fc-ink);font-size:24px}
+    .welcome-date{color:var(--fc-ink3);font-size:11px}
+
+    /* ── CONTENT: no negative overlap, the hero is gone ── */
+    .content{margin-top:0;padding:20px 16px 2.5rem}
+    .section-head{color:var(--fc-ink3);font-size:10px;letter-spacing:1px;margin-bottom:10px}
+
+    /* ── MODULE TILES ──
+       Four across, icon first. They were two columns of horizontal rows, so
+       the fourth wrapped onto a line of its own and the set stopped reading
+       as one group of four. The icon is the thing being aimed at on a phone,
+       so it gets the space the chevron and the blurb were using. */
+    .audit-cards{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));
+                 gap:12px;margin-bottom:22px}
+    .fc-card{display:flex;flex-direction:column;align-items:center;text-align:center;
+             gap:0;background:var(--fc-card);
+             border:1.5px solid var(--fc-line);border-radius:16px;padding:20px 12px 16px;
+             text-decoration:none;transition:border-color .15s,box-shadow .15s,transform .15s;
+             -webkit-tap-highlight-color:transparent}
+    .fc-card:hover{border-color:#a8d5a8;box-shadow:0 8px 22px rgba(20,50,30,.09);
+                   transform:translateY(-2px)}
+    .fc-card:active{transform:scale(.99)}
+    .fc-ico{width:64px;height:64px;border-radius:19px;flex-shrink:0;margin-bottom:13px;
+            display:flex;align-items:center;justify-content:center}
+    .fc-ico svg{width:32px;height:32px;fill:none;stroke-width:1.8;
+                stroke-linecap:round;stroke-linejoin:round}
+    .fc-body{min-width:0;width:100%}
+    .fc-ttl{font-size:14px;font-weight:800;color:var(--fc-ink);line-height:1.3;
+            letter-spacing:.2px}
+    .fc-sub{display:flex;align-items:center;justify-content:center;gap:5px;margin-top:6px;
+            font-size:9.5px;font-weight:800;letter-spacing:.8px;color:var(--fc-ink3)}
+    .fc-dot{width:6px;height:6px;border-radius:50%;background:var(--fc-green);flex-shrink:0}
+
+    /* ── TO-DO rows: same card language as the modules ── */
+    .todo-list{display:flex;flex-direction:column;gap:8px;margin-bottom:22px}
+
+    /* ── AUDIT HISTORY ────────────────────────────────────────
+       Card-shaped list of every completed audit, month by month.
+       The nav row is a fixed rhythm — arrow / month / arrow — so
+       the month name stays centred no matter how wide it prints. */
+    .history{background:var(--fc-card);border:1.5px solid var(--fc-line);border-radius:18px;
+             padding:12px 14px 10px;margin-bottom:22px}
+    .hist-nav{display:flex;align-items:center;justify-content:space-between;gap:10px;
+              padding:6px 4px 12px;border-bottom:1px solid var(--fc-line);margin-bottom:10px}
+    .hist-arrow{width:34px;height:34px;border-radius:50%;background:#f4f7fa;
+                border:1px solid var(--fc-line);color:var(--fc-ink);
+                display:flex;align-items:center;justify-content:center;
+                cursor:pointer;padding:0;font-family:inherit;
+                transition:background .15s,border-color .15s,color .15s,opacity .15s;
+                -webkit-tap-highlight-color:transparent;flex-shrink:0}
+    .hist-arrow:hover:not(:disabled){background:#e5edf5;border-color:#cbd7e2}
+    .hist-arrow:active:not(:disabled){transform:scale(.96)}
+    /* Disabled = there's no record on the other side. Muted, and the
+       cursor tells the auditor tapping again will do nothing. */
+    .hist-arrow:disabled{opacity:.32;cursor:not-allowed;background:#f4f7fa}
+    .hist-arrow svg{width:14px;height:14px;stroke:currentColor;fill:none;
+                    stroke-width:2.6;stroke-linecap:round;stroke-linejoin:round}
+    .hist-month{flex:1;text-align:center;font-size:15px;font-weight:800;
+                letter-spacing:.6px;color:var(--fc-ink);min-width:0}
+
+    .hist-list{display:flex;flex-direction:column}
+    /* A row opens its summary now, so it has to look like it does
+       something. Same restraint as the rest of this list: a tint and a
+       cursor, no chevron competing with the date on the right. */
+    .hist-row{display:flex;align-items:center;gap:12px;padding:12px 4px;
+              border-bottom:1px solid var(--fc-line);
+              cursor:pointer;border-radius:10px;
+              -webkit-tap-highlight-color:transparent;
+              transition:background .15s}
+    .hist-row:hover{background:#f4f7fa}
+    .hist-row:focus-visible{outline:2px solid #22a34a;outline-offset:-2px}
+    .hist-row:last-child{border-bottom:0}
+    .hist-ico{width:34px;height:34px;border-radius:10px;flex-shrink:0;
+              display:flex;align-items:center;justify-content:center}
+    .hist-ico svg{width:18px;height:18px;fill:none;stroke-width:1.9;
+                  stroke-linecap:round;stroke-linejoin:round}
+    .hist-body{flex:1;min-width:0}
+    .hist-ttl{font-size:13.5px;font-weight:800;color:var(--fc-ink);line-height:1.25;
+              white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .hist-sub{font-size:11.5px;font-weight:600;color:var(--fc-ink2);margin-top:2px;
+              white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .hist-date{font-size:11px;font-weight:800;color:var(--fc-ink3);white-space:nowrap;
+               flex-shrink:0;letter-spacing:.3px;text-transform:uppercase}
+    .hist-empty{padding:26px 12px;text-align:center;font-size:12.5px;
+                font-weight:600;color:var(--fc-ink3)}
+    /* ── AUDIT SCHEDULE BOARD ────────────────────────────────────────
+       Month strip, status filters, and a timeline of the windows that fall
+       in the month you are looking at. ── */
+    .sched{background:var(--fc-card);border:1.5px solid var(--fc-line);border-radius:18px;
+           padding:18px 16px 8px;margin-bottom:22px}
+    /* The count and the calendar are one thing: what is owed, and when. They
+       read as two stacked boxes when the count sat above with its own space,
+       so the rule below joins them instead of separating them. */
+    /* Stacked, not a row: the title, the nursery it applies to, the
+       greeting and the progress bar are four things in sequence, each
+       qualifying the one below it. */
+    .sched-top{display:block;padding-bottom:14px;
+               margin-bottom:14px;border-bottom:1px solid var(--fc-line)}
+    /* The block's title. Centred and set large enough to read as one —
+       at 10px uppercase grey it was a label on the greeting beneath it
+       rather than the name of the section. */
+    .sched-kicker{display:flex;align-items:center;justify-content:center;gap:8px;
+                  font-size:19px;font-weight:800;letter-spacing:.4px;
+                  color:var(--fc-ink);margin-bottom:12px}
+    /* ── HEADER ON A NARROW SCREEN ──
+       On a phone this band broke: "MJM Nursery" wrapped onto three lines,
+       "Audit System" onto two, and the user chip was pushed off the right
+       edge. The title was allowed to wrap while the buttons were allowed to
+       grow, so the row solved its overflow in the worst available way.
+
+       Same discipline as the shared ribbon: the title is the only thing that
+       gives, truncating rather than wrapping; the buttons keep their size;
+       and labels step aside before anything leaves the screen. */
+    .header-logo{min-width:0}
+    .header-logo>div{min-width:0}
+    .header-logo-text,.header-logo-sub{white-space:nowrap;overflow:hidden;
+                                       text-overflow:ellipsis}
+    .header-actions{flex-shrink:0}
+
+    /* Below ~380px the header fits only exactly — logo plus buttons landing
+       on the bar's edge to the pixel. One more character in a name and it
+       breaks, so trim the chrome rather than leave it balanced on the edge. */
+    @media (max-width:380px){
+      .header-top{gap:6px}
+      .header-logo{gap:6px}
+      .header-logo-icon{width:26px;height:26px;border-radius:7px}
+      .header-logo-icon svg{width:14px;height:14px}
+      .header-logo-text{font-size:12.5px}
+      .header-logo-sub{display:none}
+      .hbtn{padding:0 7px}
+      .lang-toggle-btn{padding:0 8px;font-size:10.5px}
+    }
+    @media (max-width:640px){
+      .header-top{height:54px;gap:8px}
+      .header-actions{gap:5px}
+      .header-logo{gap:8px}
+      .header-logo-icon{width:30px;height:30px;border-radius:8px}
+      .header-logo-icon svg{width:16px;height:16px}
+      .header-logo-text{font-size:13.5px}
+      .header-logo-sub{font-size:8px;letter-spacing:.8px}
+      /* Icon-only, the way the ribbon shows a bare back arrow. */
+      .hbtn{height:30px;padding:0 9px;font-size:11px}
+      .hbtn span{display:none}
+      .lang-toggle-btn{height:30px;padding:0 11px;font-size:11px}
+      .avatar{width:26px;height:26px;font-size:11px}
+      .user-chip{padding:4px}
+      .uname{display:none}
+      /* This page's buttons carry their own classes rather than .hbtn, and
+         the user chip is a third child of the row instead of sitting inside
+         the action group — so the rules above missed all of them and the
+         logo was crushed to 23px to make room. */
+      .back-to-portal{padding:0 9px!important;height:30px!important}
+      .back-to-portal span{display:none}
+      .lang-toggle-btn{height:30px;padding:0 10px;font-size:11px}
+      .header-user-btn{margin-left:4px!important;padding:4px!important;flex-shrink:0}
+      .header-user-btn .user-name{display:none}
+      .header-user-btn .user-avatar{width:26px;height:26px;font-size:11px}
+    }
+
+    /* ── NURSERY RIBBON ──
+       A banner rather than a chip. Pre and main nursery run different
+       schedules, so which one you are looking at is the single most
+       important fact on the screen. */
+    .ribbon{display:flex;align-items:center;gap:12px;background:var(--fc-card);
+            border:1.5px solid var(--fc-line);border-left:6px solid var(--rib,#2d7a2d);
+            border-radius:16px;padding:12px 14px;margin-bottom:14px;
+            box-shadow:0 1px 3px rgba(16,40,60,.05)}
+    .ribbon-btn{display:inline-flex;align-items:center;gap:6px;flex:0 0 auto;
+                padding:8px 14px;border-radius:22px;background:#f4f7fa;
+                border:1px solid var(--fc-line);text-decoration:none;
+                font-size:10.5px;font-weight:800;letter-spacing:.7px;
+                text-transform:uppercase;color:var(--fc-ink2);white-space:nowrap}
+    .ribbon-btn:hover{background:#e9eff5}
+    .ribbon-btn svg{width:13px;height:13px;stroke:currentColor;fill:none;stroke-width:2.6;
+                    stroke-linecap:round;stroke-linejoin:round}
+    .ribbon-ttl{flex:1;min-width:0;text-align:center;font-size:22px;font-weight:800;
+                letter-spacing:2px;text-transform:uppercase;color:var(--rib,#2d7a2d);
+                line-height:1.15}
+    /* Balances the button so the title sits centred on the ribbon, not
+       shunted right by it. */
+    .ribbon-spacer{flex:0 0 auto;width:92px}
+    @media (max-width:640px){
+      .sched-kicker{font-size:16px;margin-bottom:10px}
+      .ribbon{padding:10px 12px;gap:8px;border-radius:14px}
+      .ribbon-ttl{font-size:15px;letter-spacing:1px}
+      .ribbon-btn{padding:7px 10px;font-size:9.5px}
+      .ribbon-btn span{display:none}
+      .ribbon-spacer{width:34px}
+    }
+    .sched-count{font-size:17px;font-weight:700;color:var(--fc-ink);margin-top:6px;
+                 line-height:1.3;text-align:center}
+    .sched-count b{color:#2d7a2d}
+
+    /* ── Month strip ── */
+    .cal-head{display:flex;align-items:center;gap:6px;margin-bottom:10px}
+    .cal-nav{width:28px;height:28px;border-radius:9px;border:1px solid var(--fc-line);
+             background:#f4f7fa;cursor:pointer;display:flex;align-items:center;
+             justify-content:center;flex-shrink:0;padding:0}
+    .cal-nav:hover{background:#e9eff5}
+    .cal-nav svg{width:14px;height:14px;stroke:var(--fc-ink2);fill:none;stroke-width:2.6;
+                 stroke-linecap:round;stroke-linejoin:round}
+    .cal-month{font-size:14px;font-weight:800;color:var(--fc-ink);min-width:130px;
+               text-align:center}
+    .cal-today{margin-left:auto;font-size:10px;font-weight:800;letter-spacing:.6px;
+               text-transform:uppercase;padding:6px 12px;border-radius:20px;cursor:pointer;
+               border:1px solid var(--fc-line);background:#f4f7fa;color:var(--fc-ink2);
+               font-family:inherit}
+    .cal-today:hover{background:#e9eff5}
+
+    .cal-strip{display:flex;align-items:stretch;gap:8px;padding:2px 2px 12px}
+    .cal-step{width:30px;flex:0 0 auto;border-radius:11px;border:1px solid var(--fc-line);
+              background:#f4f7fa;cursor:pointer;display:flex;align-items:center;
+              justify-content:center;padding:0;font-family:inherit}
+    .cal-step:hover{background:#e9eff5}
+    .cal-step svg{width:14px;height:14px;stroke:var(--fc-ink2);fill:none;stroke-width:2.6;
+                  stroke-linecap:round;stroke-linejoin:round}
+    /* Five days, sized to the row rather than scrolled. Thirty-one cells on a
+       phone meant dragging a hairline scrollbar to find a date; five fill the
+       width and each is a thumb wide. */
+    .cal-days{display:flex;gap:8px;flex:1;min-width:0}
+    .day{flex:1 1 0;min-width:0;padding:9px 0 8px;border-radius:13px;cursor:pointer;
+         background:#f4f7fa;border:1.5px solid transparent;text-align:center;
+         -webkit-tap-highlight-color:transparent;transition:background .12s,border-color .12s;
+         font-family:inherit}
+    .day:hover{background:#e9eff5}
+    .day-w{font-size:9.5px;font-weight:800;letter-spacing:.5px;color:var(--fc-ink3);
+           text-transform:uppercase}
+    .day-n{font-size:18px;font-weight:800;color:var(--fc-ink);margin-top:3px;line-height:1}
+    .day-dot{width:5px;height:5px;border-radius:50%;background:#c3ced6;margin:5px auto 0}
+    .day.has .day-dot{background:#2d7a2d}
+    .day.today{border-color:#2d7a2d}
+    .day.today .day-n{color:#2d7a2d}
+    .day.sel{background:#1a4d1a;border-color:#1a4d1a}
+    .day.sel .day-w,.day.sel .day-n{color:#fff}
+    .day.sel .day-dot{background:rgba(255,255,255,.8)}
+
+    /* ── The 4 iOS-style bucket tiles that replaced the calendar +
+       due/soon/upcoming/passed chip strip. One row when there is width,
+       2×2 on a phone. The active tile is what filters the timeline
+       beneath. Colours picked to read at a glance:
+         Today's  = blue, Scheduled = red, All = ink, Overdue = amber. */
+    /* Three tiles across: Today / Overdue / All. Scheduled was
+       removed at the auditor's request. Falls to two columns on
+       phones (see the media query below), so All wraps to a full
+       row when the screen is narrow. */
+    .buckets{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));
+             gap:10px;margin:4px 0 14px}
+    .bkt{display:flex;flex-direction:column;justify-content:space-between;
+         min-height:96px;padding:14px 14px 12px;border-radius:18px;
+         cursor:pointer;font-family:inherit;color:#fff;text-align:left;
+         border:2px solid transparent;box-shadow:0 4px 12px rgba(16,40,60,.10);
+         transition:transform .12s,box-shadow .12s,filter .12s;
+         -webkit-tap-highlight-color:transparent}
+    .bkt:hover{transform:translateY(-2px);box-shadow:0 8px 20px rgba(16,40,60,.16)}
+    .bkt.on{border-color:#0f172a;filter:brightness(1.05)}
+    .bkt-top{display:flex;align-items:center;justify-content:space-between}
+    .bkt-ico{width:30px;height:30px;border-radius:9px;background:rgba(255,255,255,.22);
+             display:flex;align-items:center;justify-content:center;flex-shrink:0}
+    .bkt-ico svg{width:18px;height:18px;stroke:#fff;fill:none;stroke-width:2;
+                 stroke-linecap:round;stroke-linejoin:round}
+    .bkt-n{font-size:34px;font-weight:800;line-height:1;letter-spacing:-1px}
+    .bkt-lbl{font-size:12px;font-weight:700;letter-spacing:.2px;line-height:1.15;opacity:.95}
+    /* Colours picked so the meaning is obvious at a glance:
+         Today's Audit → green   (do this now, healthy urgency)
+         Scheduled     → amber   (coming up, gentle warning)
+         All Audit     → ink     (neutral, overview)
+         Overdue       → red     (blown deadline, high urgency) */
+    .bkt-today{background:linear-gradient(135deg,#2d7a2d,#1a4d1a)}
+    .bkt-sched{background:linear-gradient(135deg,#f59e0b,#c2410c)}
+    .bkt-all  {background:linear-gradient(135deg,#4a4a4d,#2b2b2e)}
+    .bkt-over {background:linear-gradient(135deg,#ef4444,#991b1b)}
+    /* Phones — three tiles stay on ONE row per feedback. Padding +
+       icon shrink so nothing overflows on the narrowest devices. */
+    @media (max-width:640px){
+      .buckets{grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}
+      .bkt{min-height:78px;padding:10px 10px 8px;border-radius:14px}
+      .bkt-ico{width:24px;height:24px;border-radius:7px}
+      .bkt-ico svg{width:14px;height:14px}
+      .bkt-n{font-size:24px}
+      .bkt-lbl{font-size:10px;letter-spacing:.1px}
+    }
+    @media (max-width:400px){
+      .buckets{gap:5px}
+      .bkt{min-height:70px;padding:9px 8px 7px;border-radius:12px}
+      .bkt-n{font-size:20px;letter-spacing:-.5px}
+      .bkt-lbl{font-size:9.5px;line-height:1.1}
+      .bkt-ico{width:20px;height:20px}
+      .bkt-ico svg{width:12px;height:12px}
+    }
+
+    /* ── Today's progress bar ──
+       Rendered right under the "Hi 😊, you have N audit tasks today"
+       line while today has work left. Reads "N / M done today · P%"
+       so the auditor can watch the day fill up. */
+    .today-progress{margin-top:10px;display:flex;flex-direction:column;gap:4px}
+    .tp-track{width:100%;height:10px;background:#e6ecec;border-radius:999px;
+              overflow:hidden;position:relative}
+    .tp-fill{height:100%;background:linear-gradient(90deg,#2d7a2d,#22a34a);
+             border-radius:999px;transition:width .4s ease}
+    /* Centred with the count above it — the two are one block, and
+       leaving the bar's caption ranged left while the number it
+       describes sat centred read as a mistake. */
+    .tp-text{font-size:11.5px;font-weight:700;color:var(--fc-ink2);letter-spacing:.2px;
+             text-align:center}
+
+    /* Congratulations banner — replaces the greeting text on days
+       when every one of today's tasks is closed out. Kept soft-green
+       so it reads as celebration, not alarm. */
+    .today-congrats{font-size:18px;font-weight:800;color:#166534;
+                    background:linear-gradient(135deg,#dcfce7,#bbf7d0);
+                    border:1.5px solid #86efac;border-radius:14px;
+                    padding:14px 16px;line-height:1.35;
+                    box-shadow:0 4px 14px rgba(22,101,52,.15)}
+
+    /* Nursery chips inside a timeline card — one per allowed nursery for
+       the current scope. Clicking a chip lands on the destination audit
+       page with ?nursery=X&from=home, so it opens straight on that
+       nursery's tab and the page shows a Choose-Another-Nursery button. */
+    .tl-chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
+    .tl-chip{display:inline-flex;align-items:center;gap:4px;font-size:10px;
+             font-weight:800;letter-spacing:.5px;text-transform:uppercase;
+             padding:5px 10px;border-radius:14px;background:#fff;
+             color:var(--tone,#2d7a2d);border:1.5px solid var(--tone,#c3ced6);
+             text-decoration:none;-webkit-tap-highlight-color:transparent;
+             transition:transform .1s,background .1s}
+    .tl-chip:hover{background:var(--tone,#2d7a2d);color:#fff}
+    .tl-chip:active{transform:scale(.97)}
+
+    /* ── Status filters ── (kept for the anytime badges' colour lookup;
+       the visible chip strip itself is removed) */
+    .chips{display:flex;gap:8px;overflow-x:auto;padding:2px 2px 12px;scrollbar-width:none}
+    .chips::-webkit-scrollbar{display:none}
+    .chip{flex:0 0 auto;display:flex;align-items:center;gap:7px;padding:7px 13px 7px 7px;
+          border-radius:22px;background:#f4f7fa;border:1.5px solid transparent;cursor:pointer;
+          font-family:inherit;-webkit-tap-highlight-color:transparent;transition:border-color .12s}
+    .chip:hover{background:#e9eff5}
+    .chip-dot{width:22px;height:22px;border-radius:50%;display:flex;align-items:center;
+              justify-content:center;font-size:11px;flex-shrink:0}
+    .chip-lbl{font-size:11px;font-weight:800;color:var(--fc-ink2);letter-spacing:.3px}
+    .chip-n{font-size:11px;font-weight:800;color:var(--fc-ink3)}
+    .chip.on{border-color:var(--fc-ink);background:#fff}
+    .chip.on .chip-lbl{color:var(--fc-ink)}
+    .chip.off{opacity:.4}
+
+    /* ── Timeline ──
+       The rail is what turns a list into a schedule: the eye follows it down
+       the month instead of reading four unrelated boxes. */
+    .tl{position:relative;padding:2px 0 6px 26px}
+    .tl::before{content:'';position:absolute;left:8px;top:6px;bottom:16px;width:2px;
+                background:linear-gradient(#e3ebf2,#eef3f7)}
+    .tl-item{position:relative;margin-bottom:10px}
+    .tl-item::before{content:'';position:absolute;left:-23px;top:17px;width:11px;height:11px;
+                     border-radius:50%;background:#fff;border:2.5px solid var(--tone,#c3ced6)}
+    /* ── Pending plot circles ──
+       The plots a to-do row is actually asking for, under the row that
+       asks for them. Only what is still outstanding is drawn: a plot
+       finished inside the window leaves the row, so the strip empties
+       out as the day goes and an auditor can see the end of it.
+
+       They sit OUTSIDE the row's <a>, because each circle is its own
+       link into that plot and a link cannot contain another link —
+       nested anchors get unnested by the parser and the row stops
+       working. */
+    .tl-plots{display:flex;flex-wrap:wrap;gap:7px;
+              padding:10px 12px 12px 64px;margin-top:-4px}
+    .tl-plot{width:38px;height:38px;border-radius:50%;flex:0 0 auto;
+             display:flex;align-items:center;justify-content:center;
+             background:#fff;border:1.5px solid var(--tone,#2d7a2d);
+             color:var(--tone,#2d7a2d);
+             font-size:11px;font-weight:800;letter-spacing:.2px;
+             text-decoration:none;line-height:1;
+             -webkit-tap-highlight-color:transparent;
+             transition:background .14s,color .14s,transform .14s}
+    .tl-plot:hover{background:var(--tone,#2d7a2d);color:#fff}
+    .tl-plot:active{transform:scale(.94)}
+    /* Overdue MAINTENANCE chips read red — an overdue maintenance plot is
+       the one thing on the To Do list that should catch the eye first,
+       because worker maintenance is scheduled by someone else and the
+       auditor needs to notice it without scrolling. Scoped by
+       [data-mod="maint"] so seedling / plot / papan overdue rows keep
+       their existing look.
+
+       Colour carries that on its own now — the pulse used to run on
+       every plot chip in the row at once, which on a row of twenty was
+       twenty things pulsing together rather than one thing catching the
+       eye. The icon still pulses (below); that is the one signal now. */
+    .tl-item.overdue[data-mod="maint"] .tl-plot{
+      border-color:#b91c1c;color:#b91c1c;background:#fef2f2}
+    .tl-item.overdue[data-mod="maint"] .tl-plot:hover{background:#b91c1c;color:#fff}
+    /* Opens the rest of the strip. Shaped like the circles it stands in
+       for, but filled with the row's tone rather than outlined in it, so
+       it reads as the odd one out — it is not a plot. */
+    .tl-plots-toggle{display:inline-flex;align-items:center;gap:3px;
+                     height:38px;min-width:38px;padding:0 9px;border-radius:19px;
+                     flex:0 0 auto;cursor:pointer;
+                     background:var(--tone,#2d7a2d);border:1.5px solid var(--tone,#2d7a2d);
+                     color:#fff;font-family:inherit;
+                     font-size:11px;font-weight:800;letter-spacing:.2px;
+                     -webkit-tap-highlight-color:transparent;
+                     transition:filter .14s,transform .14s}
+    .tl-plots-toggle:hover{filter:brightness(1.12)}
+    .tl-plots-toggle:active{transform:scale(.94)}
+    .tl-plots-toggle svg{width:13px;height:13px;stroke:currentColor;fill:none;
+                         stroke-width:2.6;stroke-linecap:round;stroke-linejoin:round}
+    .tl-item.overdue .tl-plots-toggle{background:#b91c1c;border-color:#b91c1c}
+    @media (max-width:640px){
+      .tl-plots{padding:8px 10px 10px 12px;gap:6px}
+      .tl-plot{width:34px;height:34px;font-size:10px}
+      .tl-plots-toggle{height:34px;min-width:34px;padding:0 8px;font-size:10px}
+    }
+
+    .tl-card{display:block;border-radius:13px;background:var(--tint,#f4f7fa);
+             border-left:4px solid var(--tone,#c3ced6);overflow:hidden;
+             text-decoration:none;color:inherit;cursor:pointer;
+             transition:transform .14s,box-shadow .14s,filter .14s,opacity .14s;
+             -webkit-tap-highlight-color:transparent}
+    .tl-card:hover:not(.disabled){transform:translateX(2px);box-shadow:0 4px 14px rgba(16,40,60,.08)}
+    .tl-card:active:not(.disabled){transform:scale(.99)}
+    /* Upcoming rows (start date still in the future) render but do not
+       navigate — the auditor cannot record work that has not started
+       yet, and a live tap on a card that opens a "you can't record
+       this yet" screen would just be a dead end. Cursor + muted look
+       tell them to wait; pointer-events prevents the anchor firing. */
+    .tl-card.disabled{cursor:not-allowed;opacity:.55;filter:grayscale(.25);
+                      pointer-events:none}
+    .tl-item.overdue .tl-card{border-left-width:6px}
+    /* Overdue rows: icon pulses so the auditor sees the backlog even
+       when scrolling past. Colour also tips toward red so the module
+       tint does not soften the alarm. */
+    @keyframes tl-shine{
+      0%,100% {box-shadow:0 0 0 0 rgba(220,38,38,.55)}
+      50%     {box-shadow:0 0 0 10px rgba(220,38,38,0)}
+    }
+    .tl-item.overdue .tl-ico{
+      background:#fee2e2 !important;
+      animation:tl-shine 1.8s ease-in-out infinite;
+    }
+    .tl-item.overdue .tl-ico svg{stroke:#dc2626 !important}
+    @media (prefers-reduced-motion:reduce){
+      .tl-item.overdue .tl-ico{animation:none}
+    }
+    /* Plots grouped by the job they are waiting on. */
+    .tl-wts{margin:8px 0 0 46px;display:flex;flex-direction:column;gap:2px}
+    .tl-wt-head{display:flex;align-items:center;gap:8px;width:100%;
+                padding:7px 10px;border:0;border-radius:9px;cursor:pointer;
+                background:transparent;font:inherit;text-align:left;
+                transition:background .15s}
+    .tl-wt-head:hover{background:rgba(0,0,0,.035)}
+    .tl-wt-caret{width:14px;height:14px;flex-shrink:0;fill:none;stroke:currentColor;
+                 stroke-width:2.4;stroke-linecap:round;stroke-linejoin:round;
+                 color:#94a3b8;transform:rotate(-90deg);transition:transform .18s}
+    .tl-wt.open .tl-wt-caret{transform:rotate(0)}
+    .tl-wt-name{font-size:12px;font-weight:800;letter-spacing:.02em;color:#334155}
+    .tl-wt-count{padding:1px 8px;border-radius:999px;background:#eef2f7;color:#64748b;
+                 font-size:11px;font-weight:800}
+    /* Closed groups keep their header, so the auditor can still see that
+       manuring is waiting on twelve plots without unfolding it. */
+    .tl-wt-plots{display:none;flex-wrap:wrap;gap:6px;padding:2px 10px 8px 32px}
+    .tl-wt.open .tl-wt-plots{display:flex}
+    .tl-item.overdue .tl-wt-count{background:#fee2e2;color:#991b1b}
+    .tl-item.overdue .tl-wt-name{color:#7f1d1d}
+    /* Said quietly. It is a note about the data, not a warning to the
+       auditor, who can do nothing about it from here. */
+    .tl-wt-none{padding:8px 12px;font-size:11.5px;font-weight:600;line-height:1.5;
+                color:#94a3b8}
+    /* Card head row: icon on the left, title + meta stacked on the
+       right. Renamed away from .tl-head (which was already taken by
+       the ANYTIME section heading and inherits tiny uppercase text). */
+    .tl-row-head{display:flex;align-items:center;gap:12px;padding:12px 14px}
+    .tl-head-btn{width:100%;display:flex;align-items:center;gap:12px;
+                 background:transparent;border:none;padding:12px 14px;
+                 font-family:inherit;color:inherit;cursor:pointer;text-align:left;
+                 -webkit-tap-highlight-color:transparent}
+    .tl-ico{width:34px;height:34px;border-radius:10px;background:rgba(255,255,255,.85);
+            display:flex;align-items:center;justify-content:center;flex-shrink:0}
+    .tl-ico svg{width:17px;height:17px;fill:none;stroke-width:2;
+                stroke-linecap:round;stroke-linejoin:round}
+    .tl-body{flex:1;min-width:0;display:flex;flex-direction:column;gap:3px}
+    .tl-ttl{font-size:14px;font-weight:800;color:var(--fc-ink);display:flex;
+            align-items:center;gap:7px;flex-wrap:wrap;line-height:1.15}
+    /* Meta row is date + status pill, always visible (was hidden on mobile
+       and pushed to a right column on desktop — the auditor could not see
+       when work was due). */
+    .tl-meta{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:12px}
+    .tl-date{font-weight:700;color:var(--fc-ink2)}
+
+    /* ── The deadline, at the end of the row ──
+       Ranged right and hard against the edge, so the four rows' dates
+       line up as a column the eye can run down instead of sitting
+       wherever each title happens to end. Tabular figures keep the
+       digits in that column from shifting between "5" and "15". */
+    .tl-due{flex:0 0 auto;text-align:right;line-height:1.25;
+            font-variant-numeric:tabular-nums}
+    .tl-due-date{font-size:12px;font-weight:800;color:var(--fc-ink);
+                 white-space:nowrap}
+    .tl-due-left{font-size:10.5px;font-weight:700;color:var(--fc-ink3);
+                 white-space:nowrap;margin-top:1px}
+    /* Only lateness earns colour. A row that is merely due is already
+       saying so in the badge beside its title. */
+    .tl-due.soon .tl-due-left{color:#92400e}
+    .tl-due.late .tl-due-date,
+    .tl-due.late .tl-due-left{color:#b91c1c}
+    @media (max-width:640px){
+      .tl-due-date{font-size:11px}
+      .tl-due-left{font-size:9.5px}
+    }
+    .tl-badge{font-size:10px;font-weight:800;padding:2px 8px;border-radius:20px;
+              white-space:nowrap;letter-spacing:.3px}
+    .tl-caret{width:22px;height:22px;flex-shrink:0;color:var(--fc-ink3);
+              display:flex;align-items:center;justify-content:center;
+              transition:transform .18s}
+    .tl-item.open .tl-caret{transform:rotate(180deg)}
+    .tl-caret svg{width:14px;height:14px;stroke:currentColor;fill:none;stroke-width:2.5;stroke-linecap:round;stroke-linejoin:round}
+    /* Nursery chips are ALWAYS visible now — per-card expand/collapse
+       was dropped so the auditor sees which nurseries still need work
+       without an extra tap. The whole timeline is collapsed via the
+       active bucket tile instead (see applyTimelineOpen()). */
+    .tl-nurs-wrap{}
+    .tl-nurs{display:flex;flex-wrap:wrap;gap:6px;padding:0 14px 12px 14px}
+    .nchip{font-size:10px;font-weight:800;letter-spacing:.5px;padding:5px 11px;
+           border-radius:20px;background:#fff;border:1.5px solid #d8e2ea;
+           color:var(--fc-ink);white-space:nowrap;text-decoration:none;
+           -webkit-tap-highlight-color:transparent;transition:transform .1s,background .1s}
+    .nchip:hover{background:var(--tone,#2d7a2d);color:#fff;border-color:var(--tone,#2d7a2d)}
+    .nchip:active{transform:scale(.97)}
+    .nchip.on{background:#dcfce7;border-color:#a7e0b5;color:#166534}
+    .nchip.on::before{content:'✓ ';font-weight:900}
+
+    .count-big{font-size:26px;font-weight:800;color:#2d7a2d;letter-spacing:-.3px}
+    .count-note{font-size:12px;font-weight:700;color:var(--fc-ink3)}
+    .count-note.over{color:#b91c1c}
+
+    .tl-from{font-size:9.5px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;
+             padding:2px 7px;border-radius:20px;background:#fee2e2;color:#7f1d1d}
+    /* Round chip — one distinctive colour per round so the auditor
+       can tell at a glance which round a card belongs to. Round 1 is
+       green (start), Round 2 amber, Round 3 red-orange, Round 4 blue.
+       Falls back to the ink defaults for unknown values. */
+    .tl-round i{font-style:normal;opacity:.55;margin:0 .5px}
+    .tl-round{font-size:9.5px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;
+             padding:2px 7px;border-radius:20px;background:#e9edf1;color:#182018;
+             border:1px solid rgba(0,0,0,.08)}
+    .tl-round[data-round="1"]{background:#dcfce7;color:#166534;border-color:#86efac}
+    .tl-round[data-round="2"]{background:#fef3c7;color:#92400e;border-color:#fcd34d}
+    .tl-round[data-round="3"]{background:#fee2e2;color:#991b1b;border-color:#fca5a5}
+    .tl-round[data-round="4"]{background:#dbeafe;color:#1e40af;border-color:#93c5fd}
+    .tl-item.overdue .tl-card{border-left-width:6px}
+    .tl-head{font-size:9.5px;font-weight:800;letter-spacing:1px;text-transform:uppercase;
+             color:var(--fc-ink3);margin:14px 0 8px}
+    .tl-empty{padding:22px 4px;text-align:center;font-size:12.5px;color:var(--fc-ink3)}
+
+    @media (max-width:640px){
+      .sched{padding:14px 12px 6px;border-radius:16px}
+      .sched-count{font-size:15px}
+      .cal-month{min-width:104px;font-size:13px}
+      .day{width:40px}
+    }
+
+    .todo-card{background:var(--fc-card);border:1.5px solid var(--fc-line)!important;
+               border-radius:14px!important;transition:border-color .15s}
+    .todo-card:hover{border-color:#a8d5a8}
+
+    /* The desktop rules above this skin letterbox the page in dark green
+       and pad the header for a hero that no longer exists. Same breakpoint,
+       same !important, so the light surface wins. */
+    @media (min-width:768px){
+      body{background:var(--fc-bg)!important}
+      #app{background:var(--fc-bg)}
+      .header{padding-bottom:18px!important}
+      .content{padding:24px 32px!important}
+      .audit-cards{grid-template-columns:repeat(4,minmax(0,1fr))!important}
+    }
+    @media (min-width:768px) and (max-width:1199px){
+      .audit-cards{grid-template-columns:repeat(4,minmax(0,1fr))!important}
+    }
+
+    /* Still four across on a phone — the tiles are an icon and a short
+       title, so they shrink rather than stack. */
+    @media (max-width:640px){
+      .audit-cards{grid-template-columns:repeat(4,minmax(0,1fr))!important;gap:8px}
+      .fc-card{padding:14px 6px 12px;border-radius:14px}
+      .fc-ico{width:46px;height:46px;border-radius:14px;margin-bottom:9px}
+      .fc-ico svg{width:24px;height:24px}
+      .fc-ttl{font-size:11px;line-height:1.25}
+      .fc-sub{font-size:8.5px;margin-top:4px}
+      .header{padding:0 14px 14px}
+      .content{padding:16px 12px 2.5rem}
+      .welcome-name{font-size:21px}
+    }
+  </style>
+  <!-- Shared a11y + motion overlay — keyboard focus rings on every
+       interactive element + prefers-reduced-motion collapse. Loaded
+       last so it wins by source order without needing !important. -->
+  <link rel="stylesheet" href="audit_a11y.css"/>
+</head>
+<body>
+<div id="app">
+
+  <!-- FC-style shared ribbon (see audit_ribbon.css). Replaces both the
+       #mjm-ribbon that lived at the top and the audit-specific band that
+       repeated similar navigation below it. The optional Back-End
+       button that used to appear here for admin accounts is now reached
+       from the portal tile or the ribbon's back arrow. -->
+  <nav class="fcr" role="navigation" aria-label="Auditor Portal">
+    <a class="fcr-back" href="https://ai.mjmnursery.com/index.html" aria-label="Back to portal" title="Back to portal">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19 12H5"/><path d="m12 19-7-7 7-7"/></svg>
+    </a>
+    <div class="fcr-brand">
+      <div class="fcr-brand-name">555</div>
+      <div class="fcr-brand-org">MJM Nursery</div>
+      <div class="fcr-brand-sub" data-t="auditor_portal">Auditor Portal</div>
+    </div>
+    <div class="fcr-right">
+      <span class="fcr-welcome" id="fcr-welcome">Welcome</span>
+      <button class="fcr-lang" onclick="toggleLang()" aria-label="Toggle language">
+        <span class="fcr-globe" aria-hidden="true">🌐</span>
+        <span id="lang-toggle-label">BM</span>
+      </button>
+      <button class="fcr-signout" onclick="MJMAuditLogin.signOut()" aria-label="Sign out" title="Sign out">
+        <span class="fcr-signout-icon" aria-hidden="true">⏻</span>
+        <span class="fcr-signout-label" data-t="signout">Sign Out</span>
+      </button>
+    </div>
+  </nav>
+
+  <!-- MAIN CONTENT -->
+  <div class="content">
+
+    <!-- AUDIT TO-DO -->
+    <!-- ── THE AUDIT SCHEDULE BOARD ──
+         A flat list of four rows could not say when anything was due beyond
+         a line of text, and every month looked identical. The month, the
+         days that carry a window, and what falls on the day you tap are the
+         whole point of this screen. -->
+    <div class="sched fade-in">
+
+      <div class="sched-top">
+        <!-- Audit To-Do is the fixed title of this whole block, so it sits
+             above everything the block contains — including which nursery
+             the list is for. The nursery bar used to float above it as a
+             separate band, which read as a heading in its own right and
+             left two competing titles stacked on one screen. -->
+        <div class="sched-kicker"><span>📋 To-Do List</span></div>
+
+        <!-- Names the nursery this list is about, and the way to the other
+             one. Reading the wrong nursery's schedule is the one mistake
+             this page can cause, so it stays directly under the title and
+             directly above the work it qualifies.
+
+             Switch is a direct PN ↔ MN toggle: no chooser page to walk
+             through, and the account still lands wherever it was last. It
+             sits at the trailing edge pointing forward, because the same
+             move is also a left-swipe across this bar and the to-do list
+             under it — an arrow on the left pointing back described the
+             opposite gesture. -->
+        <div class="ribbon" id="ribbon">
+          <div class="ribbon-spacer"></div>
+          <div class="ribbon-ttl" id="ribbon-ttl">&nbsp;</div>
+          <button type="button" class="ribbon-btn" id="scope-switch" onclick="toggleScope()">
+            <span>Switch</span>
+            <svg viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"/></svg>
+          </button>
+        </div>
+
+        <div class="sched-count" id="sched-count">&nbsp;</div>
+        <!-- Per-day progress bar. Populated by renderAll() when the
+             view is on the current month and today has real work.
+             Reads "N / M done today · P%" so the auditor can see
+             how much of the day is closed out. -->
+        <div class="today-progress" id="today-progress" style="display:none"></div>
+      </div>
+
+      <!-- Bucket tiles (Today / Overdue / All) were cancelled — the
+           timeline below shows the whole month's to-do list directly,
+           without a filter above it. The Audit History section further
+           down carries the completed work, month by month. -->
+
+      <div class="tl" id="todo-section">
+        <!-- Populated by JS -->
+      </div>
+    </div>
+
+    <!-- AUDIT HISTORY — every completed audit, grouped by month, with
+         < > arrows that only enable when there is actually a record in
+         the direction they point. -->
+    <div class="section-head fade-in" style="margin-top:22px">
+      <span data-t="home_history_title">Audit History</span>
+    </div>
+    <div class="history fade-in" id="history-section">
+      <div class="hist-nav">
+        <button class="hist-arrow" id="hist-prev" onclick="histShift(-1)"
+                aria-label="Previous month" disabled>
+          <svg viewBox="0 0 24 24" aria-hidden="true"><polyline points="15 18 9 12 15 6"/></svg>
+        </button>
+        <div class="hist-month" id="hist-month">—</div>
+        <button class="hist-arrow" id="hist-next" onclick="histShift(1)"
+                aria-label="Next month" disabled>
+          <svg viewBox="0 0 24 24" aria-hidden="true"><polyline points="9 18 15 12 9 6"/></svg>
+        </button>
+      </div>
+      <div class="hist-list" id="hist-list">
+        <div class="hist-empty" data-t="home_history_loading">Loading history…</div>
+      </div>
+    </div>
+
+    <!-- The Audit Modules card row that used to sit here has moved to
+         audit_admin.html. It listed the same four destinations the
+         to-do list above already links to, but without saying which of
+         them was due or which plots still owed work — so on the one
+         screen an auditor actually uses in the field it was four taps
+         that repeated what was already on the page. The back end has
+         no to-do list, so that is where opening a module directly
+         still earns its place. -->
+
+    <!-- The MJM Nursery — Miri, Sarawak · PN · BNN · UNN 1 · UNN 2
+         info strip that used to sit here was purely decorative — every
+         nursery is already visible on the audit modules row above and
+         on the ribbon at the top of the page, so this repeated the
+         same names for no new signal. Removed. -->
+
+  </div><!-- /content -->
+
+<!-- INSTALL BANNER -->
+<div class="install-banner" id="install-banner" style="display:none">
+  <div class="install-banner-icon">🌿</div>
+  <div class="install-banner-text">
+    <div class="install-banner-title">Install MJM Audit App</div>
+    <div class="install-banner-sub">Use offline in the field</div>
+  </div>
+  <button class="install-banner-btn" id="install-btn" onclick="handleInstall()">Install</button>
+  <button class="install-banner-close" onclick="dismissInstall()">×</button>
+</div>
+
+<!-- iOS Install Instructions Modal -->
+<div class="ios-install-modal" id="ios-modal" style="display:none">
+  <div class="ios-install-box">
+    <h3>Install MJM Audit App 🌿</h3>
+    <p>Add to your home screen to use the app offline in the field — no internet needed!</p>
+    <div class="ios-steps">
+      <div class="ios-step"><span class="ios-step-num">1</span>Tap the <strong>Share</strong> button at the bottom of Safari</div>
+      <div class="ios-step"><span class="ios-step-num">2</span>Scroll down and tap <strong>"Add to Home Screen"</strong></div>
+      <div class="ios-step"><span class="ios-step-num">3</span>Tap <strong>"Add"</strong> — done! ✅</div>
+    </div>
+    <button class="ios-close-btn" onclick="closeIosModal()">Got it!</button>
+  </div>
+</div>
+
+</div><!-- /#app -->
+
+<!-- LOGOUT MODAL -->
+<div class="modal-overlay" id="logout-modal" onclick="hideLogout(event)">
+  <div class="modal-box">
+    <div class="modal-title">Sign Out?</div>
+    <div class="modal-msg" data-t="signout_msg">You will be returned to the login page.</div>
+    <div class="modal-btns">
+      <button class="btn-stay" onclick="hideLogoutDirect()" data-t="stay">Stay</button>
+      <button class="btn-logout" onclick="doLogout()" data-t="signout">Sign Out</button>
+    </div>
+  </div>
+</div>
+
+<script src="audit_lang.js?v=20260825b"></script>
+<script src="audit_supabase.js"></script>
+<script src="audit_ribbon.js?v=20260826a"></script>
+<!-- Works out which plots still owe work, for the circles under each
+     to-do row. Needs sb.select from audit_supabase.js above it. -->
+<script src="audit_pending.js?v=20260829a"></script>
+<!-- Rounds, maintenance windows and the ages being audited. Defaults to
+     what used to be hardcoded below, so this cannot break the board. -->
+<script src="audit_settings.js?v=2"></script>
+<!-- The record summary shared with the module pages' Completed Records.
+     On this page it only exports MJMAuditSummary — the completed-records
+     section it also carries is the manage view's and does not mount
+     here. It injects the dialog's own styles, so this page needs no
+     stylesheet of ours. -->
+<script src="audit_history.js?v=20260827d"></script>
+<!-- The portal permission layer used to load here for the User Access card.
+     That card lives on the back end now and nothing on the auditor view
+     reads MJMAccess, so the three scripts came out: an auditor on nursery
+     signal no longer waits on a CDN and two shared files to see the page. -->
+<!-- backend-btn used to sit in the header ribbon and was toggled on for
+     admin accounts. The FC-style ribbon does not carry it; admins reach
+     the back end from the portal tile. -->
+
+<script>
+/* ── Auth ── */
+const userRaw = localStorage.getItem('mjm_user');
+if (!userRaw) { MJMAuditLogin.requireSignIn(); }
+else { document.body.style.opacity = '1'; }
+const user = userRaw ? JSON.parse(userRaw) : {name:'User',role:'',username:'u'};
+
+/* ── Greeting ── */
+function getGreeting(){const h=new Date().getHours();return h<12?t('home_greeting_morning'):h<17?t('home_greeting_afternoon'):t('home_greeting_evening');}
+function fmtDate(d){return d.toLocaleDateString('en-MY',{weekday:'long',day:'numeric',month:'long',year:'numeric'});}
+/* Greeting section removed with the header band retirement; the ribbon
+   already carries "Welcome, <name>" via audit_ribbon.js, and the date is
+   easier to read from the top-of-screen system clock than from a page
+   header the auditor is trying to scroll past. */
+
+/* ── Logout ── */
+function showLogout(){document.getElementById('logout-modal').classList.add('show');}
+function hideLogout(e){if(e.target===document.getElementById('logout-modal'))hideLogoutDirect();}
+function hideLogoutDirect(){document.getElementById('logout-modal').classList.remove('show');}
+function doLogout(){
+  MJMAuditLogin.signOut();
+}
+
+/* Alerts live on the back end now (audit_admin.html). The code that used
+   to sit here rendered into an #alert-section this page no longer has, so
+   it had been running to a dead end; the back-end copy is the live one. */
+/* ── Request notification permission on load ── */
+
+
+/* --- INSTALL BANNER --- */
+let deferredPrompt = null;
+const INSTALL_DISMISSED = 'mjm_install_dismissed';
+
+function isIOS(){return /iphone|ipad|ipod/i.test(navigator.userAgent);}
+function isInStandaloneMode(){return window.matchMedia('(display-mode:standalone)').matches || window.navigator.standalone;}
+
+function showInstallBanner(){
+  if(isInStandaloneMode()) return; // already installed
+  if(localStorage.getItem(INSTALL_DISMISSED)) return; // dismissed before
+  document.getElementById('install-banner').style.display='flex';
+}
+function dismissInstall(){
+  document.getElementById('install-banner').style.display='none';
+  localStorage.setItem(INSTALL_DISMISSED, '1');
+}
+function handleInstall(){
+  if(isIOS()){
+    document.getElementById('install-banner').style.display='none';
+    document.getElementById('ios-modal').style.display='flex';
+    return;
+  }
+  if(deferredPrompt){
+    deferredPrompt.prompt();
+    deferredPrompt.userChoice.then(r=>{
+      if(r.outcome==='accepted') dismissInstall();
+      deferredPrompt=null;
+    });
+  }
+}
+function closeIosModal(){
+  document.getElementById('ios-modal').style.display='none';
+  document.getElementById('install-banner').style.display='none';
+  localStorage.setItem(INSTALL_DISMISSED,'1');
+}
+
+// Chrome/Android — capture install prompt
+window.addEventListener('beforeinstallprompt', e=>{
+  e.preventDefault();
+  deferredPrompt=e;
+  showInstallBanner();
+});
+
+// iOS — show banner after 2s if not installed
+if(isIOS() && !isInStandaloneMode()){
+  setTimeout(showInstallBanner, 2000);
+}
+// Android without prompt (already installable via browser)
+setTimeout(()=>{if(!deferredPrompt&&!isIOS()&&!isInStandaloneMode())showInstallBanner();}, 3000);
+
+/* The alert refresh, and the notification permission prompt that went with
+   it, moved to the back end. Nothing on this page notifies now, so asking
+   an auditor to allow notifications would be asking for nothing. */
+
+/* ── AUDIT SCHEDULE TO-DO ── */
+function loadAuditTodo(){
+  const now   = new Date();
+  const day   = now.getDate();
+  const month = now.getMonth();
+  const year  = now.getFullYear();
+  const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+
+  // Get user role from localStorage
+  const user = JSON.parse(localStorage.getItem('mjm_user')||'{}');
+  const auditRole = (user.audit_role||'').toLowerCase();
+  const mainRole  = (user.role||'').toLowerCase();
+  // audit_role takes priority; fall back to main role
+  const role = auditRole || mainRole;
+  // Admin and Administrator see everything
+  const isAdmin = role.includes('admin') || mainRole.includes('admin');
+
+  /* What this account is allowed to audit — asked of the shared guard, so
+     this and the chooser can never disagree about it. */
+  const allowed = MJMAuditLogin.allowedScopes();
+  const mayPN = allowed.indexOf('PN') !== -1;
+  const mayMN = allowed.indexOf('MN') !== -1;
+
+  /* … and which half of it they chose on the way in. The old flow used
+     to send anyone without a choice through audit_nursery_select.html;
+     that page was cancelled — an auditor going straight to the work
+     list from the login is one screen fewer to tap through. The scope
+     defaults instead: from a profile-set preference if one exists,
+     otherwise Pre Nursery. The Switch pill on the ribbon toggles it
+     PN ↔ MN in place, so the choice is never a one-way door. */
+  let scope = MJMAuditLogin.scope();
+  if (!scope) {
+    /* permissions.audit_landing is the portal an admin set for this auditor
+       on Settings → User Access. It leads, because it is the answer someone
+       gave deliberately; the older profile fields stay behind it so nothing
+       already relying on them breaks. */
+    const pref = ((user.permissions && user.permissions.audit_landing)
+                  || user.audit_scope || user.default_nursery || '').toUpperCase();
+    const preferred = (pref === 'PN' || pref === 'MN') ? pref
+                    : (mayPN ? 'PN' : (mayMN ? 'MN' : 'PN'));
+    MJMAuditLogin.setScope(preferred);
+    scope = MJMAuditLogin.scope() || preferred;
+  }
+
+  const showPN = mayPN && scope === 'PN';
+  const showMN = mayMN && scope === 'MN';
+
+  /* Name the nursery on the screen itself, and offer the way to the other
+     one — without which the choice made on the way in is a one-way door. */
+  function paintRibbon(){
+    const ttl = document.getElementById('ribbon-ttl');
+    const rib = document.getElementById('ribbon');
+    const sw  = document.getElementById('scope-switch');
+    if (!ttl || !scope) return;
+    const isPN = scope === 'PN';
+    ttl.textContent = t(isPN ? 'pre_nursery' : 'main_nursery');
+    rib.style.setProperty('--rib', isPN ? '#1f7a3d' : '#1558a8');
+    /* Only worth offering when there is somewhere else to go. */
+    if (sw && allowed.length < 2) sw.style.visibility = 'hidden';
+  }
+  paintRibbon();
+  document.addEventListener('mjm-lang-changed', paintRibbon);
+
+  /* Go to a named scope and reload. A reload rather than a live
+     re-render because half a dozen queries were run against the
+     previous scope on first paint, and untangling them mid-session is
+     more surface than one refresh saves. */
+  function gotoScope(next) {
+    if (allowed.length < 2) return;   /* nothing to switch to */
+    if (next === scope) return;       /* already there — no reload */
+    MJMAuditLogin.setScope(next);
+    /* Only navigate if the write stuck — same guard the old chooser
+       relied on. A blocked or full localStorage would otherwise leave
+       the tab reloading against the previous scope forever. */
+    if (MJMAuditLogin.scope() === next) window.location.reload();
+  }
+
+  /* Switch pill click: flip PN ↔ MN. Exposed on window so the inline
+     onclick on .ribbon-btn can reach it. */
+  window.toggleScope = function () {
+    gotoScope(scope === 'PN' ? 'MN' : 'PN');
+  };
+
+  /* ── SWIPE PN ↔ MN ────────────────────────────────────────────────
+     The two nurseries behave like two tabs, so they answer to the
+     gesture tabs answer to. Left goes to the main nursery, right comes
+     back to pre — a fixed order, not a toggle, so a swipe the wrong way
+     on the end tab does nothing instead of bouncing the auditor to the
+     nursery they just left.
+
+     Only the nursery bar and the to-do list listen. The month strip
+     above the list scrolls sideways under the same finger, and the
+     history and module cards below are not part of what the gesture
+     is switching, so neither is wired.
+
+     Nothing calls preventDefault: the page still scrolls normally and
+     a swipe is only claimed once the finger has clearly gone sideways
+     (60px across, and half again as far across as down). A touch that
+     starts inside something with its own sideways scroll is left
+     alone — that content owns the axis. */
+  (function wireScopeSwipe(){
+    if (allowed.length < 2) return;
+    const ZONES = ['ribbon', 'todo-section'];
+    const MIN_X = 60, X_OVER_Y = 1.5;
+
+    /* Does the touch start inside something that scrolls sideways? */
+    function ownsAxis(el){
+      for (let n = el; n && n !== document.body; n = n.parentElement) {
+        if (n.scrollWidth > n.clientWidth + 4) {
+          const ox = getComputedStyle(n).overflowX;
+          if (ox === 'auto' || ox === 'scroll') return true;
+        }
+      }
+      return false;
+    }
+
+    ZONES.forEach(id => {
+      const zone = document.getElementById(id);
+      if (!zone) return;
+      let x0 = 0, y0 = 0, live = false;
+
+      zone.addEventListener('touchstart', e => {
+        /* Pinch or two-finger gestures are not this. */
+        live = e.touches.length === 1 && !ownsAxis(e.target);
+        if (!live) return;
+        x0 = e.touches[0].clientX;
+        y0 = e.touches[0].clientY;
+      }, { passive: true });
+
+      zone.addEventListener('touchend', e => {
+        if (!live) return;
+        live = false;
+        const t = e.changedTouches && e.changedTouches[0];
+        if (!t) return;
+        const dx = t.clientX - x0, dy = t.clientY - y0;
+        if (Math.abs(dx) < MIN_X) return;
+        if (Math.abs(dx) < Math.abs(dy) * X_OVER_Y) return;   /* a scroll */
+        gotoScope(dx < 0 ? 'MN' : 'PN');
+      }, { passive: true });
+
+      /* A finger leaving the element mid-gesture ends it rather than
+         leaving `live` set for the next unrelated touch. */
+      zone.addEventListener('touchcancel', () => { live = false; },
+                            { passive: true });
+    });
+  })();
+
+  /* ── The month being looked at. Starts on this one. ── */
+  /* Today is selected from the start: the question this screen answers is
+     "what am I doing today", and an unselected strip answered "what happens
+     this month" instead. Paging to another month clears it. */
+  let viewY = year, viewM = month, selDay = day;
+  /* First of the five days on screen. Kept inside the viewed month so the
+     strip, the count line and the timeline all describe the same month. */
+  let winStart = 1;
+  const WIN = 5;
+  const active = new Set();          // status filters; empty means show all
+
+  /* Built from the browser's own month names so they follow the language
+     rather than needing twelve more dictionary keys kept in step. */
+  const monthNames = (style) => Array.from({length:12}, (_, i) =>
+    new Date(2020, i, 1).toLocaleDateString(
+      (typeof currentLang !== 'undefined' && currentLang === 'ms') ? 'ms-MY' : 'en-MY',
+      {month: style}));
+  let MONTHS_FULL = monthNames('long');
+  const WD = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+
+  /* ── Schedules ──
+     Windows are day-of-month ranges. Which set applies is settled by the
+     nursery chosen on the way in. */
+  /* titles are translation KEYS resolved at render time via t(o.title)
+     so a BM switch flips them without re-declaring the array. Same keys
+     the Audit Modules row uses so the wording stays in step across the
+     page. */
+  /* The rounds are a setting now — Settings → System Setting writes them
+     and audit_settings.js reads them back, with the sets that used to be
+     written out here as its defaults. So a database that has never been to
+     that screen still schedules exactly as it always did.
+
+     A module with no rounds left drops out of the list entirely, which is
+     how "we are not running that audit here" is said.
+
+     Windows are day-of-month ranges. Which set applies is settled by the
+     nursery chosen on the way in; Papan's 1–31 is clamped by occurrences()
+     to the real last day, so February does not leak a day. */
+  const MOD_META = {
+    plot:   { title:'home_plot',   href:'audit_plot_audit.html' },
+    height: { title:'home_height', href:'audit_height_index.html' },
+    papan:  { title:'home_papan',  href:'audit_papan_index.html' }
+  };
+  const setFor = (scope) => Object.keys(MOD_META)
+    .map(mod => Object.assign({ mod }, MOD_META[mod], { windows: MJMAuditSettings.windows(scope, mod) }))
+    .filter(sc => sc.windows.length);
+  let MN_SET = setFor('MN');
+  let PN_SET = setFor('PN');
+  /* ANYTIME used to hold event-driven audits (maintenance + papan on PN).
+     Both are now dated occurrences on the main timeline — maintenance
+     via MAINT_OCCURRENCES + loadMaintTimeline, papan via the whole-month
+     window on PN_SET / MN_SET — so this stays as a no-op that the
+     downstream renderers can still safely check .length on. */
+  const ANYTIME = [];
+
+  let SET = showMN ? MN_SET : showPN ? PN_SET : [];
+  /* The board draws immediately from whatever settings this device already
+     has — the defaults, or the copy cached from the last visit — and is
+     rebuilt when the live ones land. Waiting for the network first would
+     leave an auditor with no signal looking at an empty screen. */
+  function refreshSchedule(){
+    MN_SET = setFor('MN');
+    PN_SET = setFor('PN');
+    SET    = showMN ? MN_SET : showPN ? PN_SET : [];
+  }
+
+  const ICONS = {
+    plot:   '<path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="1"/><path d="M9 12l2 2 4-4"/>',
+    height: '<line x1="12" y1="20" x2="12" y2="4"/><path d="M12 4C12 4 8 8 8 10"/><path d="M12 4C12 4 16 8 16 10"/><path d="M12 10C12 10 9 13 9 15"/><path d="M12 10C12 10 15 13 15 15"/>',
+    papan:  '<rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 9h6M9 12h6M9 15h4"/>',
+    maint:  '<path d="M14.7 6.3a1 1 0 000 1.4l1.6 1.6a1 1 0 001.4 0l3.77-3.77a6 6 0 01-7.94 7.94l-6.91 6.91a2.12 2.12 0 01-3-3l6.91-6.91a6 6 0 017.94-7.94l-3.76 3.76z"/>'
+  };
+  const TONE = {
+    plot:   {tone:'#1a4d1a', tint:'#e9f5ea'},
+    height: {tone:'#1565c0', tint:'#e5f0fb'},
+    papan:  {tone:'#e65100', tint:'#fef1e3'},
+    maint:  {tone:'#880e4f', tint:'#fdeaf1'}
+  };
+  /* Labels are looked up when a row is drawn rather than fixed here, so a
+     language change redraws into the new one. */
+  const STATUS = {
+    overdue:  {key:'st_overdue',  emoji:'⚠️', bg:'#fee2e2', fg:'#7f1d1d'},
+    due:      {key:'st_due',      emoji:'🔴', bg:'#fee2e2', fg:'#991b1b'},
+    soon:     {key:'st_soon',     emoji:'🟡', bg:'#fef9c3', fg:'#854d0e'},
+    upcoming: {key:'st_upcoming', emoji:'📅', bg:'#e0f2fe', fg:'#075985'}
+  };
+  const stLbl = k => (typeof t === 'function' ? t(STATUS[k].key) : STATUS[k].key);
+
+  /* ── HAS THIS WINDOW BEEN DONE? ────────────────────────────────────
+     A window is a task, not just a date range: it shows every day of the
+     window until somebody records the audit, disappears once they do, and
+     if the window closes with nothing recorded it does not quietly pass —
+     it turns overdue and keeps showing, into the following months, until
+     the work is done.
+
+     Which nurseries count towards it follows the nursery chosen on the way
+     in. Any one record inside the window marks it done; the main nursery is
+     not tracked per-plot here, so recording BNN closes the main-nursery
+     window for that month. Say if it should need all three.
+
+     Records are read once for a short lookback rather than per row, and
+     only the two columns this needs. If the read fails — offline, or the
+     session lapsed — everything is treated as not done, so the list shows
+     too much rather than hiding work somebody still owes. Audits recorded
+     offline and still queued are not visible to this either, for the same
+     reason: they count once they sync. */
+  /* ── WHERE THE SCHEDULE BEGINS ──
+     The audit schedule runs from August 2026. Months before it are not
+     part of it: they show no tasks, count for nothing, and never turn
+     overdue — the records from that period were kept differently and
+     dragging them in would open the list on a backlog nobody owes.
+
+     Month is zero-based, so 7 is August. Move this and everything —
+     the board, the counts, the carry-over — moves with it. */
+  let START_Y = 2026, START_M = 7;
+  /* Overridable as "YYYY-MM" so the behaviour around a live window — due
+     today, closing unfinished, carrying over — can be exercised without
+     waiting for the calendar to reach it. Also the lever to pull if the
+     schedule is ever backdated, rather than editing this file. */
+  try {
+    const o = /^(\d{4})-(\d{2})$/.exec(localStorage.getItem('mjm_schedule_start') || '');
+    if (o) { START_Y = +o[1]; START_M = +o[2] - 1; }
+  } catch (e) {}
+  const beforeStart = (y, m) => (y < START_Y) || (y === START_Y && m < START_M);
+
+  const LOOKBACK_MONTHS = 3;
+  const SCOPE_NURSERIES = (scope === 'PN') ? ['PN'] : ['BNN','UNN1','UNN2'];
+  /* How each nursery code is written on screen. Same spellings the plot audit
+     tabs and the monthly report use, so one place does not say "UNN1" while
+     another says "UNN 1". */
+  const NURSERY_LABELS = { PN:'PN', BNN:'BNN', UNN1:'UNN 1', UNN2:'UNN 2' };
+  const DONE_TABLE = {
+    plot:   'audit_plot_audits',
+    height: 'audit_height_records',
+    papan:  'audit_papan_audits'
+  };
+  /* Keyed by module → 'nursery|YYYY-MM-DD'. Tracking the nursery as well as
+     the day is what lets a main-nursery task say which of BNN, UNN 1 and
+     UNN 2 are done: recording one used to close the window for all three. */
+  let done = null;
+
+  const iso = (y,m,d) => y + '-' + String(m+1).padStart(2,'0') + '-' + String(d).padStart(2,'0');
+
+  async function loadCompletions(){
+    let from = new Date(year, month - LOOKBACK_MONTHS, 1);
+    if (beforeStart(from.getFullYear(), from.getMonth())) from = new Date(START_Y, START_M, 1);
+    const since = iso(from.getFullYear(), from.getMonth(), 1);
+    const next = { plot:new Set(), height:new Set(), papan:new Set() };
+    try {
+      await Promise.all(Object.keys(DONE_TABLE).map(async mod => {
+        const rows = await sb.select(DONE_TABLE[mod],
+          'select=date,nursery&date=gte.' + since);
+        (rows || []).forEach(r => {
+          if (r && r.date && SCOPE_NURSERIES.indexOf(r.nursery) !== -1)
+            next[mod].add(r.nursery + '|' + String(r.date).slice(0,10));
+        });
+      }));
+      done = next;
+    } catch (e) {
+      console.warn('Could not read what has been audited:', e);
+      done = null;                      // show everything rather than hide it
+    }
+  }
+
+  /* ── MAINTENANCE TIMELINE ────────────────────────────────────────
+     Pending maintenance tasks each have their own audit deadline —
+     work_date + window(work_type):
+        Manuring / Weeding / Others → 3 days
+        Interrow Spray              → 5 days
+        P & D Spraying              → skipped (audited elsewhere)
+     We turn each pending task into a synthetic occurrence at the
+     deadline date, then merge them into occurrences(y,m) so they
+     show alongside the other audits' windows with 'overdue' / 'due'
+     / 'soon' status computed the same way. */
+  let MAINT_OCCURRENCES = [];                      // [{y, m, d, nurseries:Set}]
+  const JENIS_TO_WT = {
+    'Penyemburan racun kulat dan serangga': 'pd',
+    'Meracun rumput secara selingan':       'interrow',
+    'Merumput':                             'weeding',
+    'Membaja':                              'manuring'
+  };
+  /* Days an auditor has after the work was done, per work type — also a
+     setting now. 0 means that work type raises no audit at all, which is
+     how P & D has always behaved (it is looked at in the plot condition
+     audit) and is now how any work type can be told to behave. */
+  const _wtWinFor = wt => MJMAuditSettings.maintDays(wt);
+  /* Settings keys the work types in lower case; the records do not always
+     agree, and a stray "Manuring" would otherwise open a group of its own
+     beside "manuring". Grouping and labelling only — how long the auditor
+     has is still whatever _wtWinFor already decided, so nothing appears or
+     disappears from the list because of this. */
+  function _wtCanon(wt) {
+    const v = String(wt || '').trim().toLowerCase();
+    return (MJMAuditSettings.WORKTYPES || []).indexOf(v) !== -1 ? v : 'other';
+  }
+  /* The spellings audit_maintenance_index.html already uses, so the row an
+     auditor taps and the page it opens call the job the same thing. */
+  const WT_LABEL = {
+    manuring: 'Manuring',  weeding: 'Weeding',  interrow: 'Interrow Spray',
+    pd:       'P & D Spraying',                 other:    'Others'
+  };
+  function _canonPlot(raw){
+    const s = String(raw||'').trim().toUpperCase();
+    const m = s.match(/^([A-Z]+)(\d+)(-R)?$/);
+    return m ? m[1] + m[2].padStart(2,'0') + (m[3]||'') : s;
+  }
+  const _PLOT_NUR = (function(){
+    const P = {
+      PN:   Array.from({length:52},(_,i)=>'P'+String(i+1).padStart(2,'0')),
+      BNN:  Array.from({length:14},(_,i)=>'B'+String(i+1).padStart(2,'0')),
+      UNN1: Array.from({length:18},(_,i)=>'U'+String(i+1).padStart(2,'0')),
+      UNN2: Array.from({length:20},(_,i)=>'N'+String(i+1).padStart(2,'0'))
+    };
+    const m = {};
+    Object.keys(P).forEach(n => P[n].forEach(p => {
+      m[p] = n;
+      const stripped = p.replace(/^([A-Z]+)0+(\d)/, '$1$2');
+      if (stripped !== p) m[stripped] = n;
+    }));
+    return m;
+  })();
+  /* ── WHICH NURSERY A PLOT BELONGS TO ──
+     _PLOT_NUR knows the fixed ranges only — P01–P52, B01–B14, U01–U18,
+     N01–N20. The maintenance module lets a nursery carry plots outside
+     them: it keeps those in nops_maint_custom_plots and merges them into
+     its own NURSERY_PLOTS on load (plot_maintenance_script.js:262).
+
+     This page never read that table, so every custom plot resolved to no
+     nursery and was dropped — out of push(), which is why the deadline
+     buckets came out empty and the fallback had to fire at all, and then
+     out of the fallback too once that started applying the same test.
+     A yard using custom plot names got a maintenance row with nothing in
+     it, and then no row.
+
+     Filled in by loadMaintTimeline before it walks anything. */
+  let _CUSTOM_PLOT_NUR = {};
+
+  /* Field records carry nursery_name; office Work Record rows do not —
+     they have tarikh, jenis and plot and nothing else, so for those the
+     plot IS the only route to a nursery. Hence the order: the maps
+     first, the column as a backstop for the source that has it. */
+  const _NUR_ALIAS = {
+    PN:'PN', 'PRE NURSERY':'PN', 'PRE-NURSERY':'PN',
+    BNN:'BNN', 'BATU NIAH':'BNN', 'BATU NIAH NURSERY':'BNN',
+    UNN1:'UNN1', 'ULU NIAH 1':'UNN1', 'ULU NIAH NURSERY 1':'UNN1',
+    UNN2:'UNN2', 'ULU NIAH 2':'UNN2', 'ULU NIAH NURSERY 2':'UNN2'
+  };
+  const _NUR_CODES = ['PN', 'BNN', 'UNN1', 'UNN2'];
+  function _nurFromName(raw){
+    const k = String(raw || '').trim().toUpperCase();
+    return k ? (_NUR_ALIAS[k] || null) : null;
+  }
+  function _nurseryFor(plotCanon, nurseryNameRaw){
+    return (plotCanon && (_CUSTOM_PLOT_NUR[plotCanon] || _PLOT_NUR[plotCanon]))
+        || _nurFromName(nurseryNameRaw)
+        || null;
+  }
+
+  /* "07-08-2026" → "2026-08-07". The office module used to store tarikh
+     DD-MM-YYYY only; a later redesign of Nursery Ops → Work Maintenance
+     started writing it already in YYYY-MM-DD, and this copy was never
+     told. Every office maintenance record failed to parse silently —
+     not a wrong date, an EMPTY one — which push() then read as
+     "no date" and dropped, no error anywhere. Kept in step with the
+     other copy in audit_maintenance_script.js; change one, change both. */
+  function _tarikhToISO(t){
+    if (!t || t === '-' || t === '—') return '';
+    const s = String(t).trim();
+    const m = /^(\d{2})-(\d{2})-(\d{4})$/.exec(s);
+    if (m) return m[3] + '-' + m[2] + '-' + m[1];
+    return /^\d{4}-\d{2}-\d{2}$/.test(s) ? s : '';
+  }
+  /* One To Do row per deadline day — the card body splits the plot chips
+     into per-work-type groups (Manuring / Weeding / Interrow / P&D /
+     Others). Tapping a chip deep-links straight into that plot's audit
+     form via ?plot= on the maintenance page. */
+  async function loadMaintTimeline(){
+    const diag = { fRows: 0, oRecs: 0, audited: 0, kept: 0, skippedPd: 0,
+                   skippedAudited: 0, skippedNoPlot: 0, skippedOutOfScope: 0,
+                   skippedNoDate: 0, sampleKept: [] };
+    try {
+      const [fRows, aRows, oRows, cRows] = await Promise.all([
+        sb.select('nops_maint_field_records', 'select=id,work_date,nursery_name,plot_name,work_type,jenis').catch(e => { diag.fError = String(e?.message||e); return []; }),
+        sb.select('audit_maintenance_audits', 'select=task_id').catch(e => { diag.aError = String(e?.message||e); return []; }),
+        sb.select('nops_maint_records',       'select=records').catch(e => { diag.oError = String(e?.message||e); return []; }),
+        /* The plots this yard added by hand. Fails open: without it the
+           fixed ranges still resolve, which is where this page was. */
+        sb.select('nops_maint_custom_plots',  'select=nursery,plot').catch(e => { diag.cError = String(e?.message||e); return []; })
+      ]);
+      diag.fRows = (fRows||[]).length;
+      /* Built before either walk, so both see the same plot map. */
+      _CUSTOM_PLOT_NUR = {};
+      (cRows||[]).forEach(r => {
+        const n = _nurFromName(r.nursery) || String(r.nursery||'').trim().toUpperCase();
+        const p = _canonPlot(r.plot);
+        if (n && p && _NUR_CODES.indexOf(n) !== -1) _CUSTOM_PLOT_NUR[p] = n;
+      });
+      diag.customPlots = Object.keys(_CUSTOM_PLOT_NUR).length;
+      /* The full custom-plot map, not just its size — this is a targeted
+         override that runs BEFORE the fixed B/U/N/P ranges (see
+         _nurseryFor), so a stray or wrong entry here for a plot that
+         is ALREADY inside a fixed range (B01, say) silently redirects
+         it to another nursery's scope with no error anywhere. */
+      diag.customPlotMap = Object.assign({}, _CUSTOM_PLOT_NUR);
+      /* Direct proof of what B01 (BNN's own plot) resolves to right now,
+         independent of any record — the fixed range alone says BNN, so
+         anything else here means a custom-plot override is the cause. */
+      diag.b01Check = {
+        canon: _canonPlot('B1'),
+        fixedRange: _PLOT_NUR['B01'],
+        customOverride: _CUSTOM_PLOT_NUR['B01'] || null,
+        resolvesTo: _nurseryFor('B01', undefined)
+      };
+      diag.scopeNurseries = SCOPE_NURSERIES.slice();
+      const audited = new Set((aRows||[]).map(a => String(a.task_id)));
+      diag.audited = audited.size;
+      const buckets = new Map();                  // 'YYYY-MM-DD' → {y,m,d,nurseries:Set,plots:Map}
+      const push = (id, workDateISO, workType, plotRaw, nurseryNameRaw) => {
+        if (_wtWinFor(workType) <= 0)              { diag.skippedPd++; return; }
+        if (audited.has(String(id)))               { diag.skippedAudited++; return; }
+        if (!workDateISO)                          { diag.skippedNoDate++; return; }
+        const [Y,M,D] = workDateISO.split('-').map(Number);
+        const dl = new Date(Y, M-1, D);
+        dl.setDate(dl.getDate() + _wtWinFor(workType));
+        const y = dl.getFullYear(), m = dl.getMonth(), d = dl.getDate();
+        const plot = _canonPlot(plotRaw);
+        const n = _nurseryFor(plot, nurseryNameRaw);
+        if (!n)                                    { diag.skippedNoPlot++; return; }
+        if (SCOPE_NURSERIES.indexOf(n) === -1)     { diag.skippedOutOfScope++; return; }
+        const k  = y + '-' + m + '-' + d;
+        if (!buckets.has(k))
+          buckets.set(k, { y, m, d, nurseries: new Set(), plots: new Map(), items: [] });
+        const bucket = buckets.get(k);
+        bucket.nurseries.add(n);
+        if (!bucket.plots.has(n)) bucket.plots.set(n, new Set());
+        bucket.plots.get(n).add(plot);
+        /* The same walk also keeps WHICH work each plot is waiting on, and
+           the day it was done. The deadline alone cannot say either: two
+           plots share a deadline because their windows happen to end
+           together, not because the same job was done on them. Oldest case
+           first needs the work date, not the deadline. */
+        bucket.items.push({ nursery: n, plot, wt: _wtCanon(workType), on: workDateISO });
+        diag.kept++;
+        if (diag.sampleKept.length < 3) diag.sampleKept.push({ plot:plotRaw, workType, workDateISO, deadline: y+'-'+String(m+1).padStart(2,'0')+'-'+String(d).padStart(2,'0'), nursery: n });
+      };
+      /* Raw sample BEFORE push() filters anything out, so a run where
+         everything gets skipped still shows what the real column
+         values look like — the single most useful fact when a filter
+         is dropping rows nobody expected it to. */
+      diag.rawSample = (fRows||[]).slice(0, 5).map(r => ({
+        id: r.id, work_date: r.work_date, nursery_name: r.nursery_name,
+        plot_name: r.plot_name, work_type: r.work_type,
+        _canonPlot: _canonPlot(r.plot_name),
+        _nurseryFor: _nurseryFor(_canonPlot(r.plot_name), r.nursery_name),
+        _wtWinFor: _wtWinFor(r.work_type)
+      }));
+      (fRows||[]).forEach(r => push(r.id, r.work_date, r.work_type, r.plot_name, r.nursery_name));
+      const officeRecs = (oRows && oRows[0] && Array.isArray(oRows[0].records)) ? oRows[0].records : [];
+      diag.oRecs = officeRecs.length;
+      /* Office records naming a B/U/N/P-range plot, resolved the same way
+         push() resolves them — this is where a manuring/weeding record on
+         a plot like B01 shows its real jenis spelling, its real tarikh
+         format, and exactly which nursery it resolves to before any
+         filter runs. Capped at 8 so the box stays short. */
+      diag.officeMaintSample = officeRecs
+        .filter(rec => rec && rec.plot && JENIS_TO_WT[rec.jenis] &&
+                       JENIS_TO_WT[rec.jenis] !== 'pd')
+        .slice(0, 8)
+        .map(rec => {
+          const plot = _canonPlot(rec.plot);
+          return {
+            id: rec.id, tarikh: rec.tarikh, jenis: rec.jenis, plot: rec.plot,
+            _canonPlot: plot,
+            _tarikhToISO: _tarikhToISO(rec.tarikh),
+            _mappedWorkType: JENIS_TO_WT[rec.jenis],
+            _nurseryFor: _nurseryFor(plot, undefined)
+          };
+        });
+      officeRecs.forEach(rec => {
+        push(rec.id, _tarikhToISO(rec.tarikh), JENIS_TO_WT[rec.jenis] || 'other', rec.plot);
+      });
+      MAINT_OCCURRENCES = Array.from(buckets.values());
+      diag.buckets = MAINT_OCCURRENCES.length;
+      /* Fallback: if the deadline-buckets came out empty but the raw
+         task tables have rows that the maintenance page would show
+         as pending, still surface a maintenance row on the To Do
+         list — tied to today so the auditor can tap through and see
+         what's there. Deadline windowing / plot mapping can fail
+         for a stray task without hiding the whole module from the
+         home page. */
+      /* Fires when nothing lands in the month on screen — not merely when
+         there are no buckets at all.
+
+         That distinction is the whole bug. One maintenance deadline in
+         any other month made MAINT_OCCURRENCES non-empty, so this never
+         ran; and occurrences() then filtered that bucket out for being
+         the wrong month, leaving the To Do list with no maintenance row
+         and nothing to say about it. Work that the module page lists as
+         overdue simply did not appear here.
+
+         The month is today's, not the one being browsed: this runs once
+         at load, and the answer it is standing in for is "what do I owe
+         now". */
+      /* ── THE PERMISSIVE WALK ALWAYS RUNS ──
+         It used to be a fallback, guarded first by "no buckets at all"
+         and then by "nothing this month". Both guards were guesses about
+         when the strict walk above could be trusted, and both were wrong
+         in turn: the row showed empty, then vanished, then stayed away
+         while the module page listed the very same work as overdue.
+
+         The strict walk drops a record for any of five reasons — a work
+         type set to zero days, no work date, a plot it cannot place, a
+         nursery out of scope, already audited. Four of those are right.
+         The ones that are not are invisible from here, and every round
+         of guessing which had cost a deploy.
+
+         So it runs every time now, and anything it finds that the strict
+         walk did not already place is added on today's date. The rule is
+         simple and does not depend on knowing which filter misfired: if
+         the maintenance module can see a task, this list can too. Work
+         already placed with a real deadline keeps that deadline — this
+         only fills gaps, it never duplicates. */
+      {
+        /* The buckets came out empty, but that is not the same as "no
+           work pending": push() also drops a record whose deadline could
+           not be worked out. So the same rows are walked again with only
+           the deadline arithmetic removed — every other test it applies
+           still applies here.
+
+           TWO THINGS THIS USED TO GET WRONG
+           ---------------------------------
+           It tested `some(...)` and then threw the matching rows away,
+           raising a row with `plots: new Map()` and no `items` at all.
+           The work-type groups under it are built from `items`, so the
+           row could only ever say "No pending plot came through" — which
+           is what it has been saying.
+
+           And the test ignored the nursery scope, while the row it
+           raised was labelled with the scope. A pre-nursery task with
+           nothing in the main nursery pending would put a Maintenance
+           row on a MAIN NURSERY to-do list, with no plots under it,
+           because there were none to show. Scope is applied here now, so
+           the row appears when THIS auditor has maintenance owing and
+           not otherwise. */
+        const auditedIds = new Set((aRows||[]).map(a => String(a.task_id)));
+        const loose = [];
+        /* Pending work that resolves to NO nursery at all. It is not this
+           auditor's or anyone else's until something can place it, and it
+           is the one case where staying silent is wrong: the row vanishes
+           and nothing anywhere says a dozen records were dropped. Counted
+           so the row can say so. */
+        let unplaceable = 0;
+        const pushLoose = (id, workDateISO, workType, plotRaw, nurseryNameRaw) => {
+          if (SKIP_FALLBACK_TYPES.has(String(workType||'').toLowerCase())) return;
+          if (auditedIds.has(String(id)))  return;
+          if (!workDateISO)                return;
+          const plot = _canonPlot(plotRaw);
+          const n = _nurseryFor(plot, nurseryNameRaw);
+          if (!n) { unplaceable++; return; }            // cannot say which nursery
+          if (SCOPE_NURSERIES.indexOf(n) === -1) return;
+          loose.push({ nursery: n, plot, wt: _wtCanon(workType), on: workDateISO });
+        };
+        (fRows||[]).forEach(r => pushLoose(r.id, r.work_date, r.work_type, r.plot_name, r.nursery_name));
+        const looseOffice = (oRows && oRows[0] && Array.isArray(oRows[0].records))
+          ? oRows[0].records : [];
+        looseOffice.forEach(rec => {
+          if (!rec || !rec.plot) return;
+          pushLoose(rec.id, _tarikhToISO(rec.tarikh),
+                    JENIS_TO_WT[rec.jenis] || 'other', rec.plot);
+        });
+
+        /* Placed work raises a normal row. Work that could not be placed
+           at all raises one too, empty but explaining itself — never
+           nothing. Work that placed fine and simply belongs to another
+           nursery raises nothing here, which is the whole point of the
+           scope test and is not a failure. */
+        /* What the strict walk already placed AS A BUCKET IN THE CURRENT
+           MONTH counts as "visible today". Anything else — a placed
+           bucket in a past month (beforeStart, or older than
+           LOOKBACK_MONTHS), a placed bucket in a future month, or
+           nothing at all — stays "missing" and gets a today-bucket so
+           the invariant holds: if the maintenance module can see a
+           task, this list can too.
+
+           The past-month buckets carriedOverdue() rescues are fine to
+           double: an overdue August-25 task shows both on its real
+           deadline (via carriedOverdue when the auditor pages forward)
+           and on today's row, and either read makes sense. Future-month
+           buckets similarly surface twice — once on today ("this is
+           coming"), once at their real deadline when the auditor pages
+           to that month.
+
+           Current-month buckets are the one thing we DO NOT duplicate:
+           they render on today's view already, so a today-bucket for
+           the same task would put the same chip twice next to itself. */
+        const currentMonthKey = year + '-' + month;
+        const placedKeys = new Set();
+        MAINT_OCCURRENCES.forEach(mo => {
+          if ((mo.y + '-' + mo.m) !== currentMonthKey) return;
+          (mo.items || []).forEach(it =>
+            placedKeys.add(it.nursery + '|' + it.plot + '|' + it.wt));
+        });
+        const missing = loose.filter(it =>
+          !placedKeys.has(it.nursery + '|' + it.plot + '|' + it.wt));
+        diag.filledGaps = missing.length;
+        diag.currentMonthKey = currentMonthKey;
+        diag.visibleKeys     = placedKeys.size;
+        diag.looseItems      = loose.length;
+
+        if (missing.length || (unplaceable && !placedKeys.size)) {
+          const now = new Date();
+          const plots = new Map();
+          const nurseries = new Set();
+          missing.forEach(it => {
+            nurseries.add(it.nursery);
+            if (!plots.has(it.nursery)) plots.set(it.nursery, new Set());
+            plots.get(it.nursery).add(it.plot);
+          });
+          /* Appended, not assigned. Buckets in other months are what
+             carriedOverdue() reads to bring an older deadline forward;
+             replacing the list would throw them away to fix this month. */
+          MAINT_OCCURRENCES = MAINT_OCCURRENCES.concat([{
+            y: now.getFullYear(),
+            m: now.getMonth(),
+            d: now.getDate(),
+            nurseries: nurseries.size ? nurseries : new Set(SCOPE_NURSERIES),
+            plots: plots,
+            items: missing,
+            _why: missing.length ? null
+                : (unplaceable + ' pending record' + (unplaceable === 1 ? '' : 's') +
+                   ' could not be matched to a nursery. Their plot names are not in ' +
+                   'the standard ranges and are not listed under a nursery in ' +
+                   'Nursery Operation \u2192 Work Maintenance \u2192 plot list.')
+          }]);
+          diag.fallback = true;
+          diag.unplaceable = unplaceable;
+          diag.fallbackItems = loose.length;
+        }
+      }
+      diag.startMonth = START_Y + '-' + String(START_M + 1).padStart(2, '0');
+      diag.today      = year + '-' + String(month + 1).padStart(2, '0') + '-' + String(day).padStart(2, '0');
+      diag.strictBucketsByMonth =
+        MAINT_OCCURRENCES.map(mo => mo.y + '-' + String(mo.m + 1).padStart(2, '0')
+                                  + '-' + String(mo.d).padStart(2, '0'));
+      console.log('[audit-home] maintenance timeline:', diag,
+                  'SCOPE_NURSERIES=', SCOPE_NURSERIES);
+      _paintMaintDebug(diag);
+    } catch (e) {
+      console.warn('[audit-home] maintenance timeline load failed:', e, diag);
+      MAINT_OCCURRENCES = [];
+      _paintMaintDebug(null, e);
+    }
+  }
+  /* ── ON-SCREEN DIAGNOSTIC, NO DEVTOOLS NEEDED ──
+     The console line above says everything, but a field auditor cannot
+     always get a laptop's DevTools onto a phone screen, and pasting a
+     command into the wrong box (the filter, not the REPL) is an easy
+     mistake to make from a screenshot alone. ?debug=1 on the URL prints
+     the same diag object as plain visible text at the top of the To Do
+     list instead — nothing to click, nothing to expand, just read it and
+     screenshot the page itself. Temporary: remove once the maintenance
+     row is confirmed working for everyone. */
+  const _MAINT_DEBUG = (function () {
+    try { return new URLSearchParams(location.search).get('debug') === '1'; }
+    catch (e) { return false; }
+  })();
+  function _paintMaintDebug(diag, err){
+    if (!_MAINT_DEBUG) return;
+    let box = document.getElementById('maint-debug-box');
+    if (!box) {
+      box = document.createElement('pre');
+      box.id = 'maint-debug-box';
+      box.style.cssText = 'white-space:pre-wrap;word-break:break-word;' +
+        'background:#111;color:#7fffb0;font:11px/1.5 monospace;' +
+        'padding:12px;border-radius:10px;margin-bottom:14px;' +
+        'max-height:50vh;overflow:auto';
+      const sched = document.querySelector('.sched');
+      if (sched && sched.parentNode) sched.parentNode.insertBefore(box, sched);
+    }
+    box.textContent = err
+      ? 'MAINT DEBUG — threw an error:\n' + (err && err.stack || err)
+      : 'MAINT DEBUG (?debug=1)\n' + JSON.stringify(diag, null, 2);
+  }
+  /* P & D is audited elsewhere; every other work type contributes to
+     the fallback pending check above. */
+  const SKIP_FALLBACK_TYPES = new Set(['pd']);
+
+  /* Which nurseries have been audited inside this window. Maintenance
+     is a different shape: each occurrence carries a set of nurseries
+     that STILL have pending tasks on that deadline, so we invert it. */
+  function nurseryState(o, y, m){
+    if (o.mod === 'maint' && o._maintNurseries) {
+      return SCOPE_NURSERIES.map(n => ({
+        nursery: n,
+        done: !o._maintNurseries.has(n)             // pending? then not done
+      }));
+    }
+    const fromISO = iso(y, m, o.start), toISO = iso(y, m, o.end);
+    return SCOPE_NURSERIES.map(n => {
+      /* A window is finished when no plot in it is still owed.
+
+         It used to be finished as soon as ONE record landed anywhere
+         inside it — the nursery was not tracked per plot, so a single
+         audit closed the row for the whole month. That was a fair
+         approximation while the row said nothing about plots. It stops
+         being one the moment the row lists them: auditing the first of
+         fifty-two plots would strike the row out and take the other
+         fifty-one circles off the screen with it.
+
+         Only when the batch roster actually answered for this nursery.
+         If it did not — offline, or the tables refused — fall back to
+         the old date rule rather than reading "no plots known" as "no
+         work left". */
+      if (window.MJMAuditPending && MJMAuditPending.covers(o.mod, n))
+        return { nursery: n,
+                 done: MJMAuditPending.plots(o.mod, n, fromISO, toISO).length === 0 };
+
+      let ok = false;
+      if (done && done[o.mod])
+        for (let d = o.start; d <= o.end && !ok; d++)
+          if (done[o.mod].has(n + '|' + iso(y, m, d))) ok = true;
+      return {nursery:n, done:ok};
+    });
+  }
+
+  /* A task is finished when every nursery it covers has been audited — not
+     when the first one has. */
+  function isDone(o, y, m){
+    return nurseryState(o, y, m).every(x => x.done);
+  }
+
+  const daysIn = (y,m) => new Date(y, m+1, 0).getDate();
+
+  /* Every window that falls in the month on screen.
+     A window is clamped to the last day of the month, so "the 30th" still
+     lands in February instead of vanishing or reading as 30 February. */
+  function occurrences(y, m){
+    if (beforeStart(y, m)) return [];
+    const last = daysIn(y, m);
+    const out = [];
+    SET.forEach(sc => sc.windows.forEach((w, i) => {
+      // Windows are listed in month order; assign a round number when
+      // the audit type has more than one window (Plot Condition MN
+      // has 3, Seedling Height MN has 2). Types with a single window
+      // (Papan MN, PN Plot, PN Height) are left round-less so the
+      // card doesn't display a redundant "Round 1".
+      const withRound = sc.windows.length > 1;
+      out.push(Object.assign({}, sc, {
+        start: Math.min(w[0], last),
+        end:   Math.min(w[1], last),
+        round: withRound ? (i + 1) : 0
+      }));
+    }));
+    // Maintenance — one row per deadline day this month. The card body
+    // splits the plots into per-work-type groups (Manuring / Weeding /
+    // Interrow / P&D / Others) so each job has its own chip cluster.
+    MAINT_OCCURRENCES.filter(mo => mo.y === y && mo.m === m).forEach(mo => {
+      out.push({
+        mod:   'maint',
+        title: 'Maintenance',         // rendered as-is (not translated)
+        href:  'audit_maintenance_index.html',
+        start: mo.d,
+        end:   mo.d,
+        _maintNurseries: mo.nurseries,
+        _maintPlots: mo.plots,
+        _maintItems: mo.items,
+        _maintWhy:   mo._why || null
+      });
+    });
+    return out.sort((a,b) => a.start - b.start || a.title.localeCompare(b.title));
+  }
+
+  /* Where a window stands. 'done' is returned so callers can drop it from
+     the list; a closed window with nothing recorded is overdue, not passed. */
+  function occStatus(o, y, m){
+    if (isDone(o, y, m)) return 'done';
+    const t0 = new Date(year, month, day);
+    const s0 = new Date(y, m, o.start), e0 = new Date(y, m, o.end);
+    if (t0 > e0) return 'overdue';
+    if (t0 >= s0) return 'due';
+    const away = Math.round((s0 - t0) / 864e5);
+    return away <= 3 ? 'soon' : 'upcoming';
+  }
+
+  /* Windows from earlier months that were never completed. They belong on
+     the current month's list — that is the whole point of overdue — and are
+     stamped with the month they were owed so nobody reads "20–25" as this
+     month's. Bounded by the same lookback as the records read. */
+  function carriedOverdue(){
+    const out = [];
+    for (let back = LOOKBACK_MONTHS; back >= 1; back--){
+      const d = new Date(year, month - back, 1);
+      const y = d.getFullYear(), m = d.getMonth();
+      if (beforeStart(y, m)) continue;
+      occurrences(y, m).forEach(o => {
+        if (occStatus(o, y, m) === 'overdue')
+          out.push(Object.assign({}, o, {fromY:y, fromM:m}));
+      });
+    }
+    return out;
+  }
+
+  function dateLabel(o, m){
+    const mn = MONTHS[m];
+    return o.start === o.end ? `${o.start} ${mn}` : `${o.start}–${o.end} ${mn}`;
+  }
+
+  /* ── WHEN IT IS OWED BY ──
+     A window like "1–5 Aug" told the auditor when they were allowed to
+     start as well as when they had to finish, and the first half is not
+     a thing anyone acts on: the row only appears once the window is
+     open. What is left is the deadline, so that is all the row shows —
+     the window's last day.
+
+     Under it, the same date said the way it is actually thought about.
+     "5 Aug" needs counting on fingers against today; "3 days left" does
+     not, and "overdue 5 days" is the one number that should be
+     impossible to skim past.
+
+     Days are compared at local midnight on both sides so a window
+     closing today reads "due today" all day rather than flipping to
+     overdue at some hour of the afternoon. */
+  function dueInfo(o, oy, om){
+    const due   = new Date(oy, om, o.end);
+    const today = new Date(year, month, day);
+    const days  = Math.round((due - today) / 86400000);
+    const plural = n => n === 1 ? '' : 's';
+    return {
+      date: `${t('due_word')} ${o.end} ${MONTHS[om]}`,
+      left: days > 0 ? `${fmtNum(days)} ${t('day' + (days === 1 ? '' : 's') + '_left')}`
+          : days === 0 ? t('due_today')
+          : `${t('overdue_by')} ${fmtNum(-days)} ${t('day' + plural(-days))}`,
+      late: days < 0,
+      soon: days >= 0 && days <= 1
+    };
+  }
+
+  /* ── Month strip ── */
+  const clampWin = (y,m,d) => Math.max(1, Math.min(d, Math.max(1, daysIn(y,m) - WIN + 1)));
+
+  /* Today sits in the middle of the five on the current month; other months
+     open at the 1st. */
+  function windowFor(y,m){
+    return (y === year && m === month) ? clampWin(y, m, day - 2) : 1;
+  }
+
+  function renderCalendar(){
+    // The month strip and five-day picker were removed with the bucket-tile
+    // redesign. Guard against the missing elements so any stragglers that
+    // still call this helper are a silent no-op instead of a TypeError.
+    const mon = document.getElementById('cal-month');
+    if (!mon) return;
+    mon.textContent = MONTHS_FULL[viewM] + ' ' + viewY;
+
+    const occ  = occurrences(viewY, viewM)
+      .filter(o => occStatus(o, viewY, viewM) !== 'done');   // done days stop nagging
+    const busy = new Set();
+    occ.forEach(o => { for (let d = o.start; d <= o.end; d++) busy.add(d); });
+
+    const last = daysIn(viewY, viewM);
+    winStart = clampWin(viewY, viewM, winStart);
+    let html = '';
+    for (let d = winStart; d <= Math.min(winStart + WIN - 1, last); d++){
+      const isToday = (viewY === year && viewM === month && d === day);
+      const cls = ['day'];
+      if (busy.has(d))  cls.push('has');
+      if (isToday)      cls.push('today');
+      if (selDay === d) cls.push('sel');
+      html += `<button class="${cls.join(' ')}" data-day="${d}">
+        <div class="day-w">${WD[new Date(viewY, viewM, d).getDay()]}</div>
+        <div class="day-n">${d}</div>
+        <div class="day-dot"></div>
+      </button>`;
+    }
+    const strip = document.getElementById('cal-days');
+    if (!strip) return;
+    strip.innerHTML = html;
+    strip.querySelectorAll('.day').forEach(el => {
+      el.onclick = () => {
+        const d = parseInt(el.dataset.day, 10);
+        selDay = (selDay === d) ? null : d;   // tapping the chosen day clears it
+        renderAll();
+      };
+    });
+  }
+
+  /* Paging rolls into the neighbouring month rather than stopping dead at
+     the 1st or the 31st. */
+  function stepDays(dir){
+    const last = daysIn(viewY, viewM);
+    const maxStart = Math.max(1, last - WIN + 1);
+    let next = winStart + dir * WIN;
+    if (next < 1){
+      viewM--; if (viewM < 0){ viewM = 11; viewY--; }
+      next = Math.max(1, daysIn(viewY, viewM) - WIN + 1);   // land on the final five
+    } else if (next > maxStart){
+      if (winStart >= maxStart){                             // already on the last five
+        viewM++; if (viewM > 11){ viewM = 0; viewY++; }
+        next = 1;
+      } else {
+        next = maxStart;
+      }
+    }
+    winStart = next;
+    selDay = null;
+    renderAll();
+  }
+
+  /* ── Bucket tiles ──
+     Four iOS-style buckets replace the old chip strip. Each tile maps
+     to one or more occStatus values; tapping seeds the legacy `active`
+     Set so the existing timeline filter code keeps working untouched.
+
+       Today's Audit → 'due'                          (windows open today)
+       Scheduled     → 'soon' | 'upcoming'            (still ahead of today)
+       All Audit     → (empty set — no filter)
+       Overdue       → 'overdue'                      (window past, not done)
+
+     Tapping the active tile with the SAME key clears the filter. */
+  /* Labels are translation KEYS, not strings — renderBuckets() runs
+     t(b.lbl) so the tiles update immediately on mjm-lang-changed
+     without re-declaring the array. */
+  // Bucket order: Today → Overdue → All. "Today's Audit" bundles
+  // due + overdue so it reads as the whole day's workload; Overdue
+  // isolates the backlog subset; All is the full month for context.
+  // Scheduled was removed at the auditor's request — soon/upcoming
+  // items are still countable via the All tile.
+  const BUCKETS = [
+    {k:'today',  lbl:'bucket_today',  cls:'bkt-today', statuses:['due','overdue']},
+    {k:'over',   lbl:'bucket_over',   cls:'bkt-over',  statuses:['overdue']},
+    {k:'all',    lbl:'bucket_all',    cls:'bkt-all',   statuses:[]}          // empty = no filter
+  ];
+  const BUCKET_ICONS = {
+    today: '<rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>',
+    sched: '<rect x="3" y="4" width="18" height="18" rx="2"/><path d="M8 14h.01M12 14h.01M16 14h.01M8 18h.01M12 18h.01"/>',
+    all:   '<path d="M4 6h16M4 12h16M4 18h16"/>',
+    over:  '<path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>'
+  };
+  /* Bucket tiles were cancelled — no Today/Overdue/All filter above
+     the timeline. The auditor lands on the whole month's work at
+     once; the Audit History section below carries what has been
+     closed out. `active` stays empty so renderTimeline shows every
+     occurrence in the month rather than a filtered slice. */
+  let activeBucket = null;
+  active.clear();
+
+  /* Buckets were cancelled — this function is a no-op now, kept only
+     so any older code that still calls it does nothing rather than
+     throws. The #buckets element is gone from the HTML too. */
+  function renderBuckets(_occ){
+    /* nothing to render */
+  }
+
+  // Whole-timeline open/closed. Toggled by a same-tile tap on a
+  // bucket; defaults to open on load so the auditor sees today's
+  // work first thing.
+  let timelineOpen = true;
+  function applyTimelineOpen(){
+    const box = document.getElementById('todo-section');
+    if (!box) return;
+    box.style.display = timelineOpen ? '' : 'none';
+    // Mirror on the buckets themselves so a CSS hook can highlight
+    // the "collapsed" active tile if we ever want to (currently just
+    // a data-attribute — no visual change).
+    document.querySelectorAll('.bkt.on').forEach(b =>
+      b.setAttribute('data-collapsed', timelineOpen ? 'false' : 'true'));
+  }
+
+  /* ── Timeline ──
+     Cards now carry a row of nursery chips instead of being one big link.
+     Each chip navigates to the destination page with
+       ?nursery=<code>&from=home
+     so the page opens on the right tab straight away and shows a
+     Choose-Another-Nursery button. PN scope → one chip; MN scope →
+     three (BNN / UNN 1 / UNN 2). */
+  function _chipsHtml(o, tone){
+    return `<div class="tl-chips">${
+      SCOPE_NURSERIES.map(n => `
+        <a class="tl-chip" style="--tone:${tone}"
+           href="${o.href}?nursery=${n}&from=home">${NURSERY_LABELS[n]}</a>`
+      ).join('')
+    }</div>`;
+  }
+
+  /* ── The plots a live row still owes ──
+     A strip of circles under the row, one per plot with work left
+     inside that row's own window. Which plots, and whether a plot is
+     finished, is settled the same way the row above decides it is due:
+     both ask about the window's dates, so a row can never sit at "due"
+     over an empty strip, or read "done" above plots still waiting.
+
+     Main nursery keeps one flat strip, but ordered by nursery: every B
+     plot, then every U, then every N. An auditor works a nursery at a
+     time — they are separate sites — so the strip is grouped the way
+     the walking is done, and finishing BNN means clearing a run of
+     circles rather than picking them out of an interleaved list. The
+     codes carry their own nursery, so the grouping needs no headings
+     to be legible.
+
+     Ten are shown, and the rest fold into a toggle carrying the count
+     of what is hidden. A whole main-nursery window opens owing fifty-two
+     plots across four modules, which is six rows of circles per module
+     and a page nobody can scroll past — but the count keeps the size of
+     the job visible, and one tap opens the lot. Expanding is remembered
+     per row while the page is open, so a redraw (a month change, the
+     completions arriving) does not fold a row the auditor just opened. */
+  const PLOT_PREVIEW = 10;
+  const expandedPlots = new Set();
+  const _plotKey = (o, oy, om) =>
+    [o.mod, oy, om, o.start, o.end, o.round || 0].join('|');
+  function _plotsHtml(o, oy, om, pending){
+    if (!pending.length) return '';
+    const fromISO = iso(oy, om, o.start);
+    const toISO   = iso(oy, om, o.end);
+
+    const byNursery = pending.map(x => {
+      let list = [];
+      if (o.mod === 'maint') {
+        /* Already worked out while the timeline was built. */
+        const set = o._maintPlots && o._maintPlots.get(x.nursery);
+        list = set ? [...set].sort() : [];
+      } else if (window.MJMAuditPending) {
+        list = MJMAuditPending.plots(o.mod, x.nursery, fromISO, toISO);
+      }
+      return list.map(pl => ({ nursery: x.nursery, plot: pl }));
+    });
+
+    /* pending is in SCOPE_NURSERIES order, so flattening it groups the
+       strip by nursery without any further sorting. */
+    const shown = byNursery.flat();
+    if (!shown.length) return '';
+    const label = t(o.title);
+
+    const key    = _plotKey(o, oy, om);
+    const open   = expandedPlots.has(key);
+    const visible = open ? shown : shown.slice(0, PLOT_PREVIEW);
+    const hidden  = shown.length - visible.length;
+
+    const circles = visible.map(e => {
+      const nur = NURSERY_LABELS[e.nursery] || e.nursery;
+      return `<a class="tl-plot"
+                 href="${o.href}?nursery=${encodeURIComponent(e.nursery)}` +
+             `&plot=${encodeURIComponent(e.plot)}&from=home"
+                 title="${nur} ${e.plot}"
+                 aria-label="${label} — ${nur} ${e.plot}">${e.plot}</a>`;
+    }).join('');
+
+    /* Chevrons out to open, in to close — the count rides on the closed
+       state, where it is the only thing saying how much more there is. */
+    const OUT = '<svg viewBox="0 0 24 24" aria-hidden="true">' +
+                '<polyline points="9 6 4 12 9 18"/><polyline points="15 6 20 12 15 18"/></svg>';
+    const IN  = '<svg viewBox="0 0 24 24" aria-hidden="true">' +
+                '<polyline points="4 6 9 12 4 18"/><polyline points="20 6 15 12 20 18"/></svg>';
+
+    const toggle = shown.length > PLOT_PREVIEW
+      ? `<button type="button" class="tl-plots-toggle" data-plotkey="${key}"
+                 aria-expanded="${open}"
+                 title="${open ? 'Show fewer' : 'Show all ' + fmtNum(shown.length) + ' pending plots'}"
+                 aria-label="${label} — ${open
+                    ? 'show fewer plots'
+                    : 'show ' + fmtNum(hidden) + ' more pending plots'}">${
+          open ? IN : OUT + '<span>' + fmtNum(hidden) + '</span>'}</button>`
+      : '';
+
+    return `<div class="tl-plots">${circles}${toggle}</div>`;
+  }
+
+  /* ── MAINTENANCE, BY THE JOB ──────────────────────────────────────
+     One strip of circles answers "how many plots", which is the wrong
+     question for maintenance: an auditor going out does manuring plots
+     together, then weeding plots together, because that is how the work
+     was done and how it is checked. So the row breaks into a group per
+     work type.
+
+     Oldest first, within a group and between them, by the day the work
+     was done rather than the deadline — the deadline is shared by
+     everything in the row, so sorting on it would leave the order to
+     chance. The plot waiting longest is the one at risk of ageing out.
+
+     A group can be folded away. Folded state is remembered per row while
+     the page is open, so a redraw does not undo it. Groups start open:
+     this list exists to be read, and something folded by default is
+     something nobody finds. */
+  const collapsedTypes = new Set();
+
+  /* Nothing to group is not nothing to say. An empty return leaves a gap
+     under the row that looks like a row with no work in it, which is the
+     one thing this row never means — it exists because work is pending.
+     So: fall back to the flat strip the other modules use, and if that is
+     empty too, say which of the two is missing. A silent gap is what made
+     this hard to diagnose the first time. */
+  function _maintTypesHtml(o, oy, om, pending){
+    /* `pending` is the nurseries a separate check thinks are unfinished.
+       Where it has an answer, use it. Where it does not, fall back to the
+       whole scope rather than to nothing: everything in this row was put
+       there by a walk that already dropped anything out of scope, so the
+       scope is the honest wider net. */
+    const scope = pending.length ? pending.map(x => x.nursery) : SCOPE_NURSERIES;
+    const inScope = new Set(scope);
+
+    let mine = (o._maintItems || []).filter(it => inScope.has(it.nursery));
+
+    /* Two lists come off the same walk: which plots are pending, and which
+       job each is waiting on. If the second is missing — an older cached
+       page, a record with no work type — the first is still worth drawing.
+       Better one group headed "Others" than a row with nothing under it. */
+    if (!mine.length && o._maintPlots) {
+      o._maintPlots.forEach((set, nur) => {
+        if (!inScope.has(nur)) return;
+        [...set].forEach(plot => mine.push({ nursery: nur, plot: plot, wt: 'other', on: '' }));
+      });
+    }
+
+    if (!mine.length) {
+      /* The row used to guess here — "reload; if it stays, the records
+         could not be read" — which was wrong every time the real answer
+         was a plot nobody had filed under a nursery. When the walk knows
+         why it placed nothing, say that instead. */
+      const why = o._maintWhy ||
+        'No pending plot came through for this deadline. Reload; if it stays, ' +
+        'the maintenance records behind this row could not be read.';
+      return `<div class="tl-wts"><div class="tl-wt-none">${why}</div></div>`;
+    }
+
+    /* Canonicalised again here rather than trusted. The items are written
+       that way, but a group is not the place to find out otherwise: a
+       stray "Manuring" would open a second manuring group beside the
+       first, and an unrecognised type would put its own raw spelling on
+       screen as if it were a job the yard has a name for. */
+    const groups = new Map();
+    mine.forEach(it => {
+      const wt = _wtCanon(it.wt);
+      if (!groups.has(wt)) groups.set(wt, []);
+      groups.get(wt).push(it);
+    });
+
+    const rowKey = _plotKey(o, oy, om);
+    const label  = t(o.title);
+    const oldest = list => list.reduce((a, it) => (!a || it.on < a) ? it.on : a, null);
+
+    const blocks = [...groups.entries()]
+      .map(([wt, list]) => ({
+        wt,
+        list: list.slice().sort((a, b) =>
+          String(a.on || '').localeCompare(String(b.on || '')) ||
+          a.plot.localeCompare(b.plot)),
+        from: oldest(list)
+      }))
+      // The job somebody has been waiting longest on leads.
+      .sort((a, b) => String(a.from || '').localeCompare(String(b.from || '')))
+      .map(g => {
+        const key  = rowKey + '|' + g.wt;
+        const open = !collapsedTypes.has(key);
+        const name = WT_LABEL[g.wt] || WT_LABEL.other;
+        const circles = g.list.map(it => {
+          const nur = NURSERY_LABELS[it.nursery] || it.nursery;
+          return `<a class="tl-plot"
+                     href="${o.href}?nursery=${encodeURIComponent(it.nursery)}` +
+                 `&plot=${encodeURIComponent(it.plot)}&from=home"
+                     title="${nur} ${it.plot} — ${name}${it.on ? ', done ' + it.on : ''}"
+                     aria-label="${label} — ${name} — ${nur} ${it.plot}">${it.plot}</a>`;
+        }).join('');
+        return `<div class="tl-wt${open ? ' open' : ''}">
+          <button type="button" class="tl-wt-head" data-wtkey="${key}"
+                  aria-expanded="${open}"
+                  aria-label="${name} — ${fmtNum(g.list.length)} plots, ${
+                    open ? 'hide' : 'show'}">
+            <svg class="tl-wt-caret" viewBox="0 0 24 24" aria-hidden="true">
+              <polyline points="6 9 12 15 18 9"/></svg>
+            <span class="tl-wt-name">${name}</span>
+            <span class="tl-wt-count">${fmtNum(g.list.length)}</span>
+          </button>
+          <div class="tl-wt-plots">${circles}</div>
+        </div>`;
+      }).join('');
+
+    return `<div class="tl-wts">${blocks}</div>`;
+  }
+
+  /* Folding a work type. Same delegated-listener reasoning as below. */
+  document.addEventListener('click', e => {
+    const btn = e.target.closest('.tl-wt-head');
+    if (!btn) return;
+    e.preventDefault();
+    const key = btn.dataset.wtkey;
+    if (collapsedTypes.has(key)) collapsedTypes.delete(key);
+    else collapsedTypes.add(key);
+    renderAll();
+  });
+
+  /* One delegated listener rather than a handler per button: the
+     timeline is rebuilt from scratch on every redraw, so anything bound
+     to a button dies with it. */
+  document.addEventListener('click', e => {
+    const btn = e.target.closest('.tl-plots-toggle');
+    if (!btn) return;
+    e.preventDefault();
+    const key = btn.dataset.plotkey;
+    if (expandedPlots.has(key)) expandedPlots.delete(key);
+    else expandedPlots.add(key);
+    renderAll();
+  });
+
+  function renderTimeline(occ){
+    let list = occ.filter(o => occStatus(o, o.fromY ?? viewY, o.fromM ?? viewM) !== 'done');
+    /* Today's view answers "what do I owe", so overdue belongs in it —
+       leaving it out let the page say "nothing outstanding" while the
+       Overdue chip beside it counted five. Picking a different day asks a
+       narrower question, "what falls on that date", and gets a literal
+       answer. */
+    const showingToday = (viewY === year && viewM === month && selDay === day);
+    if (selDay !== null) list = list.filter(o =>
+      /* Maintenance always rides on today's view. Its deadline is set by
+         somebody else's work — a task the field files this morning is
+         pending the moment it lands, and the row that carries it needs
+         to be visible whether it happens to be due today, in the past
+         (overdue), or two days from now. The other modules run on the
+         auditor's own calendar and are date-scoped as before. */
+      (showingToday && (o.mod === 'maint' ||
+                        occStatus(o, o.fromY ?? viewY, o.fromM ?? viewM) === 'overdue')) ||
+      (o.fromY === undefined && selDay >= o.start && selDay <= o.end));
+    if (active.size)     list = list.filter(o =>
+                           active.has(occStatus(o, o.fromY ?? viewY, o.fromM ?? viewM)));
+
+    /* Sort so overdue rides at the top, then due, then soon, then
+       upcoming. Overdue-first is the whole point of a backlog banner:
+       what should already have been done should be what the eye lands
+       on. */
+    const _ORDER = { overdue: 0, due: 1, soon: 2, upcoming: 3 };
+    /* The row's deadline as a real timestamp, for ordering within one
+       status — dueInfo() computes the same date to print "overdue by
+       N days", so this is the same day, just comparable. */
+    const _dueTime = (o, oy, om) => new Date(oy, om, o.end).getTime();
+    list.sort((a, b) => {
+      /* Maintenance used to sit above every other module regardless of
+         how overdue it was — reasoned as "somebody else's schedule, not
+         the auditor's own calendar". Removed: longest-overdue-first is
+         meant to apply across the whole list, and a rule that pinned one
+         module above it defeated that for exactly the case where it
+         mattered most — a three-week-old Seedling Height backlog sitting
+         under a maintenance row overdue by a single day. Every module
+         now interleaves purely on how overdue it is. */
+      const ka = occStatus(a, a.fromY ?? viewY, a.fromM ?? viewM);
+      const kb = occStatus(b, b.fromY ?? viewY, b.fromM ?? viewM);
+      if (ka !== kb) return (_ORDER[ka] ?? 9) - (_ORDER[kb] ?? 9);
+      /* Within the overdue group, the row that has been overdue the
+         LONGEST leads — the oldest backlog item, not the newest one.
+         The eye lands on "22 days overdue" first, because that is the
+         one that has been sitting there the longest and is the most
+         urgent to clear; a 1-day-overdue row can wait one row further
+         down. Earliest deadline first. */
+      if (ka === 'overdue')
+        return _dueTime(a, a.fromY ?? viewY, a.fromM ?? viewM)
+             - _dueTime(b, b.fromY ?? viewY, b.fromM ?? viewM);
+      return 0;   // other statuses: ties keep occurrence order (stable sort)
+    });
+
+    let html = list.map((o, idx) => {
+      const oy = o.fromY ?? viewY, om = o.fromM ?? viewM;
+      const k  = occStatus(o, oy, om);
+      const st = STATUS[k], c = TONE[o.mod];
+      const nurseries = nurseryState(o, oy, om);
+      const pending = nurseries.filter(x => !x.done);
+
+      /* A row is "live" the moment the window opens (due) or has
+         blown past (overdue). Anything with a start date still in
+         the future (soon / upcoming) renders but does not
+         navigate — the audit form itself would have nothing yet to
+         record. Done rows are already filtered out above. */
+      const live = (k === 'due' || k === 'overdue') && pending.length > 0;
+      const goTo = live
+        ? `${o.href}?nursery=${pending[0].nursery}&from=home`
+        : null;
+
+      /* Whole card is the tap target — the small nursery chips that
+         used to sit under it are gone. On MN scope with several
+         pending nurseries the card lands on the first one; the audit
+         page's own nursery tabs cover the rest. */
+      const openTag = goTo
+        ? `<a class="tl-card" href="${goTo}" style="--tint:${c.tint};--tone:${c.tone}">`
+        : `<div class="tl-card disabled" style="--tint:${c.tint};--tone:${c.tone}" aria-disabled="true">`;
+      const closeTag = goTo ? '</a>' : '</div>';
+
+      /* Only live rows get circles. A row whose window has not opened
+         renders greyed and does not navigate, so plot shortcuts into
+         it would be links to a screen with nothing to record. */
+      /* Maintenance is not gated on `live`. Every other row has to work out
+         whether its window is open and whether anything in it is still
+         owed. A maintenance row does not: it EXISTS because a deadline has
+         pending work on it — that is the only reason one is created — and
+         it arrives carrying the very plots that are pending. Asking a
+         second, separately-derived question ("is any nursery still not
+         done?") could only ever subtract from that, and when it came back
+         empty the row drew with nothing underneath: not "no work", which
+         it never means, but a silent gap. */
+      const plotsHtml = (o.mod === 'maint')
+        ? _maintTypesHtml(o, oy, om, pending)
+        : (live ? _plotsHtml(o, oy, om, pending) : '');
+      const due = dueInfo(o, oy, om);
+
+      return `<div class="tl-item ${k==='overdue'?'overdue':''}" data-idx="${idx}" data-mod="${o.mod}" style="--tone:${c.tone}">
+        ${openTag}
+          <div class="tl-row-head">
+            <div class="tl-ico"><svg viewBox="0 0 24 24" style="stroke:${c.tone}">${ICONS[o.mod]}</svg></div>
+            <div class="tl-body">
+              <div class="tl-ttl">${
+                o.round ? `<span class="tl-round" data-round="${o.round}">R<i>•</i>${o.round}</span> ` : ''
+              }${t(o.title)}${
+                o.fromY !== undefined
+                  ? ` <span class="tl-from">${MONTHS[om]} ${o.fromY}</span>` : ''}</div>
+              <div class="tl-meta">
+                <span class="tl-badge" style="background:${st.bg};color:${st.fg}">${stLbl(k)}</span>
+              </div>
+            </div>
+            <div class="tl-due${due.late ? ' late' : due.soon ? ' soon' : ''}">
+              <div class="tl-due-date">${due.date}</div>
+              <div class="tl-due-left">${due.left}</div>
+            </div>
+          </div>
+        ${closeTag}
+        ${plotsHtml}
+      </div>`;
+    }).join('');
+
+    if (!list.length){
+      html = `<div class="tl-empty">${
+        selDay !== null
+          ? `${t('nothing_on')} ${selDay} ${MONTHS_FULL[viewM]}.`
+          : active.size
+            ? t('nothing_matches')
+            : occ.length
+              ? '✅ ' + t('all_month_done')
+              : t('none_scheduled')
+      }</div>`;
+    }
+
+    /* Event-driven work has no date, so it is listed apart rather than given
+       a day it does not have — and hidden when a single day is in focus. */
+    if ((selDay === null || showingToday) && !active.size && ANYTIME.length){
+      html += `<div class="tl-head">${t('anytime')}</div>`;
+      html += ANYTIME.map(o => {
+        const c = TONE[o.mod];
+        return `<div class="tl-item" style="--tone:${c.tone}">
+          <div class="tl-card" style="--tint:${c.tint};--tone:${c.tone}">
+            <div class="tl-ico"><svg viewBox="0 0 24 24" style="stroke:${c.tone}">${ICONS[o.mod]}</svg></div>
+            <div class="tl-body">
+              <div class="tl-ttl">${t(o.title)}</div>
+              ${_chipsHtml(o, c.tone)}
+            </div>
+            <div class="tl-when">${
+              o.badge === 'maint'
+                ? '<div id="maint-pending-badge"><span class="tl-badge" style="background:#e9edf1;color:#5b7280">…</span></div>'
+                : `<span class="tl-badge" style="background:#e9edf1;color:#5b7280">${t('on_demand')}</span>`
+            }</div>
+          </div>
+        </div>`;
+      }).join('');
+    }
+
+    const todoBox = document.getElementById('todo-section');
+    todoBox.innerHTML = html;
+    // Nursery chips are always visible now — no per-card toggle to
+    // wire. The whole timeline is collapsible via the bucket tile tap
+    // (see renderBuckets), which toggles the todo-section visibility.
+    if ((selDay === null || showingToday) && !active.size) countMaintenance();
+  }
+
+  function renderAll(){
+    MONTHS_FULL = monthNames('long');
+    const thisMonth = (viewY === year && viewM === month);
+    const monthOcc  = occurrences(viewY, viewM);
+    /* Anything still owed from earlier months rides along with the current
+       month, and only there — paging back to July should show July, not
+       July plus a copy of June. */
+    const occ = thisMonth ? carriedOverdue().concat(monthOcc) : monthOcc;
+
+    const outstanding = occ.filter(o =>
+      occStatus(o, o.fromY ?? viewY, o.fromM ?? viewM) !== 'done').length;
+    const finished = monthOcc.length - monthOcc.filter(o =>
+      occStatus(o, viewY, viewM) !== 'done').length;
+
+    /* What is actually owed today: the windows open on today's date that are
+       not finished, plus anything still carried from an earlier month. The
+       month total told you how busy August was; this tells you what to do
+       before going home. */
+    const actionable = thisMonth ? occ.filter(o => {
+      const k = occStatus(o, o.fromY ?? viewY, o.fromM ?? viewM);
+      return k === 'overdue' || k === 'due';   // 'due' already means today is inside it
+    }) : [];
+
+    /* ── ONE PLOT, ONE TASK ────────────────────────────────────────
+       The greeting used to count module rows: four audits due across a
+       whole nursery read as "4 tasks today", which is the shape of the
+       schedule rather than the size of the day. Walking fifty-two plots
+       is fifty-two jobs, and that is the number an auditor is actually
+       deciding their day against.
+
+       So a task is a plot with work left on it, counted once per module
+       — a plot owing both a plot-condition and a height audit is two
+       tasks, because it is two visits' worth of work.
+
+       Falls back to counting rows when the batch roster could not
+       answer, which is the same fallback the rows themselves use: a
+       number too small is worse than a number of the old kind. */
+    function plotsOwed(o, y, m){
+      if (o.mod === 'maint')
+        return o._maintPlots
+          ? SCOPE_NURSERIES.reduce((n, nur) =>
+              n + ((o._maintPlots.get(nur) || {size: 0}).size), 0)
+          : 0;
+      if (!window.MJMAuditPending) return 0;
+      const fromISO = iso(y, m, o.start), toISO = iso(y, m, o.end);
+      return SCOPE_NURSERIES.reduce((n, nur) =>
+        MJMAuditPending.covers(o.mod, nur)
+          ? n + MJMAuditPending.plots(o.mod, nur, fromISO, toISO).length
+          : n, 0);
+    }
+    /* The whole job, audited or not — what the progress bar divides by.
+       Maintenance has no such figure: an audited task leaves the ledger
+       entirely, so its pending count IS its total. */
+    function plotsTotal(o){
+      if (o.mod === 'maint') return 0;
+      if (!window.MJMAuditPending) return 0;
+      return SCOPE_NURSERIES.reduce((n, nur) =>
+        MJMAuditPending.covers(o.mod, nur)
+          ? n + MJMAuditPending.plotsAll(o.mod, nur).length
+          : n, 0);
+    }
+
+    const todayPlots = actionable.reduce((n, o) =>
+      n + plotsOwed(o, o.fromY ?? viewY, o.fromM ?? viewM), 0);
+    /* Nothing countable in plots (roster unreadable, or only maintenance
+       with no plots resolved) → fall back to the row count. */
+    const todayN = todayPlots || actionable.length;
+
+    /* Today's total = anything whose deadline is today or already past,
+       including items that have since been audited. isForToday captures
+       that whole set so the progress bar reads N of TOTAL, where TOTAL
+       is the day's real workload (not just what's still open). */
+    const _t0 = new Date(year, month, day);
+    const isForToday = o => {
+      const oy = o.fromY ?? viewY, om = o.fromM ?? viewM;
+      const e0 = new Date(oy, om, o.end);
+      const s0 = new Date(oy, om, o.start);
+      return _t0 > e0 || (_t0 >= s0 && _t0 <= e0);
+    };
+    const todayScope   = thisMonth ? occ.filter(isForToday) : [];
+
+    /* The bar counts the same unit the greeting does. "3 tasks today"
+       above "0 / 4 done" was two different questions wearing the same
+       word, and the one that moved when an auditor finished a plot was
+       neither of them.
+
+       Total is every plot with work in today's rows; done is the ones
+       no longer owed. Maintenance contributes only to the pending side
+       — an audited maintenance task leaves the ledger, so it cannot be
+       counted as done here; it simply stops being counted at all. */
+    let todayDoneN = 0, todayTotalN = 0;
+    todayScope.forEach(o => {
+      const oy = o.fromY ?? viewY, om = o.fromM ?? viewM;
+      const owed  = plotsOwed(o, oy, om);
+      const total = plotsTotal(o) || owed;
+      todayTotalN += total;
+      todayDoneN  += Math.max(0, total - owed);
+    });
+    /* Same fallback as the greeting: no plots resolved → count rows. */
+    if (!todayTotalN) {
+      todayDoneN  = todayScope.filter(o =>
+                      isDone(o, o.fromY ?? viewY, o.fromM ?? viewM)).length;
+      todayTotalN = todayScope.length;
+    }
+    const todayPct     = todayTotalN ? Math.round(todayDoneN * 100 / todayTotalN) : 0;
+    const todayAllDone = todayTotalN > 0 && todayPct === 100;
+
+    /* Greeting rewritten per feedback:
+       - "Hi 😊, you have N audit tasks today" — no overdue count in
+         the greeting line (Overdue is its own tile below and gets its
+         own coloured pill on each row).
+       - When today's work is 100% done, the greeting is replaced by
+         a congratulations banner. */
+    document.getElementById('sched-count').innerHTML = thisMonth
+      ? (beforeStart(viewY, viewM)
+          ? `<span class="count-big">${t('no_audit')}</span> ${t('sched_starts')} ` +
+            `${MONTHS_FULL[START_M]} ${START_Y}`
+        : todayAllDone
+          ? `<div class="today-congrats">🎉 ${t('today_congrats')}</div>`
+        : todayN === 0
+          ? `<span class="count-big">${t('no_audit')}</span> ${t('tasks_today_many')} ✅`
+          /* Was "Hi 😊, you have 47 audit tasks today". The greeting cost a
+             line every time the screen was opened and said nothing the
+             auditor did not know; the number and what it counts is the
+             whole message. */
+          : `<span class="count-big">${fmtNum(todayN)}</span> ${t('pending_word')}`)
+      : (monthOcc.length === 0
+          ? (beforeStart(viewY, viewM)
+              ? `The audit schedule starts in ${MONTHS_FULL[START_M]} ${START_Y}`
+              : `No scheduled audits in ${MONTHS_FULL[viewM]} ${viewY} 🌱`)
+          : `<span class="count-big">${fmtNum(outstanding)}</span> to do in ` +
+            `${MONTHS_FULL[viewM]} ${viewY}`);
+
+    /* Progress bar for today. Only rendered when today has real work
+       (todayTotalN > 0) and we're actually looking at the current
+       month. The bar container is created / removed here so back-in-
+       time month views stay clean. */
+    const progWrap = document.getElementById('today-progress');
+    if (progWrap) {
+      if (thisMonth && todayTotalN > 0 && !todayAllDone) {
+        progWrap.style.display = '';
+        progWrap.innerHTML =
+          '<div class="tp-track"><div class="tp-fill" style="width:' + todayPct + '%"></div></div>' +
+          '<div class="tp-text">' + fmtNum(todayDoneN) + ' / ' + fmtNum(todayTotalN) +
+          ' ' + t('done_today') + ' · ' + todayPct + '%</div>';
+      } else {
+        progWrap.style.display = 'none';
+        progWrap.innerHTML = '';
+      }
+    }
+
+    // renderCalendar() and renderChips() are now no-ops for the bucket-tile
+    // layout — the month strip and due/soon/etc pills are gone; renderBuckets
+    // replaces the filter role. renderCalendar's own null guards make it safe
+    // to keep the call in case any HTML fragment brings the strip back.
+    renderCalendar();
+    renderBuckets(occ);
+    renderTimeline(occ);
+  }
+
+  /* ── Outstanding maintenance ──
+     Re-read whenever the timeline redraws that row, since switching month
+     or filter rebuilds the element this writes into. The result is cached
+     so flicking between months does not re-query every time. */
+  let maintCache = null;
+  async function countMaintenance(){
+    const el = document.getElementById('maint-pending-badge');
+    if (!el) return;
+    const paint = n => {
+      el.innerHTML = n === null
+        ? `<span class="tl-badge" style="background:#e9edf1;color:#5b7280">—</span>`
+        : n === 0
+          ? `<span class="tl-badge" style="background:#dcfce7;color:#166534">✅ ${t('all_done')}</span>`
+          : `<span class="tl-badge" style="background:#fee2e2;color:#991b1b">${n} ${t('waiting')}</span>`;
+    };
+    if (maintCache !== null) { paint(maintCache); return; }
+    try{
+      const [tasks, audits] = await Promise.all([
+        sb.select('audit_maintenance_tasks','select=id'),
+        sb.select('audit_maintenance_audits','select=task_id')
+      ]);
+      const done = new Set(audits.map(a => String(a.task_id)));
+      maintCache = tasks.filter(t => !done.has(String(t.id))).length;
+      paint(maintCache);
+    }catch(e){ paint(null); }
+  }
+
+  /* The month strip is gone with the new bucket-tile design; only wire
+     the calendar / day-strip listeners when those elements still exist,
+     otherwise a fresh page load would throw NPE on the first querySelector
+     and stop everything below it (including renderAll). */
+  const _bind = (id, fn) => {
+    const el = document.getElementById(id);
+    if (el) el.onclick = fn;
+  };
+  _bind('cal-prev', () => {
+    viewM--; if (viewM < 0){ viewM = 11; viewY--; }
+    winStart = windowFor(viewY, viewM); selDay = null; renderAll();
+  });
+  _bind('cal-next', () => {
+    viewM++; if (viewM > 11){ viewM = 0; viewY++; }
+    winStart = windowFor(viewY, viewM); selDay = null; renderAll();
+  });
+  _bind('cal-today', () => {
+    viewY = year; viewM = month; winStart = windowFor(year, month);
+    selDay = day; active.clear(); renderAll();
+  });
+  _bind('day-prev', () => stepDays(-1));
+  _bind('day-next', () => stepDays(1));
+
+  document.addEventListener('mjm-lang-changed', renderAll);
+
+  winStart = windowFor(viewY, viewM);
+  renderAll();                                   // draw at once, from the schedule
+  loadCompletions().then(renderAll);             // then again, minus what is done
+  loadMaintTimeline().then(renderAll);           // add maintenance deadlines when they arrive
+  /* Settings last: the rounds and the maintenance windows both come from
+     them, so when they land the board is rebuilt and the maintenance walk
+     is redone with the real day counts. */
+  MJMAuditSettings.load().then(() => {
+    refreshSchedule();
+    renderAll();
+    loadMaintTimeline().then(renderAll);
+  }).catch(e => console.warn('[audit-home] settings:', e));
+  /* Which plots each row still owes. Slowest of the three — it reads
+     the batch roster and the balance view — so it lands last and the
+     circles appear under rows that are already on screen, rather than
+     holding the whole board back for them. A failure here leaves the
+     rows exactly as they were before circles existed. */
+  MJMAuditPending.load(SCOPE_NURSERIES).then(renderAll).catch(e => {
+    console.warn('[audit-home] pending plots unavailable:', e);
+  });
+}
+
+loadAuditTodo();
+
+
+/* ── AUDIT HISTORY ──────────────────────────────────────────────────
+   Reads every audit table for the current nursery scope, groups the
+   records by 'YYYY-MM', and draws the currently-selected month.
+   The < > arrows are enabled only when a month with records exists
+   in that direction, so tapping them can never land on a blank page. */
+const HIST_MODS = {
+  plot: {
+    label:'Plot Condition', bg:'#e8f5e9', fg:'#2d7a2d',
+    icon:'<path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2"/>' +
+         '<rect x="9" y="3" width="6" height="4" rx="1"/><path d="M9 12l2 2 4-4"/>'
+  },
+  height: {
+    label:'Seedling Height', bg:'#e0f2fe', fg:'#0369a1',
+    icon:'<line x1="12" y1="20" x2="12" y2="4"/><path d="M12 4C12 4 8 8 8 10"/>' +
+         '<path d="M12 4C12 4 16 8 16 10"/><path d="M12 10C12 10 9 13 9 15"/>' +
+         '<path d="M12 10C12 10 15 13 15 15"/>'
+  },
+  papan: {
+    label:'Papan Tanda', bg:'#fff1e6', fg:'#c2410c',
+    icon:'<rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 9h6M9 12h6M9 15h4"/>'
+  },
+  maint: {
+    label:'Maintenance', bg:'#e8eefc', fg:'#1e3a8a',
+    icon:'<path d="M14.7 6.3a1 1 0 000 1.4l1.6 1.6a1 1 0 001.4 0l3.77-3.77a6 6 0 01-7.94 7.94l' +
+         '-6.91 6.91a2.12 2.12 0 01-3-3l6.91-6.91a6 6 0 017.94-7.94l-3.76 3.76z"/>'
+  }
+};
+let HIST_ALL = [];       // [{mod,date,nursery,plot,auditor}]
+let HIST_MONTH = null;   // 'YYYY-MM' being shown
+
+async function loadHistory(){
+  /* Nursery scope decides which rows count as "our" records; the
+     Switch pill toggles it, but that reloads the whole page and this
+     runs again from scratch. */
+  const scope = MJMAuditLogin.scope();
+  const inScope = (scope === 'PN') ? ['PN'] : ['BNN','UNN1','UNN2'];
+  const okNur = n => n && inScope.indexOf(n) !== -1;
+
+  try {
+    /* select=* rather than a column list — the four tables' column
+       sets have drifted in the past, and a named column that no
+       longer exists fails the whole row silently (which is how the
+       old sign-in showed "Auditor" for everyone). * is safe under
+       RLS and only a shade heavier for a page-sized read. */
+    /* Each row now carries what its summary needs — the module's own
+       findings and its photo columns — so tapping it can open the same
+       dialog the module pages use rather than a second, thinner one.
+
+       The column list comes from MJMAuditSummary.spec(), which is the
+       same list audit_history.js reads with. One definition, so the two
+       surfaces cannot describe a record differently.
+
+       Two levels of fallback, because this section must never be the
+       thing that breaks: no spec (the script did not load) reads the
+       four plain columns as before, and a SELECT that PostgREST refuses
+       drops back to them too. History keeps working; only the summary
+       is thinner. */
+    const MODS = ['plot','height','papan','maint'];
+    const TABLES = {
+      plot:  'audit_plot_audits',   height: 'audit_height_records',
+      papan: 'audit_papan_audits',  maint:  'audit_maintenance_audits'
+    };
+    const PLAIN = 'select=date,nursery,plot,auditor_name';
+    const readMod = (mod) => {
+      const spec = (window.MJMAuditSummary && MJMAuditSummary.spec)
+        ? MJMAuditSummary.spec(mod) : null;
+      if (!spec) return sb.select(TABLES[mod], PLAIN).catch(()=>[]);
+      return sb.select(TABLES[mod], 'select=' + spec.cols)
+               .catch(()=> sb.select(TABLES[mod], PLAIN).catch(()=>[]));
+    };
+    const results = await Promise.all(MODS.map(readMod));
+    const all = [];
+    results.forEach((rows, i) => {
+      const mod = MODS[i];
+      (rows || []).forEach(r => {
+        if (r && r.date && okNur(r.nursery)) {
+          all.push({
+            mod,
+            date: String(r.date).slice(0,10),
+            nursery: r.nursery,
+            plot: r.plot || '',
+            auditor: r.auditor_name || '',
+            raw: r                     /* what the summary renders from */
+          });
+        }
+      });
+    });
+    /* Newest first inside each month reads the way a paper book does
+       — you flip open on the most recent entry. */
+    HIST_ALL = all.sort((a,b) => (a.date < b.date ? 1 : -1));
+
+    /* Default to the current calendar month; if the current month is
+       empty, fall back to the most recent month that isn't. */
+    const now = new Date();
+    const thisMonth = now.getFullYear() + '-' + String(now.getMonth()+1).padStart(2,'0');
+    const months = histMonthsWithData();
+    HIST_MONTH = months.indexOf(thisMonth) !== -1 ? thisMonth
+              : (months.length ? months[months.length - 1] : thisMonth);
+    renderHistory();
+  } catch (e) {
+    console.warn('Could not load audit history:', e);
+    const list = document.getElementById('hist-list');
+    if (list) list.innerHTML =
+      '<div class="hist-empty">Could not load history.</div>';
+  }
+}
+
+function histMonthsWithData(){
+  const set = new Set();
+  HIST_ALL.forEach(r => set.add(r.date.slice(0,7)));
+  return [...set].sort();      // ascending
+}
+
+/* Move to the next month that actually has records in the direction
+   the arrow points. Same-month with no data still snaps to the nearest
+   populated one. */
+function histShift(dir){
+  const months = histMonthsWithData();
+  if (!months.length) return;
+  let target;
+  if (dir > 0) target = months.find(m => m > HIST_MONTH);
+  else         target = [...months].reverse().find(m => m < HIST_MONTH);
+  if (!target) return;         // arrow was disabled anyway
+  HIST_MONTH = target;
+  renderHistory();
+}
+
+function renderHistory(){
+  const monthEl = document.getElementById('hist-month');
+  const prevBtn = document.getElementById('hist-prev');
+  const nextBtn = document.getElementById('hist-next');
+  const list    = document.getElementById('hist-list');
+  if (!monthEl || !list || !HIST_MONTH) return;
+
+  const [y, m] = HIST_MONTH.split('-').map(Number);
+  const first  = new Date(y, m - 1, 1);
+  const lang   = (typeof currentLang !== 'undefined' && currentLang === 'ms') ? 'ms-MY' : 'en-MY';
+  monthEl.textContent = first.toLocaleDateString(lang,
+    { month:'long', year:'numeric' });
+
+  const months = histMonthsWithData();
+  if (prevBtn) prevBtn.disabled = !months.some(mo => mo < HIST_MONTH);
+  if (nextBtn) nextBtn.disabled = !months.some(mo => mo > HIST_MONTH);
+
+  const rows = HIST_ALL.filter(r => r.date.slice(0,7) === HIST_MONTH);
+  if (!rows.length) {
+    /* Never actually reached at the moment — the arrows can only land
+       on months with records — but the empty state matters if the
+       initial default month is a fresh one with nothing filed yet. */
+    list.innerHTML =
+      '<div class="hist-empty">' +
+      (typeof t === 'function' ? t('home_history_empty') : 'No audits filed this month.') +
+      '</div>';
+    return;
+  }
+
+  list.innerHTML = rows.map((r, i) => {
+    const mod = HIST_MODS[r.mod];
+    if (!mod) return '';
+    const d = new Date(r.date + 'T00:00:00');
+    const dstr = d.toLocaleDateString(lang, { day:'numeric', month:'short' });
+    const nur  = (typeof NURSERY_LABELS !== 'undefined' && NURSERY_LABELS[r.nursery]) || r.nursery;
+    const meta = [nur, r.auditor].filter(Boolean).join(' · ');
+    /* A row opens its summary. data-hi indexes the month's rows, which
+       is what the delegated listener below reads — the list is redrawn
+       on every month change, so anything bound to a row would die with
+       it. */
+    return '<div class="hist-row" data-hi="' + i + '" role="button" tabindex="0" ' +
+                'aria-label="' + mod.label + (r.plot ? ' ' + r.plot : '') + ' — open summary">' +
+      '<div class="hist-ico" style="background:' + mod.bg + '">' +
+        '<svg viewBox="0 0 24 24" style="stroke:' + mod.fg + '">' + mod.icon + '</svg>' +
+      '</div>' +
+      '<div class="hist-body">' +
+        '<div class="hist-ttl">' + mod.label + (r.plot ? ' — ' + r.plot : '') + '</div>' +
+        '<div class="hist-sub">' + meta + '</div>' +
+      '</div>' +
+      '<div class="hist-date">' + dstr + '</div>' +
+    '</div>';
+  }).join('');
+
+  /* Remembered so the listener can find the record behind a row without
+     re-filtering, and so a month change cannot hand back a stale one. */
+  HIST_SHOWN = rows;
+}
+
+/* One delegated listener for the whole section: the list is rebuilt
+   from scratch on every month change and on every language switch. */
+let HIST_SHOWN = [];
+document.addEventListener('click', e => {
+  const row = e.target.closest && e.target.closest('.hist-row[data-hi]');
+  if (!row) return;
+  openHistorySummary(+row.dataset.hi);
+});
+document.addEventListener('keydown', e => {
+  if (e.key !== 'Enter' && e.key !== ' ') return;
+  const row = e.target.closest && e.target.closest('.hist-row[data-hi]');
+  if (!row) return;
+  e.preventDefault();
+  openHistorySummary(+row.dataset.hi);
+});
+function openHistorySummary(i){
+  const rec = HIST_SHOWN[i];
+  if (!rec) return;
+  /* Without the shared summary this stays a plain list rather than
+     opening something half-built. */
+  if (!window.MJMAuditSummary || !MJMAuditSummary.open) return;
+  MJMAuditSummary.open(rec.raw || rec, rec.mod);
+}
+
+/* Kick history now that its definitions above are in place. Kept at the
+   bottom of the script so the let-bindings are past their TDZ before
+   the fetch begins; hoisted function declarations mean HIST_MODS is
+   already assigned by the time loadHistory runs. */
+loadHistory();
+document.addEventListener('mjm-lang-changed', renderHistory);
+
+</script>
+<script src="audit_dexie_offline.js?v=20260831b"></script>
+
+<!-- Nelos floating To-Do dock — the round button in the corner.
+     See shared/shared_nelos_dock.js -->
+<script src="../shared/shared_nelos_dock.js"></script>
+</body>
+</html>

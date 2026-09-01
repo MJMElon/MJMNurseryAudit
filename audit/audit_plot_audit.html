@@ -1,0 +1,344 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate"/>
+<meta http-equiv="Pragma" content="no-cache"/>
+<meta http-equiv="Expires" content="0"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no"/>
+<link rel="manifest" href="audit_manifest.json"/>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+<meta name="apple-mobile-web-app-title" content="MJM Audit"/>
+<!-- The login cover's mark: MJM Nursery, the 555 logotype, Auditor
+     Portal — so the home screen shows the book you are opening. -->
+<link rel="apple-touch-icon" sizes="180x180" href="audit_apple-touch-icon.png"/>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+<meta name="apple-mobile-web-app-title" content="MJM Audit"/>
+<meta name="theme-color" content="#ffffff"/>
+<title>Plot Condition Audit — MJM Nursery</title>
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 32 32%27%3E%3Crect width=%2732%27 height=%2732%27 rx=%277%27 fill=%27%234a7a2e%27/%3E%3Ctext x=%2716%27 y=%2722%27 font-family=%27system-ui,sans-serif%27 font-size=%2715%27 font-weight=%27900%27 fill=%27%23fff%27 text-anchor=%27middle%27%3EAI%3C/text%3E%3C/svg%3E">
+<link rel="stylesheet" href="audit_styles.css?v=20260828a"/>
+<link rel="stylesheet" href="audit_a11y.css"/>
+<!-- DM Sans is what every one of these stylesheets asks for and what
+     audit_admin.html loads. It was never actually fetched here, so the
+     pages fell back to the system sans and read a shade different from
+     the page they open from. audit_sw.js caches Google Fonts, and the
+     stack falls back to system-ui, so a phone with no signal is no
+     worse off than before. -->
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400..900&display=swap" rel="stylesheet"/>
+<!-- The module pages in audit_admin.html's design: colour, weight and
+     shape, at every width. Before audit_wide.css so that file's
+     desktop layout keeps the last word. -->
+<link rel="stylesheet" href="audit_theme.css?v=20260827d"/>
+<!-- The desk half of the module pages: everything in it is inside a
+     min-width:768px query, so a phone in a nursery is untouched.
+     Loaded last so it wins on equal specificity. -->
+<link rel="stylesheet" href="audit_wide.css?v=20260827a"/>
+</head>
+<body>
+<div id="app">
+
+  <nav class="top-bar">
+    <div class="top-bar-logo">
+      <a href="audit_home.html" class="top-bar-back" onclick="return goBack(event)"><svg viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg></a>
+      <div class="top-bar-icon"><svg viewBox="0 0 24 24"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="1"/><path d="M9 12l2 2 4-4"/></svg></div>
+      <div>
+        <div class="top-bar-title"><span data-t="plot_title">Plot Condition Audit</span> &nbsp;—&nbsp; <span id="topbar-nursery">PN</span></div>
+        <div class="top-bar-sub" id="nav-today"></div>
+        <!-- Which plot you are on, carried up from the sub-headers that
+             used to sit under the ribbon. setView shows one at a time. -->
+        <div class="top-bar-sub" id="ctx-plot" style="display:none"><span id="plot-detail-plot">—</span> · <span id="plot-detail-count">0 batches</span></div>
+        <div class="top-bar-sub" id="ctx-form" style="display:none"><span id="form-view-title" data-t="new_audit">New Audit</span></div>
+      </div>
+    </div>
+    <div class="top-bar-actions">
+      <!-- BM/EN toggle removed: language is set once on audit_nursery_select.html
+           and this page picks up the choice via setLang() on load. -->
+      <button class="top-bar-btn" title="Refresh" aria-label="Refresh" onclick="refreshCurrentView()"><svg viewBox="0 0 24 24"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 11-2.12-9.36L23 10"/></svg></button>
+    </div>
+  </nav>
+
+  <!-- LIST VIEW — now a grid of plot icons instead of a flat record list.
+       Each icon carries N dots (one per known batch on that plot). Yellow
+       dot = batch still to audit; green dot + tick overlay = plot done.
+       Click a plot to open the per-plot detail below (view-plot). -->
+  <div id="view-list" class="view page-scroll">
+    <div class="list-header">
+      <span class="list-heading" id="list-heading">PN</span>
+      <span class="list-count" id="list-count">0 <span data-t="records">records</span></span>
+    </div>
+    <div class="plot-grid" id="plot-grid"></div>
+    <div class="record-list" id="records-list" style="display:none"></div>
+  </div>
+
+  <!-- PLOT DETAIL — one plot's batches, each a row with an Audit / Edit
+       button. Fed by openPlotDetail(plot); back button returns to grid. -->
+  <div id="view-plot" class="view page-scroll">
+    <div class="record-list" id="plot-detail-list" style="padding:0 12px"></div>
+  </div>
+
+  <!-- FORM VIEW -->
+  <div id="view-form" class="view page-scroll">
+
+    <!-- Batch queue carousel indicator — hidden outside a queue (see
+         _bqRenderHeader in audit_script.js). Says which batch of how
+         many, and shows one dot per pending batch so an auditor
+         mid-plot can see how much of the plot is left. -->
+    <div id="bq-header" class="bq-header" style="display:none">
+      <div class="bq-pos" id="bq-pos">Batch 1 of 1</div>
+      <div class="bq-dots" id="bq-dots"></div>
+    </div>
+
+    <div class="form-card">
+      <div class="form-section-head"><svg viewBox="0 0 24 24"><path d="M13 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V9z"/><polyline points="13 2 13 9 20 9"/></svg><span data-t="plot_info">Audit Information</span></div>
+      <div class="form-inner">
+        <div class="form-row">
+          <div class="form-field"><div class="field-label" data-t="date">Date</div><input id="f-date" class="input" type="date" readonly/></div>
+          <div class="form-field">
+            <div class="field-label"><span data-t="plot">Plot</span> <span class="req">*</span></div>
+            <div class="select-wrap"><select id="f-plot" class="input"><option value="" data-t="select_plot">— Select Plot —</option></select></div>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-field">
+            <div class="field-label"><span data-t="batch">Batch</span> <span class="req">*</span></div>
+            <input id="f-batch" class="input" type="text" placeholder="e.g. 231" maxlength="24"/>
+          </div>
+        </div>
+        <!-- Batches sitting on this plot — auto-detected from the
+             batches roster, shown read-only. The auditor keys one
+             record per plot; this row just names the batches under
+             the plot so the audit is not blind to what is there. -->
+        <div class="form-field" id="f-batches-row" style="margin-top:10px">
+          <div class="field-label" data-t="batches_on_plot">Batches on this plot</div>
+          <div id="f-batches-chips"
+               style="display:flex;flex-wrap:wrap;gap:6px;padding:8px 10px;
+                      border-radius:10px;background:var(--g50);border:1px solid var(--border);
+                      min-height:38px;align-items:center">
+            <span style="font-size:12px;color:#94a3b8">—</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- No Audit Required — one-tap way to close out a batch when the
+         auditor confirms there is nothing to check (e.g. plants already
+         removed, plot empty, ledger balance ≤ 0 but the row still needs
+         a formal closure). Grey-out the fields below via #no-audit-note
+         and stores who declined + when so it's auditable. -->
+    <div class="form-card" id="no-audit-card">
+      <div class="form-inner" style="padding-top:14px;padding-bottom:14px">
+        <div id="no-audit-choices">
+          <div style="font-size:11px;font-weight:700;letter-spacing:.5px;color:var(--text3);text-transform:uppercase;margin-bottom:9px;text-align:center" data-t="no_audit_ask">No audit needed? Say which kind of plot</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:9px">
+            <button type="button" class="no-audit-choice" onclick="declineAudit('Culling Plot')" data-t="culling_plot">CULLING PLOT</button>
+            <button type="button" class="no-audit-choice" onclick="declineAudit('Transplanting Plot')" data-t="transplanting_plot">TRANSPLANTING PLOT</button>
+          </div>
+        </div>
+        <div id="no-audit-note" style="display:none;margin-top:14px;padding:12px 14px;border-radius:12px;background:var(--g50);border:1px solid var(--g200);color:var(--g800);font-size:12px;font-weight:600;line-height:1.5">
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:4px">
+            <div style="display:flex;align-items:center;gap:8px;min-width:0">
+              <svg viewBox="0 0 24 24" style="width:16px;height:16px;stroke:var(--g600);fill:none;stroke-width:2.5;stroke-linecap:round;stroke-linejoin:round;flex-shrink:0"><polyline points="5 12 10 17 19 8"/></svg>
+              <strong>Marked <span id="no-audit-reason">No Audit Required</span></strong>
+            </div>
+            <!-- Undo — the auditor tapped by mistake. Clears the sentinel
+                 out of formState, re-enables every field, hides this
+                 panel, and shows the NO AUDIT REQUIRED button again. -->
+            <button type="button" id="btn-undo-no-audit" onclick="undoDeclineAudit()"
+                    style="flex-shrink:0;background:transparent;border:1px solid var(--g500);color:var(--g700);font-family:inherit;font-weight:800;font-size:10px;letter-spacing:.5px;padding:5px 11px;border-radius:999px;cursor:pointer;text-transform:uppercase;display:flex;align-items:center;gap:5px">
+              <svg viewBox="0 0 24 24" style="width:11px;height:11px;stroke:currentColor;fill:none;stroke-width:2.5;stroke-linecap:round;stroke-linejoin:round"><path d="M3 7v6h6"/><path d="M3.51 15a9 9 0 102.13-9.36L3 7"/></svg>
+              <span>Undo</span>
+            </button>
+          </div>
+          <div style="color:var(--text3);font-weight:500">By <span id="no-audit-by">—</span> · <span id="no-audit-when">—</span></div>
+          <div style="color:var(--text3);font-weight:500;margin-top:6px">Fields below are disabled. Tap Save to close this batch out — no photos or condition ratings needed.</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="form-card">
+      <div class="form-section-head"><svg viewBox="0 0 24 24"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg><span data-t="plot_condition">Plot Condition</span></div>
+      <div class="form-inner">
+        <div class="form-field">
+          <div class="field-label"><span data-t="pest_inf">Pest Infestation</span> <span class="req">*</span></div>
+          <div class="tri-group" id="f-ulat-grp">
+            <button class="tri-btn" data-val="Banyak"    onclick="pickTri('ulat','Banyak',this)" data-t="banyak">Banyak</button>
+            <button class="tri-btn" data-val="Sedikit"   onclick="pickTri('ulat','Sedikit',this)" data-t="sedikit">Sedikit</button>
+            <button class="tri-btn" data-val="Tidak Ada" onclick="pickTri('ulat','Tidak Ada',this)" data-t="tidak_ada">Tidak Ada</button>
+          </div>
+        </div>
+        <div class="divider-line"></div>
+        <div class="form-field">
+          <div class="field-label"><span data-t="animal_inf">Animal Infestation</span> <span class="req">*</span></div>
+          <div class="tri-group" id="f-tikus-grp">
+            <button class="tri-btn" data-val="Banyak"    onclick="pickTri('tikus','Banyak',this)" data-t="banyak">Banyak</button>
+            <button class="tri-btn" data-val="Sedikit"   onclick="pickTri('tikus','Sedikit',this)" data-t="sedikit">Sedikit</button>
+            <button class="tri-btn" data-val="Tidak Ada" onclick="pickTri('tikus','Tidak Ada',this)" data-t="tidak_ada">Tidak Ada</button>
+          </div>
+        </div>
+        <div class="divider-line"></div>
+        <div class="form-field">
+          <div class="field-label"><span data-t="disease_inf">Disease Infestation</span> <span class="req">*</span></div>
+          <div class="tri-group" id="f-bintik-grp">
+            <button class="tri-btn" data-val="Banyak"    onclick="pickTri('bintik','Banyak',this)" data-t="banyak">Banyak</button>
+            <button class="tri-btn" data-val="Sedikit"   onclick="pickTri('bintik','Sedikit',this)" data-t="sedikit">Sedikit</button>
+            <button class="tri-btn" data-val="Tidak Ada" onclick="pickTri('bintik','Tidak Ada',this)" data-t="tidak_ada">Tidak Ada</button>
+          </div>
+        </div>
+        <div class="divider-line"></div>
+        <div class="form-field">
+          <div class="field-label"><span data-t="leaf_cond">Leaf Condition</span> <span class="req">*</span></div>
+          <div class="warna-group" id="f-warna-grp">
+            <div class="warna-btn" style="background:#1e3d0f" data-v="1" onclick="pickWarna(this)"><span>1</span></div>
+            <div class="warna-btn" style="background:#2d6a1f" data-v="2" onclick="pickWarna(this)"><span>2</span></div>
+            <div class="warna-btn" style="background:#5a8a2a" data-v="3" onclick="pickWarna(this)"><span>3</span></div>
+            <div class="warna-btn" style="background:#b5a800" data-v="4" onclick="pickWarna(this)"><span>4</span></div>
+            <div class="warna-btn" style="background:#d4c200" data-v="5" onclick="pickWarna(this)"><span>5</span></div>
+          </div>
+          <div class="warna-labels">
+            <div class="warna-label" data-t="very_green">Very Green</div>
+            <div class="warna-label" data-t="green">Green</div>
+            <div class="warna-label" data-t="light_green">Light Green</div>
+            <div class="warna-label" data-t="yellowish">Yellowish</div>
+            <div class="warna-label" data-t="very_yellow">Very Yellow</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="form-card">
+      <div class="form-section-head"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="12" cy="12" r="3"/><path d="M9 5l1.5-2h3L15 5"/></svg><span data-t="photo_plot">Plot Photos</span> <span class="req" style="margin-left:4px">*</span></div>
+      <div class="form-inner">
+        <div class="photo-slots">
+          <div class="photo-slot" id="photo-slot-1" onclick="triggerPlotPhoto(1)">
+            <div class="photo-slot-num">1</div>
+            <svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="12" cy="12" r="3"/><path d="M9 5l1.5-2h3L15 5"/></svg>
+            <span class="photo-slot-label" data-t="photo1">Photo 1</span>
+          </div>
+          <div class="photo-slot" id="photo-slot-2" onclick="triggerPlotPhoto(2)">
+            <div class="photo-slot-num">2</div>
+            <svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="12" cy="12" r="3"/><path d="M9 5l1.5-2h3L15 5"/></svg>
+            <span class="photo-slot-label" data-t="photo2">Photo 2</span>
+          </div>
+        </div>
+        <input type="file" id="plot-photo-camera-1"  accept="image/*" style="display:none" onchange="handlePlotPhoto(1,this)"/>
+        <input type="file" id="plot-photo-gallery-1" accept="image/*" style="display:none" onchange="handlePlotPhoto(1,this)"/>
+        <input type="file" id="plot-photo-camera-2"  accept="image/*" style="display:none" onchange="handlePlotPhoto(2,this)"/>
+        <input type="file" id="plot-photo-gallery-2" accept="image/*" style="display:none" onchange="handlePlotPhoto(2,this)"/>
+        <p class="photo-req-note" id="photo-req-note" data-t="photo_req">2 photos required</p>
+      </div>
+    </div>
+
+    <div class="form-actions">
+      <button class="btn btn-cancel" onclick="cancelForm()" data-t="cancel">Cancel</button>
+      <button class="btn btn-save" id="btn-save-record" onclick="saveRecord()" data-t="save">Save Record</button>
+    </div>
+  </div>
+
+  <!-- DETAIL VIEW -->
+  <div id="view-detail" class="view page-scroll">
+    <div class="detail-hero">
+      <img id="detail-hero-img" src="" alt="Plot photo" style="display:none" onclick="openLightbox(this.src)"/>
+      <div id="detail-hero-placeholder" class="detail-hero-placeholder"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="12" cy="12" r="3"/><path d="M9 5l1.5-2h3L15 5"/></svg></div>
+      <button class="detail-hero-back" onclick="closeDetail()"><svg viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg></button>
+    </div>
+    <div class="detail-body">
+      <div class="detail-tag-row">
+        <span class="detail-nursery-tag" id="detail-nursery-tag">PN</span>
+        <span class="detail-id" id="detail-id">—</span>
+        <span class="detail-date" id="detail-date">—</span>
+      </div>
+      <div class="detail-plot" id="detail-plot">—</div>
+      <div class="detail-batch" id="detail-batch"></div>
+      <div class="detail-grid">
+        <div class="detail-cell"><div class="detail-cell-label" data-t="pest">Pest</div><div class="detail-cell-val" id="detail-ulat-val">—</div></div>
+        <div class="detail-cell"><div class="detail-cell-label" data-t="animal">Animal</div><div class="detail-cell-val" id="detail-tikus-val">—</div></div>
+        <div class="detail-cell"><div class="detail-cell-label" data-t="disease">Disease</div><div class="detail-cell-val" id="detail-bintik-val">—</div></div>
+      </div>
+      <div class="warna-display" id="detail-warna-box">
+        <div>
+          <div class="warna-display-label" id="detail-warna-label">Leaf Condition —</div>
+          <div style="font-size:11px;color:rgba(255,255,255,0.7);margin-top:3px" id="detail-warna-desc"></div>
+        </div>
+      </div>
+      <div style="display:flex;gap:10px;margin-top:6px">
+        <button class="btn btn-cancel" style="flex:1" onclick="closeDetail()" data-t="back">Back</button>
+        <button class="btn btn-save"   style="flex:1" onclick="editFromDetail()" data-t="edit">Edit Record</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- BOTTOM TABS -->
+  <nav class="bottom-tabs">
+    <button class="tab-item active" data-n="PN" onclick="selectTab('PN')">
+      <div class="tab-icon"><svg viewBox="0 0 24 24"><path d="M12 22V12"/><path d="M12 12C12 12 7 10 5 6c3 0 6 2 7 6z"/><path d="M12 12C12 12 17 10 19 6c-3 0-6 2-7 6z"/><path d="M12 12C12 12 8 14 7 18c2.5-.5 4.5-2.5 5-6z"/><path d="M12 12C12 12 16 14 17 18c-2.5-.5-4.5-2.5-5-6z"/></svg></div>
+      <span class="tab-label">PN</span>
+    </button>
+    <button class="tab-item" data-n="BNN" onclick="selectTab('BNN')">
+      <div class="tab-icon"><svg viewBox="0 0 24 24"><path d="M12 22V12"/><path d="M12 12C12 12 7 10 5 6c3 0 6 2 7 6z"/><path d="M12 12C12 12 17 10 19 6c-3 0-6 2-7 6z"/><path d="M12 12C12 12 8 14 7 18c2.5-.5 4.5-2.5 5-6z"/><path d="M12 12C12 12 16 14 17 18c-2.5-.5-4.5-2.5-5-6z"/></svg></div>
+      <span class="tab-label">BNN</span>
+    </button>
+    <button class="tab-item" data-n="UNN1" onclick="selectTab('UNN1')">
+      <div class="tab-icon"><svg viewBox="0 0 24 24"><path d="M12 22V12"/><path d="M12 12C12 12 7 10 5 6c3 0 6 2 7 6z"/><path d="M12 12C12 12 17 10 19 6c-3 0-6 2-7 6z"/><path d="M12 12C12 12 8 14 7 18c2.5-.5 4.5-2.5 5-6z"/><path d="M12 12C12 12 16 14 17 18c-2.5-.5-4.5-2.5-5-6z"/></svg></div>
+      <span class="tab-label">UNN 1</span>
+    </button>
+    <button class="tab-item" data-n="UNN2" onclick="selectTab('UNN2')">
+      <div class="tab-icon"><svg viewBox="0 0 24 24"><path d="M12 22V12"/><path d="M12 12C12 12 7 10 5 6c3 0 6 2 7 6z"/><path d="M12 12C12 12 17 10 19 6c-3 0-6 2-7 6z"/><path d="M12 12C12 12 8 14 7 18c2.5-.5 4.5-2.5 5-6z"/><path d="M12 12C12 12 16 14 17 18c-2.5-.5-4.5-2.5-5-6z"/></svg></div>
+      <span class="tab-label">UNN 2</span>
+    </button>
+  </nav>
+
+  <!-- FAB removed — every batch now has its own row in the plot detail
+       and 'Audit without a batch' is available from the empty-state
+       message when a plot really has no batches on file. audit_script's
+       init still touches document.getElementById('fab') and setView()
+       still tries to toggle its .hidden class; the element is kept as
+       a hidden stub so those calls stay no-ops rather than throwing. -->
+  <button class="fab hidden" id="fab" hidden style="display:none" aria-hidden="true" tabindex="-1"></button>
+
+  <div class="modal-overlay" id="modal-overlay">
+    <div class="modal-box">
+      <div class="modal-title" data-t="delete_confirm">Delete Record?</div>
+      <div class="modal-msg" data-t="delete_msg">This audit record will be permanently removed.</div>
+      <div class="modal-btns">
+        <button class="btn-modal-cancel" onclick="cancelDelete()" data-t="cancel">Cancel</button>
+        <button class="btn-modal-delete" onclick="doDelete()" data-t="delete">Delete</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+  <div id="loading-overlay" class="hidden"><div class="loading-box"><div class="loading-spinner"></div><span class="loading-text" data-t="loading">Saving...</span></div></div>
+
+</div><!-- /#app -->
+
+<div class="lightbox" id="lightbox">
+  <img id="lightbox-img" src="" alt="photo"/>
+  <button class="lightbox-close" onclick="closeLightbox()">×</button>
+</div>
+
+<script src="audit_login_guard.js?v=20260827a"></script>
+<script>if(window.MJMAuditLogin&&MJMAuditLogin.requireSignIn)MJMAuditLogin.requireSignIn();</script>
+<script src="audit_lang.js?v=20260826a"></script>
+<script src="audit_supabase.js"></script>
+<script src="audit_dexie_offline.js?v=20260831b"></script>
+<!-- ?plot= deep link: the portal's pending-plot circles link straight
+     to a plot, and this is what lands on it. -->
+<script src="audit_deeplink.js?v=20260824a"></script>
+<script src="audit_script.js?v=20260829a"></script>
+<!-- Completed records under the plot grid, and the summary that
+     opens on a tap. Renders only when the page was opened from
+     audit_admin.html (?from=manage); on the auditor portal it
+     returns on its first line. After the module script, so
+     #view-list and its tab bar are already built. -->
+<script src="audit_history.js?v=20260827d"></script>
+
+<!-- Nelos floating To-Do dock — the round button in the corner.
+     See shared/shared_nelos_dock.js -->
+<script src="../shared/shared_nelos_dock.js"></script>
+</body>
+</html>

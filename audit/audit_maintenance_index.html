@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate"/>
+<meta http-equiv="Pragma" content="no-cache"/>
+<meta http-equiv="Expires" content="0"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no"/>
+<meta name="theme-color" content="#ffffff"/>
+<link rel="manifest" href="audit_manifest.json"/>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+<meta name="apple-mobile-web-app-title" content="MJM Audit"/>
+<!-- The login cover's mark: MJM Nursery, the 555 logotype, Auditor
+     Portal — so the home screen shows the book you are opening. -->
+<link rel="apple-touch-icon" sizes="180x180" href="audit_apple-touch-icon.png"/>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<title>Maintenance Audit — MJM Nursery</title>
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 32 32%27%3E%3Crect width=%2732%27 height=%2732%27 rx=%277%27 fill=%27%234a7a2e%27/%3E%3Ctext x=%2716%27 y=%2722%27 font-family=%27system-ui,sans-serif%27 font-size=%2715%27 font-weight=%27900%27 fill=%27%23fff%27 text-anchor=%27middle%27%3EAI%3C/text%3E%3C/svg%3E">
+<link rel="stylesheet" href="audit_maintenance_styles.css?v=20260826c"/>
+<link rel="stylesheet" href="audit_a11y.css"/>
+<!-- DM Sans is what every one of these stylesheets asks for and what
+     audit_admin.html loads. It was never actually fetched here, so the
+     pages fell back to the system sans and read a shade different from
+     the page they open from. audit_sw.js caches Google Fonts, and the
+     stack falls back to system-ui, so a phone with no signal is no
+     worse off than before. -->
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400..900&display=swap" rel="stylesheet"/>
+<!-- The module pages in audit_admin.html's design: colour, weight and
+     shape, at every width. Before audit_wide.css so that file's
+     desktop layout keeps the last word. -->
+<link rel="stylesheet" href="audit_theme.css?v=20260827d"/>
+<!-- The desk half of the module pages: everything in it is inside a
+     min-width:768px query, so a phone in a nursery is untouched.
+     Loaded last so it wins on equal specificity. -->
+<link rel="stylesheet" href="audit_wide.css?v=20260827a"/>
+</head>
+<body>
+<div id="app">
+
+  <nav class="top-bar">
+    <div class="top-bar-logo">
+      <a href="audit_home.html" class="top-bar-back" onclick="return goBack(event)"><svg viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg></a>
+      <div class="top-bar-icon"><svg viewBox="0 0 24 24"><path d="M14.7 6.3a1 1 0 000 1.4l1.6 1.6a1 1 0 001.4 0l3.77-3.77a6 6 0 01-7.94 7.94l-6.91 6.91a2.12 2.12 0 01-3-3l6.91-6.91a6 6 0 017.94-7.94l-3.76 3.76z"/></svg></div>
+      <div>
+        <div class="top-bar-title">Maintenance Audit &nbsp;—&nbsp; <span id="topbar-nursery">PN</span></div>
+        <div class="top-bar-sub" id="nav-today"></div>
+        <!-- Form context carried up from the old .form-view-header row
+             so the outer ribbon is the one ribbon. -->
+        <div class="top-bar-sub" id="ctx-form" style="display:none"><span id="form-title">Audit Task</span></div>
+      </div>
+    </div>
+    <div class="top-bar-actions">
+      <!-- BM/EN toggle removed: language is set once on audit_nursery_select.html. -->
+      <button class="top-bar-btn" onclick="loadAll()"><svg viewBox="0 0 24 24"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 11-2.12-9.36L23 10"/></svg></button>
+    </div>
+  </nav>
+
+  <!-- LIST VIEW -->
+  <div id="view-list" class="view page-scroll">
+
+    <!-- Total / Pending / Audited dashboard and the work-type filter
+         row were both cancelled at the auditor's request. The "To
+         Audit" section below already carries the progress in its own
+         header (audited / total tasks), and the auditor walks every
+         work type in one pass rather than filtering to one at a time. -->
+
+    <!-- To audit -->
+    <div id="pending-wrap">
+      <div class="list-header">
+        <span class="list-heading" data-t="to_audit">To Audit</span>
+        <!-- Progress: "audited / total tasks" — replaces the old
+             three-tile dashboard above with a single line the eye
+             lands on when opening the page. -->
+        <span class="list-count" id="pending-count">0 / 0 tasks</span>
+      </div>
+      <div class="record-list" id="pending-list"></div>
+    </div>
+
+    <!-- Completed audits -->
+    <div id="done-wrap">
+      <div class="list-header" style="margin-top:8px">
+        <span class="list-heading">✅ Audited</span>
+        <span class="list-count" id="done-count">0 tasks</span>
+      </div>
+      <div class="record-list" id="done-list"></div>
+    </div>
+  </div>
+
+  <!-- AUDIT FORM VIEW —
+       Sub-header removed. Task title now reads on the outer ribbon
+       (#form-title inside #ctx-form) and the back button up there
+       returns via goBack(). Audit ID pill retired. -->
+  <div id="view-form" class="view page-scroll">
+
+    <!-- Task info banner — trimmed to the five facts an auditor
+         actually cross-checks against the plot: Plot, Nursery, Task
+         Type, Chemical, Batch. Round / Completed / Worker retired at
+         the auditor's request (they read on the office record but do
+         not change what the auditor is checking on-site). -->
+    <div style="padding:14px 12px 0">
+      <div class="task-banner">
+        <div class="task-banner-title"><svg viewBox="0 0 24 24"><path d="M14.7 6.3a1 1 0 000 1.4l1.6 1.6a1 1 0 001.4 0l3.77-3.77a6 6 0 01-7.94 7.94l-6.91 6.91a2.12 2.12 0 01-3-3l6.91-6.91a6 6 0 017.94-7.94l-3.76 3.76z"/></svg>Task Info</div>
+        <div class="task-banner-grid">
+          <div class="tbg-row"><span class="tbg-label">Plot:</span><span class="tbg-val" id="b-plot"></span></div>
+          <div class="tbg-row"><span class="tbg-label">Nursery:</span><span class="tbg-val" id="b-nursery"></span></div>
+          <div class="tbg-row"><span class="tbg-label">Task Type:</span><span class="tbg-val" id="b-type"></span></div>
+          <div class="tbg-row"><span class="tbg-label">Chemical:</span><span class="tbg-val" id="b-chemical"></span></div>
+          <div class="tbg-row"><span class="tbg-label">Batch:</span><span class="tbg-val" id="b-batch"></span></div>
+          <!-- Kept as hidden stubs so a stale cached script that still
+               writes to them does not throw. -->
+          <span id="b-round" style="display:none"></span>
+          <span id="b-completed" style="display:none"></span>
+          <span id="b-worker" style="display:none"></span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Audit result — Satisfied / Unsatisfied as the same dashed
+         chooser card the plot-audit "no audit needed" row uses, so
+         both audits close out through the same visual grammar.
+         Compulsory: saveAudit refuses when nothing is picked. -->
+    <div class="form-card">
+      <div class="form-inner" style="padding-top:14px;padding-bottom:14px">
+        <div style="font-size:11px;font-weight:700;letter-spacing:.5px;color:var(--text3);text-transform:uppercase;margin-bottom:9px;text-align:center" data-t="work_quality_ask">Work quality — pick one <span class="req">*</span></div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:9px" id="f-result-grp">
+          <button type="button" class="no-audit-choice" data-val="Satisfactory"
+                  onclick="pickResult('Satisfactory',this)">✓ SATISFIED</button>
+          <button type="button" class="no-audit-choice" data-val="Unsatisfactory"
+                  onclick="pickResult('Unsatisfactory',this)">✗ UNSATISFIED</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Audit Photo — compulsory for every audit, not just the
+         Unsatisfied ones. Remarks column stays alongside as optional. -->
+    <div class="form-card">
+      <div class="form-section-head"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="12" cy="12" r="3"/><path d="M9 5l1.5-2h3L15 5"/></svg><span>Audit Photo</span> <span class="req" style="margin-left:4px">*</span></div>
+      <div class="form-inner">
+        <div id="photo-drop" class="photo-drop">
+          <svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="12" cy="12" r="3"/><path d="M9 5l1.5-2h3L15 5"/></svg>
+          <div class="photo-drop-title">Add Audit Photo</div>
+          <div style="display:flex;gap:8px;justify-content:center;margin-top:10px">
+            <button type="button" onclick="document.getElementById('photo-camera').click()" style="flex:1;height:36px;border-radius:10px;background:linear-gradient(135deg,#2f9c4f,#1b6b32);color:#fff;font-size:12px;font-weight:600;border:none;font-family:inherit">📷 Camera</button>
+            <button type="button" onclick="document.getElementById('photo-gallery').click()" style="flex:1;height:36px;border-radius:10px;background:#f4f7fa;color:#41586a;font-size:12px;font-weight:600;border:1px solid #e6ecf2;font-family:inherit">🖼 Gallery</button>
+          </div>
+        </div>
+        <div id="photo-preview" class="photo-preview-wrap">
+          <img id="photo-img" src="" alt="Audit photo" onclick="openLightbox(this.src)"/>
+          <button class="photo-clear" onclick="clearPhoto()">×</button>
+        </div>
+        <input type="file" id="photo-camera"  accept="image/*" style="display:none" onchange="handlePhoto(this)"/>
+        <input type="file" id="photo-gallery" accept="image/*" style="display:none" onchange="handlePhoto(this)"/>
+      </div>
+    </div>
+
+    <!-- Remarks — optional, single column below the photo. -->
+    <div class="form-card">
+      <div class="form-section-head"><svg viewBox="0 0 24 24"><path d="M12 2a10 10 0 100 20 10 10 0 000-20z"/><line x1="12" y1="8" x2="12" y2="12"/><circle cx="12" cy="16" r="0.5"/></svg><span data-t="remarks_head">Remarks</span></div>
+      <div class="form-inner">
+        <div class="form-field">
+          <div class="field-label">Remarks <span class="opt">optional</span></div>
+          <textarea id="f-remarks" class="input" placeholder="Any observations or notes..."></textarea>
+        </div>
+      </div>
+    </div>
+
+    <!-- Kept as an empty stub so any stale JS that still queries
+         #unsat-only does not throw. -->
+    <div id="unsat-only" style="display:none"></div>
+
+    <div class="form-actions">
+      <button class="btn btn-cancel" onclick="cancelForm()" data-t="cancel">Cancel</button>
+      <button class="btn btn-save"   onclick="saveAudit()" data-t="save">Save Audit</button>
+    </div>
+  </div>
+
+  <!-- DETAIL VIEW -->
+  <div id="view-detail" class="view page-scroll">
+    <div class="detail-hero">
+      <img id="detail-img" src="" style="display:none" onclick="openLightbox(this.src)"/>
+      <div id="detail-placeholder" class="detail-hero-placeholder"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="12" cy="12" r="3"/></svg></div>
+      <button class="detail-hero-back" onclick="closeDetail()"><svg viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg></button>
+    </div>
+    <div class="detail-body">
+      <div class="detail-tag-row">
+        <span class="detail-nursery-tag" id="detail-nursery"></span>
+        <span class="task-type-tag" id="detail-type"></span>
+        <span class="detail-date" id="detail-date"></span>
+      </div>
+      <div class="detail-plot" id="detail-plot"></div>
+      <div class="detail-sub" id="detail-sub"></div>
+      <div class="detail-result" id="detail-result-box">
+        <div class="detail-result-label">Audit Result</div>
+        <div class="detail-result-val" id="detail-result-val"></div>
+      </div>
+      <div class="detail-remarks">
+        <div class="detail-remarks-label">Remarks</div>
+        <div class="detail-remarks-text" id="detail-remarks"></div>
+      </div>
+      <div class="task-banner" style="margin-bottom:16px">
+        <div class="task-banner-title"><svg viewBox="0 0 24 24"><path d="M14.7 6.3a1 1 0 000 1.4l1.6 1.6a1 1 0 001.4 0l3.77-3.77a6 6 0 01-7.94 7.94l-6.91 6.91a2.12 2.12 0 01-3-3l6.91-6.91a6 6 0 017.94-7.94l-3.76 3.76z"/></svg>Task Info</div>
+        <div class="task-banner-grid" id="detail-task-info"></div>
+      </div>
+      <div style="display:flex;gap:10px">
+        <button class="btn btn-cancel" style="flex:1" onclick="closeDetail()">Back</button>
+        <button class="btn btn-save"   style="flex:1" onclick="reAuditFromDetail()">Re-audit</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- BOTTOM TABS — one per nursery, mirroring the Plot Condition and
+       Seedling Height audits. A green pending-count badge lights up when
+       that nursery has open work (see updateStats). Scope hides the
+       out-of-scope tabs: PN scope keeps just PN; MN scope keeps
+       BNN/UNN1/UNN2. The old "To Audit / History" toggle was dropped —
+       both sections already sit on the page one under the other. -->
+  <nav class="bottom-tabs nursery-bottom-tabs">
+    <button class="nursery-tab-item tab-item" data-n="PN" onclick="selectNursery('PN',this)">
+      <div class="tab-icon"><svg viewBox="0 0 24 24"><path d="M12 22V12"/><path d="M12 12C12 12 7 10 5 6c3 0 6 2 7 6z"/><path d="M12 12C12 12 17 10 19 6c-3 0-6 2-7 6z"/><path d="M12 12C12 12 8 14 7 18c2.5-.5 4.5-2.5 5-6z"/><path d="M12 12C12 12 16 14 17 18c-2.5-.5-4.5-2.5-5-6z"/></svg></div>
+      <span class="tab-label">PN</span>
+    </button>
+    <button class="nursery-tab-item tab-item" data-n="BNN" onclick="selectNursery('BNN',this)">
+      <div class="tab-icon"><svg viewBox="0 0 24 24"><path d="M12 22V12"/><path d="M12 12C12 12 7 10 5 6c3 0 6 2 7 6z"/><path d="M12 12C12 12 17 10 19 6c-3 0-6 2-7 6z"/><path d="M12 12C12 12 8 14 7 18c2.5-.5 4.5-2.5 5-6z"/><path d="M12 12C12 12 16 14 17 18c-2.5-.5-4.5-2.5-5-6z"/></svg></div>
+      <span class="tab-label">BNN</span>
+    </button>
+    <button class="nursery-tab-item tab-item" data-n="UNN1" onclick="selectNursery('UNN1',this)">
+      <div class="tab-icon"><svg viewBox="0 0 24 24"><path d="M12 22V12"/><path d="M12 12C12 12 7 10 5 6c3 0 6 2 7 6z"/><path d="M12 12C12 12 17 10 19 6c-3 0-6 2-7 6z"/><path d="M12 12C12 12 8 14 7 18c2.5-.5 4.5-2.5 5-6z"/><path d="M12 12C12 12 16 14 17 18c-2.5-.5-4.5-2.5-5-6z"/></svg></div>
+      <span class="tab-label">UNN 1</span>
+    </button>
+    <button class="nursery-tab-item tab-item" data-n="UNN2" onclick="selectNursery('UNN2',this)">
+      <div class="tab-icon"><svg viewBox="0 0 24 24"><path d="M12 22V12"/><path d="M12 12C12 12 7 10 5 6c3 0 6 2 7 6z"/><path d="M12 12C12 12 17 10 19 6c-3 0-6 2-7 6z"/><path d="M12 12C12 12 8 14 7 18c2.5-.5 4.5-2.5 5-6z"/><path d="M12 12C12 12 16 14 17 18c-2.5-.5-4.5-2.5-5-6z"/></svg></div>
+      <span class="tab-label">UNN 2</span>
+    </button>
+  </nav>
+
+  <div class="modal-overlay" id="modal-overlay">
+    <div class="modal-box">
+      <div class="modal-title">Delete Audit?</div>
+      <div class="modal-msg">This audit record will be permanently removed.</div>
+      <div class="modal-btns">
+        <button class="btn-modal-cancel" onclick="cancelDelete()">Cancel</button>
+        <button class="btn-modal-delete" onclick="doDelete()">Delete</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+  <div id="loading-overlay" class="hidden"><div class="loading-box"><div class="loading-spinner"></div><span class="loading-text">Saving...</span></div></div>
+
+</div><!-- /#app -->
+
+<div class="lightbox" id="lightbox">
+  <img id="lightbox-img" src="" alt="photo"/>
+  <button class="lightbox-close" onclick="closeLightbox()">×</button>
+</div>
+
+<script src="audit_login_guard.js?v=20260827a"></script>
+<script>if(window.MJMAuditLogin&&MJMAuditLogin.requireSignIn)MJMAuditLogin.requireSignIn();</script>
+<script src="audit_lang.js?v=20260826f"></script>
+<script src="audit_supabase.js"></script>
+<script src="audit_dexie_offline.js?v=20260831b"></script>
+<!-- ?plot= deep link: the portal's pending-plot circles link straight
+     to a plot, and this is what lands on it. -->
+<script src="audit_deeplink.js?v=20260824a"></script>
+<script src="audit_maintenance_script.js?v=20260827b"></script>
+<!-- Completed records under the plot grid, and the summary that
+     opens on a tap. Renders only when the page was opened from
+     audit_admin.html (?from=manage); on the auditor portal it
+     returns on its first line. After the module script, so
+     #view-list and its tab bar are already built. -->
+<script src="audit_history.js?v=20260827d"></script>
+
+<!-- Nelos floating To-Do dock — the round button in the corner.
+     See shared/shared_nelos_dock.js -->
+<script src="../shared/shared_nelos_dock.js"></script>
+</body>
+</html>

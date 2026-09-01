@@ -1,0 +1,859 @@
+/* BUILD: 2026-08-23i */
+/* ================================================================
+   MJM NURSERY — MAINTENANCE AUDIT
+   maintenance_script.js
+
+   Task source: nops_maint_field_records (the same table the operation
+   Maintenance system writes into when a field worker records a
+   completed job). As soon as the work_date is keyed in over there, the
+   task shows up here with a "Pending" audit status. The auditor's
+   verdict continues to be written to audit_maintenance_audits, keyed
+   by field_records.id.
+================================================================ */
+'use strict';
+
+/* Filter categories — four work-type tiles + an 'All' tile. P&D
+   Spraying is intentionally NOT audited on this page (business rule:
+   its records are reviewed elsewhere), so it doesn't appear as a
+   filter and any 'pd' rows from the field ledger are dropped in
+   loadAll(). */
+const TASK_TYPES = ['Manuring','Weeding','Interrow Spray','Others'];
+
+/* Map the operation ledger's short work_type codes onto the human
+   labels the audit UI uses. 'pd' is deliberately omitted — those rows
+   are filtered out at load time. Anything else that isn't one of the
+   three known codes falls into "Others". */
+const WORK_TYPE_LABEL = {
+  manuring: 'Manuring',
+  weeding:  'Weeding',
+  interrow: 'Interrow Spray'
+};
+
+/* Which raw work_type codes to skip entirely. Kept as a Set so a
+   future policy change ("actually add Xyz back in") is a one-line
+   edit rather than three grepped call sites. */
+const SKIP_WORK_TYPES = new Set(['pd']);
+
+/* Office schedule → work_type mapping. The Maintenance system on
+   nops_maint_records writes rows with `jenis` in Malay, not the short
+   code the FC Scan Portal uses. Values below match the exact strings
+   the operation module emits. Anything unrecognised falls into
+   'other' (which resolves to "Others" via WORK_TYPE_LABEL fallback). */
+const JENIS_TO_WORKTYPE = {
+  'Penyemburan racun kulat dan serangga': 'pd',
+  'Meracun rumput secara selingan':       'interrow',
+  'Merumput':                             'weeding',
+  'Membaja':                              'manuring'
+};
+
+/* "07-08-2026" → "2026-08-07". The office module used to store tarikh
+   DD-MM-YYYY only; the ISO fallback below covers the later Nursery Ops
+   redesign that writes it as YYYY-MM-DD directly. Returns '' when the
+   value isn't a real date (or is "-", not yet checked) so the caller
+   can drop the record. Kept in step with the copy in audit_home.html —
+   change one, change both. */
+function _tarikhToISO(t){
+  if (!t || t === '-' || t === '—') return '';
+  const m = /^(\d{2})-(\d{2})-(\d{4})$/.exec(String(t).trim());
+  if (m) return m[3] + '-' + m[2] + '-' + m[1];
+  // Some seeds carry ISO-like values already; pass those through if
+  // they parse.
+  const m2 = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(t).trim());
+  return m2 ? (m2[0]) : '';
+}
+
+/* "Round 2: Antracol 50gm..." or "R2: ..." → 2. Blank string when the
+   racun text has no round marker so the round chip is skipped. */
+function _parseRound(racun){
+  if (!racun) return '';
+  const m = /^\s*R(?:ound)?\s*(\d+)\s*:/i.exec(String(racun));
+  return m ? m[1] : '';
+}
+
+/* Audit deadline window per work type — how many days after the field
+   recorded the work the auditor still has to close it out. Manuring /
+   Weeding = 3 days, Interrow = 5 days, Others defaults to 3 days. */
+const AUDIT_WINDOW_DAYS = {
+  'Manuring':        3,
+  'Weeding':         3,
+  'Interrow Spray':  5,
+  'Others':          3
+};
+function _windowFor(type){ return AUDIT_WINDOW_DAYS[type] || 3; }
+
+/* Add N calendar days to a YYYY-MM-DD string and return the same shape.
+   Uses local time (matching how the field records their work_date), not
+   UTC — the deadline for "22 Aug" work is "25 Aug", not "24 Aug" in some
+   negative timezone. */
+function _addDaysISO(iso, days){
+  if(!iso) return '';
+  const [y,m,d] = iso.split('T')[0].split('-').map(Number);
+  const dt = new Date(y, (m||1)-1, d||1);
+  dt.setDate(dt.getDate() + (days||0));
+  return dt.getFullYear() + '-' + String(dt.getMonth()+1).padStart(2,'0') + '-' + String(dt.getDate()).padStart(2,'0');
+}
+function _daysBetween(fromISO, toISO){
+  if(!fromISO || !toISO) return 0;
+  const [ya,ma,da] = fromISO.split('T')[0].split('-').map(Number);
+  const [yb,mb,db] = toISO.split('T')[0].split('-').map(Number);
+  const a = Date.UTC(ya,(ma||1)-1,da||1);
+  const b = Date.UTC(yb,(mb||1)-1,db||1);
+  return Math.round((b - a) / 86400000);
+}
+
+/* Countdown chip for a task's audit deadline. Deadline = work_date +
+   window(type). Returns a coloured pill so the auditor sees at a
+   glance whether the window is still comfortable, running out, or
+   already blown. Audited tasks skip the pill entirely — no clock left
+   to run once the audit is filed. */
+function _countdownChip(t){
+  if(!t || !t.completedDate) return '';
+  const win = _windowFor(t.type);
+  const deadline = _addDaysISO(t.completedDate, win);
+  const today = todayISO();
+  const left = _daysBetween(today, deadline);
+  const clockSvg = '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15 14"/></svg>';
+  let cls, label;
+  if (left > 1)       { cls = 'cd-ok';   label = left + ' days left'; }
+  else if (left === 1){ cls = 'cd-soon'; label = '1 day left'; }
+  else if (left === 0){ cls = 'cd-soon'; label = 'Due today'; }
+  else                { cls = 'cd-over'; label = 'Overdue ' + Math.abs(left) + (Math.abs(left) === 1 ? ' day' : ' days'); }
+  return '<span class="countdown-chip ' + cls + '" title="Audit deadline: ' + fmtDate(deadline) + ' (' + win + '-day window)">'
+       + clockSvg + label
+       + '</span>'
+       + '<span class="deadline-note">by ' + fmtDate(deadline) + '</span>';
+}
+
+let tasks=[], audits=[];
+let activeTab='audit';
+// Default filter is 'All' — the first tile in the row is pre-selected
+// and the type filter is a no-op until the auditor picks a specific
+// work type. 'All' or '' both mean "no type filter".
+let activeFilter='All', activeView='list';
+// The nursery filter respects the scope chosen on audit_nursery_select:
+//   Pre Nursery scope → only PN
+//   Main Nursery scope → BNN, UNN1, UNN2
+// so a PN auditor never sees the three main-nursery tabs (and vice
+// versa). The active default is the first entry in that list.
+const NURSERY_LABELS={PN:'PN',BNN:'BNN',UNN1:'UNN 1',UNN2:'UNN 2'};
+function _scopeNurseries(){
+  try {
+    if (window.MJMAuditLogin && MJMAuditLogin.scopeNurseries)
+      return MJMAuditLogin.scopeNurseries();
+  } catch (e) {}
+  return ['PN','BNN','UNN1','UNN2'];        // no guard loaded → show all
+}
+const SCOPE_NURSERIES = _scopeNurseries();
+let activeNursery = SCOPE_NURSERIES[0] || 'PN';
+let editMode=false, editId=null, detailId=null, deleteTarget=null;
+let formTaskId=null;
+let formState={result:null,remarks:'',photo:null};
+let toastTimer=null;
+
+/* --- HELPERS --- */
+function pad(n){return String(n).padStart(3,'0');}
+function todayISO(){return new Date().toISOString().split('T')[0];}
+function fmtDate(iso){
+  if(!iso)return'—';
+  const s=iso.split('T')[0].split('-');
+  return s[2]+' '+['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][+s[1]-1]+' '+s[0];
+}
+function fmtDT(iso){
+  if(!iso)return'—';
+  return new Date(iso).toLocaleString('en-MY',{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit',hour12:true});
+}
+function getAuditForTask(taskId){return audits.find(a=>a.taskId===taskId)||null;}
+function resultBadgeClass(r){
+  if(r==='Satisfactory')return'badge-satisfactory';
+  if(r==='Unsatisfactory')return'badge-unsatisfactory';
+  if(r==='Not Done')return'badge-not_done';
+  return'badge-pending';
+}
+function resultStatusClass(r){
+  if(r==='Satisfactory')return'status-satisfactory';
+  if(r==='Unsatisfactory')return'status-unsatisfactory';
+  if(r==='Not Done')return'status-not_done';
+  return'status-pending';
+}
+function resultColor(r){
+  if(r==='Satisfactory')return{bg:'#ecfdf5',color:'#065f46'};
+  if(r==='Unsatisfactory')return{bg:'#fff1f1',color:'#b91c1c'};
+  if(r==='Not Done')return{bg:'#f1f5f9',color:'#475569'};
+  return{bg:'#fef3c7',color:'#92400e'};
+}
+function nextAuditID(){return'MTA-'+pad(audits.length+1);}
+
+/* --- UI --- */
+function showToast(msg, ms){ window._pageShowToast=showToast;
+  const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');
+  clearTimeout(toastTimer);toastTimer=setTimeout(()=>t.classList.remove('show'),ms || 2600);
+}
+function setLoading(on){
+  const o=document.getElementById('loading-overlay');
+  if(o)on?o.classList.remove('hidden'):o.classList.add('hidden');
+}
+function setView(v){
+  activeView=v;
+  document.querySelectorAll('.view').forEach(el=>el.classList.remove('active'));
+  const el=document.getElementById('view-'+v);if(el)el.classList.add('active');
+  /* Outer ribbon carries the context — the sub-header row inside the
+     form was removed. Show form title only when a form view is on. */
+  const ctxForm=document.getElementById('ctx-form');
+  const navToday=document.getElementById('nav-today');
+  const inForm=(v==='form');
+  if(ctxForm)ctxForm.style.display=inForm?'':'none';
+  if(navToday)navToday.style.display=inForm?'none':'';
+  window.scrollTo(0,0);
+}
+function goBack(e){
+  /* Auditor came in from the To Do list on audit_home. Back returns
+     there directly rather than the module's own list. The anchor's
+     own href does it. */
+  return true;
+}
+window.goBack=goBack;
+/* selectTab was the old bottom "To Audit / History" toggle. That bar is
+   gone (the bottom bar is now the nursery tabs), and the two sections
+   (pending + audited) both sit on the page one under the other, so this
+   is only kept as a no-op wrapper in case any surviving call site still
+   invokes it. */
+function selectTab(tab){
+  activeTab=tab;
+  const p=document.getElementById('pending-wrap');
+  const d=document.getElementById('done-wrap');
+  if(p) p.style.display='block';
+  if(d) d.style.display='block';
+  renderLists();
+}
+function setFilter(f,el){
+  // 'All' is a real tile now — tapping it just clears the type filter
+  // and stays highlighted so the row always shows one active tile.
+  // Tapping a specific tile while it's already active reverts to 'All'.
+  const alreadyActive = (activeFilter === f);
+  activeFilter = (f === 'All' || alreadyActive) ? 'All' : f;
+  document.querySelectorAll('.filter-icon, .filter-chip').forEach(c=>c.classList.remove('active'));
+  if (activeFilter === 'All') {
+    const allBtn = document.querySelector('.filter-icon[data-f="All"]');
+    if (allBtn) allBtn.classList.add('active');
+  } else if (el) {
+    el.classList.add('active');
+  }
+  renderLists();
+  updateStats();
+}
+
+/* Nursery selector is a bottom tab bar (see .nursery-bottom-tabs).
+   Marks the active tab, flips the top-bar `— <nursery>` label, then
+   re-renders + re-counts. `el` is the clicked button when called from
+   the DOM; when called from the URL param handler / scope init it
+   falls back to the matching data-n button. */
+function selectNursery(n, el){
+  activeNursery=n;
+  document.querySelectorAll('.nursery-tab-item').forEach(b=>b.classList.remove('active'));
+  if (el) el.classList.add('active');
+  else {
+    const btn=document.querySelector('.nursery-tab-item[data-n="'+n+'"]');
+    if (btn) btn.classList.add('active');
+  }
+  const label=document.getElementById('topbar-nursery');
+  if (label) label.textContent=NURSERY_LABELS[n]||n;
+  renderLists();
+  updateStats();
+  // Nursery tap is a navigation: if the auditor was mid-form (or on
+  // the detail view) when they tapped it, take them back to the list
+  // for the nursery they just picked. Matches Plot Condition + Height
+  // audits' selectTab().
+  setView('list');
+}
+
+/* --- STATS ---
+   The Total / Pending / Audited dashboard was cancelled — the
+   pending-count header ("N / M tasks") on the To Audit list is the
+   progress indicator now. The three stat-cards' DOM ids no longer
+   exist; writes are guarded so a stale cached page does not throw. */
+function updateStats(){
+  const filtered=filterTasks(tasks);
+  const pending=filtered.filter(t=>!getAuditForTask(t.id));
+  const done=filtered.filter(t=>!!getAuditForTask(t.id));
+  const _st=document.getElementById('stat-total');   if(_st)_st.textContent=fmtNum(filtered.length);
+  const _sp=document.getElementById('stat-pending'); if(_sp)_sp.textContent=fmtNum(pending.length);
+  const _sd=document.getElementById('stat-done');    if(_sd)_sd.textContent=fmtNum(done.length);
+  // Pending count per nursery on the bottom tab bar — a green badge on
+  // BNN says work exists there while you're standing on PN, so nobody
+  // has to click through four tabs to find it. Same shape as the plot
+  // audit and height audit's tab-badges.
+  document.querySelectorAll('.nursery-tab-item').forEach(btn=>{
+    const n=btn.dataset.n; if(!n) return;
+    const count=tasks.filter(t=>t.nursery===n && !getAuditForTask(t.id)).length;
+    let dot=btn.querySelector('.tab-badge');
+    if(count>0){
+      if(!dot){dot=document.createElement('span');dot.className='tab-badge';btn.appendChild(dot);}
+      dot.textContent=fmtNum(count);
+      btn.setAttribute('aria-label',(NURSERY_LABELS[n]||n)+' — '+fmtNum(count)+' pending');
+    } else {
+      if(dot) dot.remove();
+      btn.removeAttribute('aria-label');
+    }
+  });
+}
+
+/* Applies BOTH filters together — nursery first (cheaper), then task
+   type. 'All' (or an empty activeFilter as a legacy fallback) means
+   "no type filter, show every task on this nursery". */
+function filterTasks(list){
+  let out = list.filter(t=>t.nursery===activeNursery);
+  if(activeFilter && activeFilter !== 'All') out = out.filter(t=>t.type===activeFilter);
+  return out;
+}
+
+/* Field records only carry plot_name (e.g. 'B1', 'B4-R'); the audit
+   grid keys everything by nursery + padded plot code ('B01', 'B04-R').
+   This is the same helper the Plot / Height / Papan audits use. */
+function _canonicalPlot(raw){
+  const s = String(raw||'').trim().toUpperCase();
+  const m = s.match(/^([A-Z]+)(\d+)(-R)?$/);
+  if(!m) return s;
+  return m[1] + m[2].padStart(2,'0') + (m[3]||'');
+}
+const PLOT_TO_NURSERY_M = (function(){
+  const P = {
+    PN:   Array.from({length:52},(_,i)=>'P'+String(i+1).padStart(2,'0')),
+    BNN:  Array.from({length:14},(_,i)=>'B'+String(i+1).padStart(2,'0')),
+    UNN1: Array.from({length:18},(_,i)=>'U'+String(i+1).padStart(2,'0')),
+    UNN2: Array.from({length:20},(_,i)=>'N'+String(i+1).padStart(2,'0'))
+  };
+  const m = {};
+  Object.keys(P).forEach(n => P[n].forEach(p => {
+    m[p] = n;
+    const stripped = p.replace(/^([A-Z]+)0+(\d)/, '$1$2');
+    if(stripped !== p) m[stripped] = n;
+  }));
+  return m;
+})();
+
+/* --- LOAD ---
+   Tasks now come from the operation Maintenance module's own ledger
+   (nops_maint_field_records). Every row there is a completed job the
+   field worker keyed in; the moment its work_date is set, the row
+   arrives here as a Pending audit task. Fall back to the legacy
+   audit_maintenance_tasks table when nops_maint_field_records isn't
+   readable (RLS gap on a fresh auditor account), so the page always
+   renders something rather than staying blank. */
+async function loadAll(){
+  setLoading(true);
+  try{
+    // nops_maint_field_records is the SINGLE source of truth for tasks
+    // now. As soon as a field worker keys a work_date over on the
+    // operation Maintenance page, the row shows up here as a Pending
+    // audit. The legacy audit_maintenance_tasks table was never keyed
+    // into and its UUID ids don't fit the BIGINT task_id column on
+    // audit_maintenance_audits anyway, so it's no longer read.
+    // Column list must match the actual schema of nops_maint_field_records
+    // (see shared/fix_nops_maint_field_records.sql + add_maint_field_batch.sql
+    // + add_maint_field_photos.sql). The worker's name is `reported_by`,
+    // NOT `worker_name` — the previous query asked for a column that
+    // doesn't exist, Supabase 400'd the whole request, the .catch() below
+    // swallowed it, and every auditor saw an empty task list even when
+    // the operation Maintenance system was actively logging work.
+    // Task sources:
+    //  1. nops_maint_field_records  — FC Scan Portal (mobile) submissions.
+    //  2. nops_maint_records         — the office Maintenance module's
+    //     record blob. A row here becomes an audit task the moment an
+    //     admin fills in its `tarikh` (or ticks Check) on the operation
+    //     Maintenance page. This is the source the user watches when
+    //     they say "I saw work date but audit is empty" — until this
+    //     PR we only read the field portal, not the office schedule.
+    //
+    // Both sources are optional: any RLS gap fails the fetch open so
+    // the page still renders whatever the other source produced.
+    const [fRows, aRows, oRows] = await Promise.all([
+      sb.select('nops_maint_field_records',
+                'select=id,work_date,nursery_name,plot_name,work_type,jenis,chemical,'
+              + 'batch_name,reported_by,photo_urls,qty,remark,week_no,created_at')
+        .catch(e => { console.warn('[maint-audit] nops_maint_field_records unavailable:', e); return []; }),
+      sb.select('audit_maintenance_audits','select=*'),
+      sb.select('nops_maint_records', 'select=id,records,updated_at')
+        .catch(e => { console.warn('[maint-audit] nops_maint_records unavailable:', e); return []; })
+    ]);
+
+    tasks = [];
+    (fRows||[]).forEach(r => {
+      // Business rule: P&D Spraying is audited elsewhere — skip 'pd'
+      // rows so they never enter this list (also keeps the pending
+      // counts honest).
+      if (SKIP_WORK_TYPES.has(r.work_type)) return;
+      const plot    = _canonicalPlot(r.plot_name);
+      const nursery = plot ? PLOT_TO_NURSERY_M[plot] : null;
+      if(!nursery) return;                              // stray plot in the log
+      // photo_urls is a comma-separated TEXT column, not JSONB.
+      const photos = (typeof r.photo_urls === 'string' && r.photo_urls.length)
+        ? r.photo_urls.split(',').map(s => s.trim()).filter(Boolean)
+        : (Array.isArray(r.photo_urls) ? r.photo_urls : []);
+      tasks.push({
+        id:            String(r.id),                    // field-record BIGSERIAL id
+        nursery,
+        plot,
+        type:          WORK_TYPE_LABEL[r.work_type] || 'Others',
+        // Kept off the card chips (user wanted that noise removed) but
+        // still shown on the form banner + detail-info grid where it
+        // matters for context.
+        chemical:      r.chemical || r.jenis || '',
+        // Round comes from week_no (1..4) on the field record. Blank
+        // if the older record predates the schedule-week column.
+        round:         (r.week_no != null && r.week_no !== '') ? String(r.week_no) : '',
+        batch:         r.batch_name || '',
+        worker:        r.reported_by || '',
+        qty:           r.qty ?? null,
+        remark:        r.remark || '',
+        completedDate: r.work_date || '',
+        workerPhotos:  photos,
+        createdAt:     r.created_at,
+        _source:       'field'
+      });
+    });
+
+    // --- Office schedule records (nops_maint_records → records[]) ---
+    // Single-row JSONB blob at id=1 for the whole database (per the
+    // operation Maintenance module's persistRecords()). Every element
+    // carries {id, tarikh, jenis, racun, plot, batch, qty, gaia,
+    // remark, checked}. A row without a real tarikh is still pending
+    // on the office side — skip it. Dedupe against field_records on
+    // (nursery, plot, batch, work_type, work_date) so a row that the
+    // field portal also submitted only produces one card.
+    const officeBlob = Array.isArray(oRows) && oRows.length ? oRows[0] : null;
+    const officeRecs = (officeBlob && Array.isArray(officeBlob.records)) ? officeBlob.records : [];
+    const seenKey = new Set(tasks.map(t =>
+      t.nursery + '|' + t.plot + '|' + (t.batch||'') + '|' + t.type + '|' + (t.completedDate||'')));
+    officeRecs.forEach(rec => {
+      const workType = JENIS_TO_WORKTYPE[rec.jenis] || 'other';
+      if (SKIP_WORK_TYPES.has(workType)) return;
+      const workDate = _tarikhToISO(rec.tarikh);
+      if (!workDate) return;                                // still pending on the office
+      const plot = _canonicalPlot(rec.plot);
+      const nursery = plot ? PLOT_TO_NURSERY_M[plot] : null;
+      if (!nursery) return;
+      const round = _parseRound(rec.racun);
+      const key = nursery + '|' + plot + '|' + (rec.batch||'') + '|' + (WORK_TYPE_LABEL[workType]||'Others') + '|' + workDate;
+      if (seenKey.has(key)) return;                         // field portal already carried this
+      seenKey.add(key);
+      tasks.push({
+        id:            String(rec.id),                      // record.id is JS Date.now() — fits BIGINT, unlikely to clash
+        nursery,
+        plot,
+        type:          WORK_TYPE_LABEL[workType] || 'Others',
+        chemical:      rec.racun || rec.jenis || '',
+        round,
+        batch:         rec.batch || '',
+        worker:        '',                                  // office records don't carry a worker name
+        qty:           rec.qty ?? null,
+        remark:        rec.remark || '',
+        completedDate: workDate,
+        workerPhotos:  [],
+        createdAt:     rec.updated_at || officeBlob?.updated_at || null,
+        _source:       'office'
+      });
+    });
+
+    audits = aRows.map(r=>({
+      uid:     String(r.id),
+      id:      r.audit_id,
+      taskId:  String(r.task_id),
+      result:  r.result||'',
+      remarks: r.remarks||'',
+      photo:   r.photo_url||null,
+      date:    r.date||'',
+      auditor: r.auditor_name||'',
+      createdAt: r.created_at
+    }));
+
+    console.log('[maint-audit] loaded', {
+      fromFieldRecords: (fRows||[]).length,
+      fromOfficeRecords:(officeRecs||[]).length,
+      totalTasks:       tasks.length,
+      audits:           audits.length
+    });
+    renderLists();
+    /* Arrived from a pending-plot circle on the portal — open that
+       plot's first pending task's audit form directly. Only here, in
+       the loader: doing it in the filter and tab handlers would yank
+       the page back to it on every tap. reveal() falls through as a
+       compatibility shim if the plot has no pending task any more. */
+    (function _deepPlot(){
+      try {
+        const p = MJMAuditDeepLink.plot();
+        if (!p) return;
+        /* Prefer a task on the currently-active nursery so tapping a
+           B01 chip while UNN1 is on-screen does not open an N-plot
+           audit; fall back to any nursery when nothing on the active
+           tab matches (rare — the chip should not have been offered
+           in that case, but a stale URL might name one). */
+        const canon = _canonicalPlot(p);
+        const cand = tasks.filter(t => _canonicalPlot(t.plot||'') === canon &&
+                                       !getAuditForTask(t.id));
+        const target = cand.find(t => t.nursery === activeNursery) || cand[0];
+        if (!target) { MJMAuditDeepLink.reveal(); return; }
+        openForm(target.id, false, null);
+      } catch (e) {
+        console.warn('[maint-audit] deep-link openForm failed:', e);
+        try { MJMAuditDeepLink.reveal(); } catch (_) {}
+      }
+    })();
+    updateStats();
+  }catch(e){
+    showToast('⚠ Failed to load');console.error(e);
+  }
+  setLoading(false);
+}
+
+/* --- RENDER ---
+   Timeline layout: one row per work_date (oldest → newest), the date
+   itself sits in a prominent column on the left, and every task the
+   field recorded on that date stacks in the right column. Each card
+   carries its own countdown chip so the auditor can see at a glance
+   how much time is left inside the audit window. */
+function renderLists(){
+  const filtered = filterTasks(tasks);
+  const pending  = filtered.filter(t=>!getAuditForTask(t.id));
+  const done     = filtered.filter(t=>!!getAuditForTask(t.id));
+
+  /* Progress on the To Audit header replaces the old Total / Pending
+     / Audited dashboard: "audited / total tasks", like the other
+     audit modules read. */
+  const _pc=document.getElementById('pending-count');
+  if(_pc)_pc.textContent = fmtNum(done.length) + ' / ' + fmtNum(filtered.length) +
+    ' task' + (filtered.length!==1?'s':'');
+  const _dc=document.getElementById('done-count');
+  if(_dc)_dc.textContent = fmtNum(done.length) + ' task' + (done.length!==1?'s':'');
+
+  const pendingEl = document.getElementById('pending-list');
+  if(!pending.length){
+    pendingEl.innerHTML=`<div class="empty-state">
+      <div class="empty-state-icon"><svg viewBox="0 0 24 24"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg></div>
+      <h3>No tasks to audit</h3>
+      <p>Once a worker keys in a work date on the Maintenance system, it appears here automatically.</p>
+    </div>`;
+  } else {
+    pendingEl.innerHTML = _timelineHtml(pending, /*isAudited=*/false);
+  }
+
+  const doneEl = document.getElementById('done-list');
+  if(!done.length){
+    doneEl.innerHTML='<div style="text-align:center;padding:16px;color:var(--text4);font-size:13px">No audited tasks yet.</div>';
+  } else {
+    doneEl.innerHTML = _timelineHtml(done, /*isAudited=*/true);
+  }
+}
+
+/* Group a task list by work_date and render one .timeline-day row per
+   day, oldest first. Undated tasks (a rare edge case if the ledger has
+   a row without work_date) get a "No date" bucket at the bottom. */
+function _timelineHtml(list, isAudited){
+  const groups = new Map();                       // date → [tasks]
+  list.forEach(t => {
+    const key = t.completedDate || '';
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(t);
+  });
+  const keys = Array.from(groups.keys()).sort((a,b) => {
+    if (!a) return  1;                            // undated bucket → bottom
+    if (!b) return -1;
+    return a.localeCompare(b);                    // ascending: oldest first
+  });
+  const MONTHS = ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
+  const WEEKS  = ['SUN','MON','TUE','WED','THU','FRI','SAT'];
+  return keys.map(k => {
+    const items = groups.get(k).slice().sort((a,b) => String(a.plot||'').localeCompare(String(b.plot||'')));
+    /* Date column retired — the "by <due date>" line under each card
+       carries the same day already, and dropping the box lets each
+       card use the full row width. */
+    const cards = items.map(t => makeTaskCard(t, isAudited ? getAuditForTask(t.id) : null)).join('');
+    return `<div class="timeline-day"><div class="timeline-tasks">${cards}</div></div>`;
+  }).join('');
+}
+
+/* Left-border colour by task type — one colour per kind of work so
+   the auditor sees which task a row is at a glance. Falls back to
+   grey for anything the map does not recognise. */
+function _taskTypeColour(type){
+  const s = String(type||'').toLowerCase();
+  if (s.indexOf('manur')  !== -1) return '#1e40af';   // blue
+  if (s.indexOf('weed')   !== -1) return '#166534';   // green
+  if (s.indexOf('interrow')!==-1) return '#c2410c';   // orange
+  if (s.indexOf('p&d')    !== -1 ||
+      s.indexOf('pest')   !== -1 ||
+      s.indexOf('disease')!== -1 ||
+      s.indexOf('spray')  !== -1) return '#ca8a04';   // yellow
+  return '#94a3b8';                                    // slate
+}
+
+function makeTaskCard(t, audit){
+  const status = audit ? resultStatusClass(audit.result) : 'status-pending';
+  // Countdown pill only renders while pending — the clock stops once
+  // the audit is filed. Round chip and Pending status pill were
+  // retired at the auditor's request.
+  const countdownHtml = audit ? '' : _countdownChip(t);
+  const chips = `<div class="task-chips">
+    ${t.batch?`<span class="task-chip">Batch ${t.batch}</span>`:''}
+    ${t.workerPhotos&&t.workerPhotos.length?`<span class="task-chip">📸 ${fmtNum(t.workerPhotos.length)} worker photo${t.workerPhotos.length>1?'s':''}</span>`:''}
+    ${countdownHtml}
+  </div>`;
+  const actions = audit
+    ? `<div class="task-actions">
+        <button class="btn-view-task" onclick="openDetail('${audit.uid}')">View Audit</button>
+        <button class="btn-audit-now" style="background:var(--g600)" onclick="openForm('${t.id}',true,'${audit.uid}')">Re-audit</button>
+      </div>`
+    : `<div class="task-actions">
+        <button class="btn-audit-now" onclick="openForm('${t.id}',false,null)">Audit Now</button>
+      </div>`;
+  /* Left border colour is set inline so it does not need a class per
+     task type — a new work type only has to be named in
+     _taskTypeColour and the card picks it up. */
+  const tone = _taskTypeColour(t.type);
+  return `<div class="task-card ${status}" data-plot="${_canonicalPlot(t.plot||'')}"
+                style="border-left-color:${tone}">
+    <div class="task-work">${t.type}</div>
+    <div class="task-plot">${t.plot}</div>
+    <div class="task-meta">${t.worker?'Worker: '+t.worker:''}</div>
+    ${chips}${actions}
+  </div>`;
+}
+
+/* --- FORM --- */
+function openForm(taskId, isEdit, existingAuditUid){
+  formTaskId=taskId;
+  const t=tasks.find(x=>x.id===taskId);if(!t)return;
+  if(isEdit&&existingAuditUid){
+    const ex=audits.find(a=>a.uid===existingAuditUid);
+    editMode=true;editId=existingAuditUid;
+    formState={result:ex?.result||null,remarks:ex?.remarks||'',photo:ex?.photo||null};
+  } else {
+    editMode=false;editId=null;
+    formState={result:null,remarks:'',photo:null};
+  }
+  // Fill banner
+  document.getElementById('b-plot').textContent=t.plot;
+  document.getElementById('b-nursery').textContent=t.nursery||'—';
+  document.getElementById('b-type').textContent=t.type;
+  document.getElementById('b-chemical').textContent=t.chemical||'—';
+  document.getElementById('b-round').textContent=t.round?'Round '+t.round:'—';
+  document.getElementById('b-batch').textContent=t.batch||'—';
+  document.getElementById('b-completed').textContent=fmtDate(t.completedDate);
+  document.getElementById('b-worker').textContent=t.worker||'—';
+  /* Title reads on the outer ribbon; audit ID pill retired. */
+  const _ftm=document.getElementById('form-title');
+  if(_ftm)_ftm.textContent='Audit — '+t.plot;
+  const _fim=document.getElementById('form-id');
+  if(_fim)_fim.textContent='';
+  // Reset chooser buttons (Satisfied / Unsatisfied)
+  document.querySelectorAll('#f-result-grp .no-audit-choice').forEach(b=>b.classList.remove('picked'));
+  if(formState.result){
+    const btn=document.querySelector(`#f-result-grp [data-val="${formState.result}"]`);
+    if(btn)btn.classList.add('picked');
+  }
+  /* Remarks + photo cards are always visible now (photo compulsory,
+     remarks optional). The old #unsat-only wrapper is a hidden stub. */
+  const rem = document.getElementById('f-remarks');
+  if (rem) rem.value = formState.remarks || '';
+  if (formState.photo) {
+    document.getElementById('photo-img').src = formState.photo;
+    document.getElementById('photo-drop').style.display = 'none';
+    document.getElementById('photo-preview').style.display = 'block';
+  } else {
+    document.getElementById('photo-drop').style.display = 'block';
+    document.getElementById('photo-preview').style.display = 'none';
+    document.getElementById('photo-img').src = '';
+  }
+  setView('form');
+}
+function getTriClass(v){
+  if(v==='Satisfactory')return'sel-ok';
+  if(v==='Unsatisfactory')return'sel-bad';
+  return'sel-na';
+}
+/* Satisfied / Unsatisfied is the only compulsory choice; a photo is
+   required for both branches now, so the Remarks + Audit Photo cards
+   stay visible either way. pickResult just marks the chosen button
+   and flips formState.result. */
+function pickResult(val,el){
+  document.querySelectorAll('#f-result-grp .no-audit-choice').forEach(b=>b.classList.remove('picked'));
+  if (el) el.classList.add('picked');
+  formState.result=val;
+}
+async function handlePhoto(input){
+  if(!input.files||!input.files[0])return;
+  const compressed=await compressPhoto(input.files[0]);
+  formState.photo=compressed;
+  document.getElementById('photo-img').src=compressed;
+  document.getElementById('photo-drop').style.display='none';
+  document.getElementById('photo-preview').style.display='block';
+  input.value='';
+}
+function clearPhoto(){
+  formState.photo=null;
+  document.getElementById('photo-drop').style.display='block';
+  document.getElementById('photo-preview').style.display='none';
+  document.getElementById('photo-img').src='';
+}
+function cancelForm(){setView('list');}
+
+/* --- SAVE ---
+   Single validation shape now — the auditor picks Satisfied or
+   Unsatisfied (compulsory), attaches a photo (compulsory), and
+   optionally leaves a remark. The photo requirement is the same
+   either way, so nothing branches on the result. */
+async function saveAudit(){
+  if(!formState.result){showToast('⚠ Please pick Satisfied or Unsatisfied');return;}
+  if (!formState.photo){
+    showToast('⚠ A photo is required for every audit');
+    return;
+  }
+  const t=tasks.find(x=>x.id===formTaskId);if(!t)return;
+  const remEl = document.getElementById('f-remarks');
+  const remarks = remEl ? remEl.value.trim() : '';
+  const user=JSON.parse(localStorage.getItem('mjm_user')||'{}');
+  setLoading(true);
+  try{
+    // Photo only uploaded on the Unsatisfied branch — a Satisfied audit
+    // leaves photo_url null in the DB, which is the honest signal that
+    // no exception photo was needed.
+    let photoUrl = null;
+    if (isUnsat && formState.photo) {
+      photoUrl = formState.photo;
+      if (photoUrl && photoUrl.startsWith('data:'))
+        photoUrl = await sb.uploadPhoto('audit-photos','maint_'+t.plot+'_'+Date.now(),photoUrl);
+    }
+    const payload={
+      task_id:parseInt(formTaskId),
+      nursery:t.nursery,plot:t.plot,task_type:t.type,
+      result:formState.result,
+      // Satisfied → drop any residual remark too; only the Unsatisfied
+      // branch is supposed to carry commentary.
+      remarks: isUnsat ? (remarks || null) : null,
+      photo_url: photoUrl,
+      auditor_name:user.name||'',
+      date:todayISO()
+    };
+    const result=await smartSave('audit_maintenance_audits',editMode?'update':'insert',
+      editMode?payload:{...payload,audit_id:nextAuditID()},
+      editMode?editId:null);
+    showToast(result?.offline?'📴 Saved offline — will sync later':editMode?'✓ Audit updated':'✓ Audit saved');
+    await loadAll();setView('list');
+  }catch(e){showToast('⚠ Save failed');console.error(e);setLoading(false);}
+}
+
+/* --- DETAIL --- */
+function openDetail(auditUid){
+  const audit=audits.find(a=>a.uid===auditUid);if(!audit)return;
+  detailId=auditUid;
+  const t=tasks.find(x=>x.id===audit.taskId);
+  const heroImg=document.getElementById('detail-img');
+  const heroPh=document.getElementById('detail-placeholder');
+  if(audit.photo){heroImg.src=audit.photo;heroImg.style.display='block';heroPh.style.display='none';}
+  else{heroImg.style.display='none';heroPh.style.display='flex';}
+  document.getElementById('detail-nursery').textContent=audit.nursery||'—';
+  document.getElementById('detail-type').textContent=audit.taskType||t?.type||'—';
+  document.getElementById('detail-date').textContent=fmtDate(audit.date);
+  document.getElementById('detail-plot').textContent=audit.plot;
+  document.getElementById('detail-sub').textContent='Auditor: '+(audit.auditor||'—');
+  const rc=resultColor(audit.result);
+  const rb=document.getElementById('detail-result-box');
+  rb.style.background=rc.bg;rb.style.color=rc.color;rb.style.border='1px solid '+rc.color+'33';
+  document.getElementById('detail-result-val').textContent=audit.result||'—';
+  document.getElementById('detail-remarks').textContent=audit.remarks||'No remarks.';
+  if(t){
+    document.getElementById('detail-task-info').innerHTML=`
+      <div class="tbg-row"><span class="tbg-label">Plot:</span><span class="tbg-val">${t.plot}</span></div>
+      <div class="tbg-row"><span class="tbg-label">Task Type:</span><span class="tbg-val">${t.type}</span></div>
+      <div class="tbg-row"><span class="tbg-label">Chemical:</span><span class="tbg-val">${t.chemical||'—'}</span></div>
+      <div class="tbg-row"><span class="tbg-label">Round:</span><span class="tbg-val">${t.round?'Round '+t.round:'—'}</span></div>
+      <div class="tbg-row"><span class="tbg-label">Batch:</span><span class="tbg-val">${t.batch||'—'}</span></div>
+      <div class="tbg-row"><span class="tbg-label">Worker:</span><span class="tbg-val">${t.worker||'—'}</span></div>
+      <div class="tbg-row"><span class="tbg-label">Completed:</span><span class="tbg-val">${fmtDate(t.completedDate)}</span></div>`;
+  }
+  setView('detail');
+}
+function closeDetail(){setView('list');}
+function reAuditFromDetail(){
+  const audit=audits.find(a=>a.uid===detailId);
+  if(audit)openForm(audit.taskId,true,audit.uid);
+}
+
+/* --- LIGHTBOX --- */
+function openLightbox(src){document.getElementById('lightbox-img').src=src;document.getElementById('lightbox').classList.add('open');}
+function closeLightbox(){document.getElementById('lightbox').classList.remove('open');}
+
+/* --- DELETE --- */
+function confirmDelete(uid){
+  if(!isAuditAdmin()){showToast(t('err_delete_admin_only'));return;}
+  deleteTarget=uid;document.getElementById('modal-overlay').classList.add('show');
+}
+function cancelDelete(){deleteTarget=null;document.getElementById('modal-overlay').classList.remove('show');}
+async function doDelete(){
+  if(!deleteTarget)return;
+  /* Checked again here: the modal's Delete button is reachable on its own. */
+  if(!isAuditAdmin()){
+    deleteTarget=null;
+    document.getElementById('modal-overlay').classList.remove('show');
+    showToast(t('err_delete_admin_only'));return;
+  }
+  document.getElementById('modal-overlay').classList.remove('show');
+  setLoading(true);
+  try{
+    await sb.delete('audit_maintenance_audits',deleteTarget);deleteTarget=null;
+    await loadAll();showToast('Audit deleted');
+    if(activeView==='detail')setView('list');
+  }catch(e){showToast('⚠ Delete failed');console.error(e);setLoading(false);}
+}
+
+/* --- INIT --- */
+function init(){
+  const d=document.getElementById('nav-today');
+  if(d)d.textContent=new Date().toLocaleDateString('en-MY',{weekday:'short',day:'numeric',month:'short',year:'numeric'});
+  document.getElementById('modal-overlay').addEventListener('click',e=>{
+    if(e.target===document.getElementById('modal-overlay'))cancelDelete();
+  });
+  document.getElementById('lightbox').addEventListener('click',e=>{
+    if(e.target===document.getElementById('lightbox'))closeLightbox();
+  });
+  selectTab('audit');setView('list');
+  // Hide the nursery tabs that fall outside the current scope
+  // (Pre Nursery = PN only; Main Nursery = BNN/UNN1/UNN2). Applies to
+  // the bottom nursery bar; the remaining tabs stretch to fill the row.
+  (function _applyScope(){
+    var row = document.querySelector('.nursery-bottom-tabs');
+    var kept = 0;
+    document.querySelectorAll('.nursery-tab-item').forEach(function(b){
+      if (SCOPE_NURSERIES.indexOf(b.dataset.n) === -1) {
+        b.style.display = 'none';
+        b.classList.remove('active');
+      } else { kept++; }
+    });
+    if (row && kept) row.style.gridTemplateColumns = 'repeat(' + kept + ',1fr)';
+    var d = document.querySelector('.nursery-tab-item[data-n="'+activeNursery+'"]');
+    if (d) d.classList.add('active');
+    var label = document.getElementById('topbar-nursery');
+    if (label) label.textContent = NURSERY_LABELS[activeNursery] || activeNursery;
+    // PN scope only has one nursery — hide the bar entirely and drop
+    // --tab-h to 0 so page-scroll padding + toast offset collapse. Same
+    // fix pattern that Plot Condition / Height / Papan use.
+    if (SCOPE_NURSERIES.length <= 1) {
+      if (row) row.style.display = 'none';
+      document.documentElement.style.setProperty('--tab-h', '0px');
+    }
+  })();
+  // Deep-link support: the auditor hub tags its nursery chips with
+  // ?nursery=X&from=home. Only honour it when the target is in scope.
+  const _q = new URLSearchParams(location.search);
+  const _nq = String(_q.get('nursery') || '').toUpperCase();
+  if (NURSERY_LABELS[_nq] && SCOPE_NURSERIES.indexOf(_nq) !== -1) selectNursery(_nq);
+  loadAll();
+  if (_q.get('from') === 'home') {
+    const back = document.querySelector('.top-bar-back');
+    if (back) {
+      back.setAttribute('href', 'audit_home.html');
+      back.setAttribute('title', 'Choose another nursery');
+      back.setAttribute('aria-label', 'Choose another nursery');
+    }
+  }
+}
+document.addEventListener('DOMContentLoaded',init);

@@ -6,7 +6,24 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate"/>
 <meta http-equiv="Pragma" content="no-cache"/>
 <meta http-equiv="Expires" content="0"/>
-<title>MJM Nursery Audit has moved</title>
+<title>555 Auditor Portal</title>
+<script>
+/* Two kinds of visitor arrive at this page.
+
+   On audit.mjmnursery.com (or any future custom domain) this repository IS
+   the live 555 Auditor Portal, mirrored from mjm-ai-system/audit — go
+   straight in, before anything renders, so the address bar stays on this
+   domain.
+
+   On mjmelon.github.io this is still the RETIRED old audit repo: phones
+   that installed the old PWA from there hold its service worker and full
+   offline cache, and must be torn down and sent to the portal copy. That
+   path keeps the behaviour below. */
+var LEGACY = /\.github\.io$/i.test(location.hostname);
+if (!LEGACY) {
+  location.replace('audit/audit_index.html' + location.search + location.hash);
+}
+</script>
 <style>
   html,body{height:100%;margin:0}
   body{background:#1a4d1a;color:#fff;display:flex;align-items:center;justify-content:center;
@@ -24,39 +41,42 @@
 <body>
   <div class="box">
     <div class="spin"></div>
-    <h1>The audit app has moved</h1>
-    <p>It now lives inside the MJM Nursery portal. Taking you there&nbsp;&mdash; please update your bookmark.</p>
-    <a id="go" href="https://ai.mjmnursery.com/audit/audit_home.html">Open MJM Nursery Audit</a>
+    <h1>Opening the 555 Auditor Portal</h1>
+    <p>One moment&hellip;</p>
+    <a id="go" href="audit/audit_index.html">Open 555 Auditor Portal</a>
   </div>
 
 <script>
-/* This repository is retired; the audit app is part of the portal now.
-   Phones that installed the old PWA are still holding a service worker and a
-   full offline cache of it, so tear those down before leaving — otherwise the
-   cache keeps serving the old app and this page is never seen again. */
-var TARGET = 'https://ai.mjmnursery.com/audit/audit_home.html';
-document.getElementById('go').href = TARGET;
+/* Legacy github.io path only: unregister the old PWA's service worker and
+   delete its caches before leaving, or the cache keeps serving the retired
+   app and this page is never seen again. On the audit domain this must NOT
+   run — the live app's own service worker and offline cache live on that
+   origin, and deleting them would wipe an auditor's offline copy. */
+if (LEGACY) {
+  var TARGET = 'https://audit.mjmnursery.com/audit/audit_home.html';
+  document.getElementById('go').href = TARGET;
 
-function teardown() {
-  var jobs = [];
-  if (window.caches && caches.keys) {
-    jobs.push(caches.keys().then(function (keys) {
-      return Promise.all(keys.map(function (k) { return caches.delete(k); }));
-    }).catch(function () {}));
-  }
-  if (navigator.serviceWorker && navigator.serviceWorker.getRegistrations) {
-    jobs.push(navigator.serviceWorker.getRegistrations().then(function (regs) {
-      return Promise.all(regs.map(function (r) { return r.unregister(); }));
-    }).catch(function () {}));
-  }
-  return Promise.all(jobs);
+  var teardown = function () {
+    var jobs = [];
+    if (window.caches && caches.keys) {
+      jobs.push(caches.keys().then(function (keys) {
+        return Promise.all(keys.map(function (k) { return caches.delete(k); }));
+      }).catch(function () {}));
+    }
+    if (navigator.serviceWorker && navigator.serviceWorker.getRegistrations) {
+      jobs.push(navigator.serviceWorker.getRegistrations().then(function (regs) {
+        return Promise.all(regs.map(function (r) { return r.unregister(); }));
+      }).catch(function () {}));
+    }
+    return Promise.all(jobs);
+  };
+
+  /* Never let the teardown strand anyone: leave after 2s whatever happens. */
+  var left = false;
+  var leave = function () { if (!left) { left = true; window.location.replace(TARGET); } };
+  setTimeout(leave, 2000);
+  teardown().then(leave);
 }
-
-/* Never let the teardown strand anyone: leave after 2s whatever happens. */
-var left = false;
-function leave() { if (!left) { left = true; window.location.replace(TARGET); } }
-setTimeout(leave, 2000);
-teardown().then(leave);
 </script>
 </body>
 </html>

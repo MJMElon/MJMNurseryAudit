@@ -226,8 +226,27 @@
     })[0];
   }
 
-  const openActivities = (logs, key) =>
-    currentEntries(logs, key).map((e) => actByN(e.actN)).filter(Boolean).sort((a, b) => a.n - b.n);
+  /* One entry per ACTIVITY, not per log row.
+
+     A plot can end up with two open entries for the same activity — a Field
+     Conductor keys the round in on a phone that has not pulled yet, or the
+     same day is saved from two devices, and both entries are legitimately
+     open against the same act_n. Mapping rows straight to activities then
+     read back as "Membesar + Membesar", which is not a plot doing anything
+     twice; it is one activity counted twice.
+
+     Deduped by n, so the status names each activity once however many rows
+     stand behind it. The rows themselves are untouched — computeStatus still
+     takes the worst of them, which is the right answer whether there is one
+     or three. */
+  const openActivities = (logs, key) => {
+    const byN = {};
+    currentEntries(logs, key).forEach((e) => {
+      const a = actByN(e.actN);
+      if (a) byN[a.n] = a;
+    });
+    return Object.keys(byN).map((n) => byN[n]).sort((a, b) => a.n - b.n);
+  };
 
   /* ---------- one line per plot, for the board ----------
      What the office actually reads: where the plot is now, when that stage
@@ -237,6 +256,23 @@
      "when did anybody last say anything about this plot" is a different
      question from "what is running", and a plot sitting with nothing open is
      exactly the case where the answer matters. */
+  /* Both are YYYY-MM-DD, so a string compare is a date compare. Either may
+     be missing — a plot with no daily report, or (in principle) an entry
+     with no date — and the one that is there wins. */
+  function latestOf(a, b) {
+    if (!a) return b || null;
+    if (!b) return a;
+    return String(a) > String(b) ? a : b;
+  }
+  /* Whoever did the thing that happened last, so the name and the date on
+     the line are the same event rather than two. */
+  function pickBy(save, last) {
+    if (save && save.at && (!last || !last.start || String(save.at) >= String(last.start))) {
+      return save.by || last && last.by || null;
+    }
+    return (last && last.by) || (save && save.by) || null;
+  }
+
   function plotLine(logs, key) {
     const all = logs[key] || [];
     if (!all.length) return null;
@@ -257,8 +293,29 @@
       due: st.state === 'none' ? null : st.due,          // expected completion
       left: st.state === 'none' ? null : st.left,        // <0 = days over
       start: st.state === 'none' ? null : st.start,
-      lastDate: last.start,
-      lastBy: last.by || null,
+      /* "Last update" is when somebody last SAVED this plot, not when its
+         current stage started.
+
+         A Field Conductor walks the nursery and presses Save once for the
+         whole list. Most plots are unchanged that round — nothing changed
+         means no new log entry — so reading the newest entry's start date
+         showed a plot last updated in August when it had been checked and
+         saved this morning. The board then reads as neglect where there was
+         none, and the plots that genuinely have not been looked at are the
+         ones you can no longer pick out.
+
+         The daily report already records every plot in the save, changed or
+         not (fcportal_palms_history, one row per unit per day). So that is
+         the answer when it is there, and the newest entry is the fallback
+         for a plot whose history predates the table or has not synced.
+
+         The LATER of the two, not the report outright: the office board can
+         write a log entry straight into the plot log without going through a
+         daily report at all, and a change made here five minutes ago must
+         not read as older than last week's round. Whichever happened last is
+         the last time anybody touched this plot, which is the question. */
+      lastDate: latestOf(SAVES[key] && SAVES[key].at, last.start),
+      lastBy: pickBy(SAVES[key], last),
     };
   }
 
@@ -530,6 +587,54 @@
      Supabase caps one request at 1000 rows, and the plot log passes that
      inside a season. A partial read does not fail — it quietly returns a
      shorter history, which here would mean inventing a faster nursery. */
+  /* When each unit was last SAVED — see the note on plotLine's lastDate.
+
+     Module-level, and empty until a page loads it, so a page that never asks
+     behaves exactly as it did before: the newest log entry. Keyed by unit
+     key ("B2", or "B2#A" once the plot is split), holding the NEWEST save.
+
+     Best effort: a read that fails leaves the map empty and every line falls
+     back to its entry date. A board that is a few weeks stale on one column
+     is worth more than a board that does not draw. */
+  var SAVES = {};
+
+  function applySaves(rows) {
+    const by = {};
+    (rows || []).forEach((r) => {
+      const key = r.unit_key || r.plot_name;
+      const at = r.at_date;
+      if (!key || !at) return;
+      const cur = by[key];
+      // String compare is date order for YYYY-MM-DD, which is what these are.
+      if (!cur || String(at) > String(cur.at)) by[key] = { at: at, by: r.recorded_by || null };
+    });
+    SAVES = by;
+    return by;
+  }
+
+  async function loadSaves(supa) {
+    try {
+      const all = [];
+      const PAGE = 1000;
+      for (let from = 0; ; from += PAGE) {
+        const res = await supa.from('fcportal_palms_history')
+          .select('unit_key, at_date, recorded_by')
+          .order('at_date', { ascending: false })
+          .range(from, from + PAGE - 1);
+        if (res.error) throw res.error;
+        const rows = res.data || [];
+        all.push.apply(all, rows);
+        if (rows.length < PAGE) break;
+      }
+      return applySaves(all);
+    } catch (e) {
+      console.warn('[palms] daily reports not read, falling back to entry dates:',
+                   (e && e.message) || e);
+      SAVES = {};
+      return {};
+    }
+  }
+
   async function loadLogs(supa) {
     const all = [];
     const PAGE = 1000;
@@ -561,6 +666,10 @@
     nurseryOfPlot: nurseryOfPlot,
     loadLogs: loadLogs,
     loadStages: loadStages,
+    // When each unit was last saved — see plotLine's lastDate. A page that
+    // does not call loadSaves keeps the old behaviour.
+    loadSaves: loadSaves,
+    applySaves: applySaves,
     // false once a read has found no colour column: a page offering to set
     // one would be offering a save that cannot succeed.
     hasStageColours: function () { return STAGE_COLOURS !== false; },

@@ -59,7 +59,12 @@
 
   const state = {
     user: null,        // { id, email, full_name }
-    permissions: null  // permissions JSONB (or DEFAULT_PERMS if unset)
+    permissions: null, // permissions JSONB (or DEFAULT_PERMS if unset)
+    /* True when the permissions on this page are the last ones this device
+       was given rather than a fresh read — the office could not be reached.
+       A page that wants to say "showing what this phone last knew" has an
+       honest way to ask; nothing is gated on it. */
+    offline: false
   };
 
   function normalize(perms) {
@@ -147,6 +152,79 @@
 
   function _profileCacheKey(uid) { return 'mjm_profile_cache__' + uid; }
 
+  /* ── STAYING SIGNED IN WHEN THE OFFICE CANNOT BE REACHED ──────────────
+     Two caches, and they answer different questions. The 30-second one
+     above stops a dogpile during a blip. This one is what a person on a
+     dropped connection is actually standing on, so it is in localStorage,
+     has no expiry, and is only ever cleared by a real sign-out.
+
+     It is a SCREEN GATE, not the security. Row-level security decides what
+     any of these pages may read or write; a stale copy here can draw a tile
+     or hide one and the database still refuses what it always refused. The
+     live read already fails open on an error for exactly that reason — a
+     remembered answer is strictly better than the blank one it falls back
+     to today, which hides every module the person has.
+
+     SHARED RULE. The phone portal keeps the same thing under
+     `mjm_fc_permissions_v1` (Barcode_Counter src/context/AuthContext.jsx).
+     Change one, change the other. */
+  function _lastKnownKey(uid) { return 'mjm_perm_last__' + uid; }
+
+  function _readLastKnown(uid) {
+    try {
+      const rec = JSON.parse(localStorage.getItem(_lastKnownKey(uid)));
+      return (rec && rec.data) || null;
+    } catch (_) { return null; }
+  }
+
+  function _writeLastKnown(uid, data) {
+    try {
+      localStorage.setItem(_lastKnownKey(uid),
+        JSON.stringify({ ts: Date.now(), data: data }));
+    } catch (_) { /* private mode / quota — silent */ }
+  }
+
+  /* Everything this device remembers about anybody. Called by a real sign
+     out and by nothing else: the whole point is that it survives a closed
+     browser, a flat battery and a fortnight in a plot with no signal. */
+  function forgetLastKnown() {
+    try {
+      Object.keys(localStorage).forEach(function (k) {
+        if (k.indexOf('mjm_perm_last__') === 0) localStorage.removeItem(k);
+      });
+    } catch (_) {}
+  }
+
+  /* The session supabase-js has in this browser, read straight out of
+     storage rather than asked for.
+
+     getSession() answers null for two very different reasons: nobody has
+     signed in here, or somebody has and the token needed refreshing and the
+     refresh could not be made — which is every offline start. Treating the
+     second as "not signed in" is what sends a person standing in a nursery
+     back to a login screen they cannot complete.
+
+     An EXPIRED token is trusted, deliberately. Signed in is meant to be a
+     state you stay in: the login screen is for a pressed Sign Out or an
+     account the server actually revoked, never for a clock. A stale token
+     goes nowhere without a network to carry it, and with one supabase-js
+     refreshes it in the background.
+
+     SHARED RULE — cachedSession() in Barcode_Counter
+     src/context/AuthContext.jsx is the same read. Change one, change the
+     other. */
+  function _cachedSession() {
+    try {
+      const key = Object.keys(localStorage)
+        .find(function (k) { return /^sb-.+-auth-token$/.test(k); });
+      if (!key) return null;
+      const raw = JSON.parse(localStorage.getItem(key));
+      const s = (raw && (raw.currentSession || raw)) || null;
+      if (!s || !s.access_token || !s.user || !s.user.id) return null;
+      return s;
+    } catch (_) { return null; }
+  }
+
   function _readProfileCache(uid) {
     try {
       const raw = sessionStorage.getItem(_profileCacheKey(uid));
@@ -200,7 +278,17 @@
 
   async function load(supa) {
     if (!supa) throw new Error('MJMAccess.load(supabase) — supabase client required');
-    const { data: { session } } = await supa.auth.getSession();
+    /* Ask supabase-js, and fall back to what is in storage. Offline the ask
+       itself can throw — there is a refresh in it — and a throw here used to
+       take the whole page down before its own gate ran. */
+    let session = null;
+    try {
+      const got = await supa.auth.getSession();
+      session = (got && got.data && got.data.session) || null;
+    } catch (e) {
+      console.warn('[MJMAccess] the session check failed, reading storage:', e);
+    }
+    if (!session) session = _cachedSession();
     if (!session) {
       state.user = null;
       state.permissions = normalize(null);
@@ -229,6 +317,8 @@
       if (data) {
         if (data.full_name) state.user.full_name = data.full_name;
         state.permissions = normalize(data.permissions);
+        // What the next offline start will stand on.
+        _writeLastKnown(u.id, data);
       } else {
         state.permissions = normalize(null);
         /* SIGNED IN, BUT NO PROFILE ROW.
@@ -258,8 +348,25 @@
       }
       fetchOk = true;
     } catch (e) {
-      console.warn('[MJMAccess] failed to load permissions:', e);
-      state.permissions = normalize(null);
+      /* The read could not be made — almost always no signal. Fall back to
+         the last answer this device was given rather than to none.
+
+         normalize(null) is "nobody has been asked", and on a page that reads
+         its own modules that comes out as a hub with no tiles and a
+         Maintenance board with nothing on it. The person is signed in,
+         entitled, holding a phone in a plot, and being shown an empty
+         building. Their access did not change on the walk out there. */
+      const last = _readLastKnown(u.id);
+      if (last) {
+        console.warn('[MJMAccess] permissions unreadable, using the last '
+          + 'known copy for this account:', e);
+        if (last.full_name) state.user.full_name = last.full_name;
+        state.permissions = normalize(last.permissions);
+        state.offline = true;
+      } else {
+        console.warn('[MJMAccess] failed to load permissions:', e);
+        state.permissions = normalize(null);
+      }
     }
 
     // Whole-system gate. The signed-in user MUST have at least one
@@ -523,6 +630,13 @@
     canScanArea,
     scanAreaNurseries,
     scanHome,
-    guard
+    guard,
+    /* Is this page drawn from what the device remembers rather than from a
+       fresh read? For a page that wants to say so. */
+    isOffline: function () { return !!state.offline; },
+    /* Called by a real sign out, and by nothing else. Every door that signs
+       somebody out has to call it, or the next person on a shared office
+       machine inherits the last one's tiles. */
+    forgetLastKnown
   };
 })(window);

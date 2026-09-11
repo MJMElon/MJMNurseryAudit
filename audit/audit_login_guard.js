@@ -113,6 +113,12 @@
       Object.keys(localStorage).forEach(function (k) {
         if (k.indexOf('sb-') === 0) localStorage.removeItem(k);
       });
+      /* And what the portal remembers for an offline start — see the note in
+         index.html's handleLogout. A sign-out here is a sign-out of the whole
+         site, so it has to take the same things with it. */
+      Object.keys(localStorage).forEach(function (k) {
+        if (k.indexOf('mjm_perm_last__') === 0) localStorage.removeItem(k);
+      });
       sessionStorage.removeItem('mjm_session_active');
     } catch (e) {}
     global.location.replace(loginUrl());

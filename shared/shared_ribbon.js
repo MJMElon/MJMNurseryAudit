@@ -256,10 +256,19 @@
     if (btn) { btn.innerText = 'Signing Out…'; btn.disabled = true; }
     try {
       Object.keys(localStorage).forEach(function (k) {
-        if (k.indexOf('sb-') === 0) localStorage.removeItem(k);
+        /* mjm_user and the remembered permissions go with the tokens.
+           They are what an offline start draws a page from, and they now
+           outlive a closed browser on purpose — so a sign-out is the one
+           thing that has to take them, or the next person on a shared office
+           machine inherits the last one's access. See index.html's
+           handleLogout, which says the same. */
+        if (k.indexOf('sb-') === 0
+            || k === 'mjm_user'
+            || k.indexOf('mjm_perm_last__') === 0) localStorage.removeItem(k);
       });
       Object.keys(sessionStorage).forEach(function (k) {
-        if (k.indexOf('sb-') === 0 || k === 'mjm_session_active') sessionStorage.removeItem(k);
+        if (k.indexOf('sb-') === 0 || k === 'mjm_session_active'
+            || k.indexOf('mjm_profile_cache__') === 0) sessionStorage.removeItem(k);
       });
     } catch (_) {}
     try {

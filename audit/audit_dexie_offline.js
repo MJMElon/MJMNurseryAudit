@@ -124,31 +124,23 @@ async function discardBlocked(){
 }
 window.discardBlocked = discardBlocked;
 
-/* Auto-discard blocked records that have been parked longer than the
-   given window. A 23503 (missing FK) or similar server refusal does
-   not fix itself, so keeping the stuck banner around forever just
-   nags the auditor. Called on page load and after every sync sweep;
-   default window is 1 hour, which is long enough for a legitimate
-   transient issue (a batch being manually inserted from another
-   device) to resolve without keeping the badge sticky for weeks. */
-async function autoDropOldBlocked(maxAgeMs){
-  // 5 minutes: the retry loop caps at 5 tries and permanent errors
-  // (23503, RLS refusals) block on the first try, so anything still
-  // parked after 5 minutes is not going to fix itself. Older stuck
-  // records are dropped silently on load and before every sync sweep.
-  const window = maxAgeMs || 300000;
-  const cutoff = Date.now() - window;
-  const db = await getDB();
-  const rows = await getBlocked();
-  // Rows without blocked_at were parked before the timestamp field
-  // was added — treat them as old and drop them too.
-  const old  = rows.filter(r => !r.blocked_at || r.blocked_at < cutoff);
-  if(!old.length) return 0;
-  await db.queue.bulkDelete(old.map(r => r.id));
-  console.log('[Sync] Auto-dropped', old.length, 'stale blocked record(s) (>' + Math.round(window/60000) + ' min old)');
-  return old.length;
-}
-window.autoDropOldBlocked = autoDropOldBlocked;
+/* There WAS an auto-drop here that DELETED any blocked record parked
+   longer than five minutes, on every page load and before every sync. It
+   was meant to stop the badge nagging about something transient.
+
+   What it actually deleted was completed audits. The sync loop below says
+   it plainly — "a permanently-refused record is exactly the one worth
+   keeping: fix the permission and it still needs to go up" — and then
+   this threw it away five minutes later, silently, with nothing on screen
+   to say a plot's audit had ever existed.
+
+   The badge nagging is the correct behaviour for work that has not
+   reached the server. It stops when the record syncs, or when somebody
+   reads the reason and decides to let it go — which the badge tap now
+   actually offers, having never once managed to before.
+
+   Nothing replaces it. A record leaves this queue by succeeding, or by
+   being discarded on purpose. */
 async function setDone(id){
   const db = await getDB();
   await db.queue.update(id, {synced:1});
@@ -329,10 +321,6 @@ async function syncNow(manual){
     if(manual) showToast('📴 You\'re offline — records stay saved on this phone and sync automatically once you\'re back online.');
     return;
   }
-
-  // Sweep stale blocked records before each sync so the badge doesn't
-  // hang around when the server keeps refusing something transient.
-  try { await autoDropOldBlocked(); } catch(_){}
 
   const pending = await getPending();
   if(!pending.length){
@@ -535,21 +523,51 @@ async function refreshBadge(){
       b.onclick = async ()=>{
         const blk = await countBlocked();
         const pen = await countPending();
-        // Stuck-only badge → the queue has records the server keeps
-        // refusing (23503, RLS, etc). Retrying does not fix that. Ask
-        // whether to drop them; only fall back to retry when the user
-        // explicitly declines the discard prompt.
-        if(blk > 0 && pen === blk){
+        /* Stuck-only badge → the queue holds records the server keeps
+           refusing (RLS, a missing batch, an expired login). The auditor
+           needs the REASON first; nothing else they can do is useful
+           without it.
+
+           `pen === 0`, not `pen === blk`. getPending() excludes blocked
+           rows, so pending can never equal blocked once anything is
+           parked — this read `0 === 2` and was false every time the badge
+           said "tap to clear". The tap fell through to retryBlocked(),
+           which un-parked the records, re-sent them, got the same refusal
+           and parked them again with a fresh blocked_at. The banner came
+           straight back, no dialog, no reason, and the 5-minute stale
+           sweep never fired because every tap reset its clock. Tapping
+           harder was the one thing that guaranteed it would not clear.
+
+           The badge's own test above is `blocked>0 && n===0`. This is
+           the same question and must be asked the same way. */
+        if(blk > 0 && pen === 0){
           const why    = (await getBlocked())[0];
           const reason = (why && why.last_error) ? why.last_error : 'sync failed';
-          const msg    = 'Delete '+blk+' stuck record'+(blk>1?'s':'')+' permanently?\n\n'
+          const noun   = blk+' record'+(blk>1?'s':'');
+          /* Try again FIRST. Once an admin has fixed the permission or
+             restored the linked row, re-sending is all that is wanted —
+             and these are somebody's completed audits, so the button that
+             throws them away is not the one under your thumb. */
+          const msg    = noun+' could not be sent to the server.\n\n'
                        + 'Reason: '+reason+'\n\n'
-                       + 'These will not sync — the linked batch or task no longer '
-                       + 'exists on the server. OK deletes them; Cancel keeps them '
-                       + 'in the queue.';
+                       + 'OK — try sending again now.\n'
+                       + 'Cancel — other options, including deleting them.';
           if(confirm(msg)){
+            showToast('🔄 Trying again…', 1500);
+            await retryBlocked();
+            // retryBlocked syncs; whatever comes back has already toasted
+            // its own reason. Say so plainly when nothing changed.
+            if(await countBlocked()) showToast('Still stuck — the reason above has not been fixed yet.', 6000);
+            return;
+          }
+          /* Deleting a completed audit is behind its own question, and
+             says what it costs. */
+          if(confirm('Delete '+noun+' permanently?\n\n'
+                   + 'The work recorded in '+(blk>1?'them':'it')+' will be lost and '
+                   + 'the plot'+(blk>1?'s':'')+' will show as not audited. '
+                   + 'This cannot be undone.')){
             await discardBlocked();
-            showToast('Cleared '+blk+' stuck record'+(blk>1?'s':''));
+            showToast('Deleted '+noun);
           }
           return;
         }
@@ -676,9 +694,9 @@ async function initOffline(){
       }).catch(e=>console.warn('[SW]',e));
   }
 
-  // Purge stale blocked records on load so a lingering banner from a
-  // previous session clears itself as soon as the app opens.
-  autoDropOldBlocked().catch(_=>{}).finally(refreshBadge);
+  // A banner carried over from a previous session is a record still
+  // waiting to go up, so it is shown, not swept.
+  refreshBadge();
   renderSyncPill();
 
   window.addEventListener('online',()=>{

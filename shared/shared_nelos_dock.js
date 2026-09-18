@@ -250,12 +250,16 @@
                     'created_at,resolution,resolved_by,resolved_at';
   var ROUTED_COLS = BASE_COLS + ',assigned_module,assigned_seat_no';
   var FULL_COLS   = ROUTED_COLS + ',photo_url,raised_by';
+  /* The document a case can carry arrives with
+     RUN_ME_nelos_case_document.sql — the newest tier, and the first one
+     asked for. */
+  var DOC_COLS    = FULL_COLS + ',doc_url,doc_name';
 
   /* Asked for in this order, dropping to the next on a 400 — two different
      migrations add the columns above the base set, and a database may have
      run either, both or neither. Once dropped it stays dropped for the
      session; there is no point asking again every thirty seconds. */
-  var COL_TIERS = [FULL_COLS, ROUTED_COLS, BASE_COLS];
+  var COL_TIERS = [DOC_COLS, FULL_COLS, ROUTED_COLS, BASE_COLS];
   var _tier = 0;
   var _cols = COL_TIERS[0];
 
@@ -500,6 +504,8 @@
         _cols = COL_TIERS[_tier];
         warn('nelos_cases is missing columns from a migration — falling back. ' +
              (_tier === 1
+               ? 'No doc_url: run shared/RUN_ME_nelos_case_document.sql.'
+               : _tier === 2
                ? 'No photo_url: run shared/migration_nelos_case_tools.sql.'
                : 'No routing columns: run shared/migration_nelos_routing.sql and ' +
                  'shared/migration_nelos_seats.sql.'));
@@ -767,6 +773,22 @@
   .nd-shot-prev { position:relative; flex:1; min-height:64px; border-radius:11px;
                   overflow:hidden; background:#f1f5f9; }
   .nd-shot-prev img { width:100%; height:100%; object-fit:cover; display:block; }
+  .nd-d-doc { display:flex; align-items:center; gap:7px; margin:9px 0 2px; padding:9px 11px;
+              border:1px solid #ede9fe; border-radius:11px; background:#faf8ff;
+              font-size:12px; font-weight:800; color:#4c1d95; text-decoration:none;
+              overflow-wrap:anywhere; }
+  .nd-d-doc:hover { border-color:#c4b5fd; background:#f5f3ff; }
+  .nd-doc { display:flex; align-items:center; gap:8px; padding:9px 11px; margin-top:6px;
+            border:1px solid #ede9fe; border-radius:11px; background:#faf8ff; }
+  .nd-doc[hidden] { display:none; }
+  .nd-doc-name { flex:1; font-size:11.5px; font-weight:700; color:#4c1d95;
+                 overflow-wrap:anywhere; }
+  .nd-doc-x { width:24px; height:24px; border-radius:999px; border:1px solid #e9d5ff;
+              background:#fff; color:#7c3aed; font-size:12px; cursor:pointer; flex-shrink:0; }
+  .nd-solve-err { margin-top:7px; padding:8px 10px; border-radius:9px; font-size:11.5px;
+                  font-weight:700; line-height:1.35; color:#7f1d1d;
+                  background:#fef2f2; border:1px solid #fecaca; }
+  .nd-solve-err[hidden] { display:none; }
   .nd-shot-x { position:absolute; top:4px; right:4px; width:22px; height:22px; border:none;
                border-radius:50%; background:rgba(15,23,42,.62); color:#fff; cursor:pointer;
                font-size:13px; line-height:1; display:flex; align-items:center;
@@ -1051,14 +1073,35 @@
           '</div>' +
           '<div class="nd-fld">' +
             '<span class="nd-lbl">Photo</span>' +
-            /* capture="environment" opens the camera straight onto the back
+            /* No capture= attribute. It used to say capture="environment",
+               which on Android sends the chooser STRAIGHT to the camera and
+               takes the gallery away — so a photo already taken while the
+               work was being done could not be attached at all. Without it
+               Android offers Camera and Files side by side, and iOS offers
+               the same three it always did.
+
+               The old note, kept for why it was ever there: it opens the camera straight onto the back
                lens on a phone and is ignored on a desktop, where the same
                control is a file picker. One control, both jobs. */
             '<label class="nd-photo-pick"><input type="file" id="nd-f-photo" ' +
-                   'accept="image/*" capture="environment" hidden>' +
+                   'accept="image/*" hidden>' +
               '<span>&#128247; Take or upload a photo</span></label>' +
             '<div class="nd-photo" hidden><img alt=""><button type="button" ' +
                  'class="nd-photo-x" aria-label="Remove photo">&#10005;</button></div>' +
+          '</div>' +
+          /* …and one DOCUMENT. A photo is not always the thing to attach:
+             a delivery order, a lab result, a supplier's letter. Hidden
+             until the database has the columns for it — see
+             shared/RUN_ME_nelos_case_document.sql. */
+          '<div class="nd-fld nd-doc-fld" hidden>' +
+            '<label class="nd-lbl" for="nd-f-doc">Document</label>' +
+            '<label class="nd-photo-pick"><input type="file" id="nd-f-doc" ' +
+                   'accept=".pdf,.doc,.docx,.xls,.xlsx,.csv,.txt,.ppt,.pptx,image/*" hidden>' +
+              '<span>&#128196; Attach a file</span></label>' +
+            '<div class="nd-doc" hidden>' +
+              '<span class="nd-doc-name"></span>' +
+              '<button type="button" class="nd-doc-x" aria-label="Remove document">&#10005;</button>' +
+            '</div>' +
           '</div>' +
           '<div class="nd-fld">' +
             '<label class="nd-lbl" for="nd-f-desc">New Case Remark</label>' +
@@ -1476,6 +1519,12 @@
     PN:   pad('P', 52), BNN: pad('B', 14), UNN1: pad('U', 18), UNN2: pad('N', 20)
   };
   var NURSERY_LABEL = { PN: 'Pre Nursery', BNN: 'BNN', UNN1: 'UNN1', UNN2: 'UNN2' };
+  /* …and one that is in no table and never will be. Some cases are about
+     every nursery at once — a rule, a form, a piece of equipment that
+     travels — and they were being filed against whichever nursery the
+     person happened to pick. Stored as the words, because it has no code:
+     nursery_name is printed as it is saved everywhere it is shown. */
+  var NURSERY_ALL = 'All Nursery';
   function pad(letter, n) {
     var out = [];
     for (var i = 1; i <= n; i++) out.push(letter + (i < 10 ? '0' + i : String(i)));
@@ -1690,6 +1739,12 @@
        nothing, so the one screen where the picture decides the answer was
        the one screen without it. From `f`, so it is there whether it came
        down with the list or only with the full read. */
+    /* The document, which is opened rather than looked at. Beside the
+       photo, for the same reason the photo is here. */
+    var docLink = f.doc_url
+      ? '<a class="nd-d-doc" href="' + esc(f.doc_url) + '" target="_blank" rel="noopener">' +
+        '\uD83D\uDCC4 ' + esc(f.doc_name || 'Open the document') + '</a>'
+      : '';
     var shot = f.photo_url
       ? '<img class="nd-d-shot" src="' + esc(f.photo_url) + '" alt="Photo on the case" loading="lazy">'
       : '';
@@ -1704,7 +1759,7 @@
     return '<div class="nd-d-sec">' + head + '</div>' +
            '<div class="nd-d-title">' + esc(c.title || 'Case') + '</div>' +
            (meta ? '<div class="nd-d-meta">' + meta + '</div>' : '') +
-           shot +
+           shot + docLink +
            '<div class="nd-d-facts">' +
              fact('Nursery (Plot)', where) +
              fact('Assigned to', esc(SOURCE_LABEL[f.assigned_module || f.source_module] ||
@@ -1726,27 +1781,120 @@
     } catch (_) { return iso; }
   }
 
+  /* ── PHOTOS OFF A PHONE ──────────────────────────────────────────
+     A photo taken on an Android phone is routinely 4–12 MB; the same
+     scene off an iPhone arrives as a HEIC a fraction of that. So the
+     upload that worked all day for one person failed for the next, and
+     on the solve form it failed IN SILENCE — the case was marked solved,
+     the picture went nowhere, and nothing on the screen said so.
+
+     Every photo is therefore shrunk here before it is sent: long edge
+     1600px, JPEG, which is far more than enough to see a pest, a gap or
+     a broken bag, and turns eight megabytes into a few hundred kilobytes.
+     A file that cannot be decoded (an odd format, a browser without
+     canvas) is sent exactly as it came — shrinking is an improvement on
+     the upload, not a condition of it.
+
+     Exported as window.MJMPhoto so nelos/nelos_case.html, which loads
+     this file for the dock, solves cases through the same rule rather
+     than a second copy of it. */
+  var MAX_EDGE   = 1600;
+  var JPEG_Q     = 0.82;
+  var EASY_BYTES = 1.5 * 1024 * 1024;   // small enough to leave alone
+
+  function decodeImage(file) {
+    if (window.createImageBitmap) {
+      return window.createImageBitmap(file, { imageOrientation: 'from-image' })
+        .catch(function () { return window.createImageBitmap(file); });
+    }
+    return new Promise(function (res, rej) {
+      var url = URL.createObjectURL(file);
+      var img = new Image();
+      img.onload  = function () { URL.revokeObjectURL(url); res(img); };
+      img.onerror = function () { URL.revokeObjectURL(url); rej(new Error('cannot decode')); };
+      img.src = url;
+    });
+  }
+
+  /* What to send, and under what name. Always resolves — never throws —
+     because a photo that will not shrink is still a photo worth having. */
+  async function photoForUpload(file) {
+    var plain = { body: file, name: file && file.name || 'photo.jpg',
+                  type: (file && file.type) || 'image/jpeg', bytes: file && file.size || 0,
+                  shrunk: false };
+    if (!file || !/^image\//i.test(file.type || '')) return plain;
+    try {
+      var img = await decodeImage(file);
+      var w = img.width, h = img.height;
+      if (!w || !h) return plain;
+      /* Already small enough in both senses? Send it exactly as it came.
+         Re-encoding a photo that is fine costs a little quality and saves
+         nobody anything — shrinking is for the ones that need it. */
+      if (Math.max(w, h) <= MAX_EDGE && file.size <= EASY_BYTES) {
+        if (img.close) { try { img.close(); } catch (_) {} }
+        return plain;
+      }
+      var scale = Math.min(1, MAX_EDGE / Math.max(w, h));
+      var cw = Math.max(1, Math.round(w * scale));
+      var ch = Math.max(1, Math.round(h * scale));
+      var canvas = document.createElement('canvas');
+      canvas.width = cw; canvas.height = ch;
+      var ctx = canvas.getContext('2d');
+      if (!ctx) return plain;
+      ctx.drawImage(img, 0, 0, cw, ch);
+      if (img.close) { try { img.close(); } catch (_) {} }
+      var blob = await new Promise(function (res) {
+        if (canvas.toBlob) canvas.toBlob(res, 'image/jpeg', JPEG_Q);
+        else res(null);
+      });
+      // No good turn done: an already-small photo can come out bigger as a
+      // re-encoded JPEG, and then the original is the better thing to send.
+      if (!blob || blob.size >= file.size) return plain;
+      var name = String(file.name || 'photo').replace(/\.[^.]+$/, '') + '.jpg';
+      var body = blob;
+      try { body = new File([blob], name, { type: 'image/jpeg' }); } catch (_) {}
+      return { body: body, name: name, type: 'image/jpeg', bytes: blob.size, shrunk: true };
+    } catch (_) {
+      return plain;
+    }
+  }
+
+  window.MJMPhoto = window.MJMPhoto || { forUpload: photoForUpload, MAX_EDGE: MAX_EDGE };
+
   /* ── SOLVING ─────────────────────────────────────────────────────
      Upload first, then patch. That order matters: a failed upload
      leaves the case exactly as it was, whereas patching first would
      mark work solved and then lose the picture of it. */
   var _shot = null;                    // the File chosen for this case
 
+  /* Hands back the URL, or the REASON there is not one. It used to hand
+     back null for every kind of failure and the caller had nothing to
+     tell anybody — which is how "I solved it and the photo never went"
+     looked from the field. */
   async function uploadShot(caseId, file) {
     var token = await accessToken();
-    if (!token) return null;
-    var ext  = (file.name.split('.').pop() || 'jpg').toLowerCase().replace(/[^a-z0-9]/g, '');
+    if (!token) return { url: null, why: 'you are signed out — sign in and try again' };
+    var pic  = await photoForUpload(file);
+    var ext  = (pic.name.split('.').pop() || 'jpg').toLowerCase().replace(/[^a-z0-9]/g, '');
     var path = 'solve/' + caseId + '-' + Date.now() + '.' + (ext || 'jpg');
     try {
       var res = await fetch(CFG.url + '/storage/v1/object/nelos-photos/' + path, {
         method: 'POST',
         headers: { apikey: CFG.key, Authorization: 'Bearer ' + token,
-                   'Content-Type': file.type || 'application/octet-stream' },
-        body: file
+                   'Content-Type': pic.type || 'application/octet-stream' },
+        body: pic.body
       });
-      if (!res.ok) return null;
-      return CFG.url + '/storage/v1/object/public/nelos-photos/' + path;
-    } catch (_) { return null; }
+      if (!res.ok) {
+        var why = res.status === 413 ? 'the photo is too big for the store'
+                : res.status === 403 || res.status === 401 ? 'you are not allowed to add photos'
+                : res.status === 404 ? 'the nelos-photos bucket is missing'
+                : 'the photo store answered ' + res.status;
+        return { url: null, why: why };
+      }
+      return { url: CFG.url + '/storage/v1/object/public/nelos-photos/' + path, why: '' };
+    } catch (_) {
+      return { url: null, why: 'no connection to the photo store' };
+    }
   }
 
   async function patchCase(id, body) {
@@ -1776,7 +1924,31 @@
     _solving = true;
     if (btn) { btn.disabled = true; btn.textContent = 'Saving…'; }
 
-    var url = _shot ? await uploadShot(id, _shot) : null;
+    var err = detailEl.querySelector('.nd-solve-err');
+    var say = function (msg) {
+      if (!err) return;
+      err.textContent = msg || '';
+      err.hidden = !msg;
+    };
+    say('');
+
+    var shot = _shot ? await uploadShot(id, _shot) : { url: null, why: '' };
+    /* A PHOTO THAT DID NOT GO STOPS THE SOLVE.
+
+       It used to carry on and save the remark, leaving the case marked
+       solved with no picture and nothing said — which is exactly what the
+       field reported as "cannot upload photo". Nothing is lost by
+       stopping: the remark is still in the box, and the person can try
+       again or take the photo off with the ✕ and solve without it. That
+       is their call to make, not ours to make quietly. */
+    if (_shot && !shot.url) {
+      _solving = false;
+      if (btn) { btn.disabled = false; btn.textContent = 'Save & Solve'; }
+      say('The photo did not upload — ' + (shot.why || 'unknown reason') +
+          '. Try Save & Solve again, or press ✕ on the photo to solve without it.');
+      return;
+    }
+    var url = shot.url;
     var body = {
       status: 'resolved',
       resolution: text,
@@ -1816,7 +1988,7 @@
                '<label>' +
                  '<svg viewBox="0 0 24 24"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>' +
                  '<span>Take or attach a photo</span>' +
-                 '<input type="file" accept="image/*" capture="environment" class="nd-shot-in">' +
+                 '<input type="file" accept="image/*" class="nd-shot-in">' +
                '</label>' +
              '</div>' +
              /* Labelled rather than prompted from inside the box: a
@@ -1825,6 +1997,7 @@
                 when they start filling it in. */
              '<div class="nd-solve-lab">Solve Case Remark</div>' +
              '<textarea class="nd-solve-note" maxlength="2000"></textarea>' +
+             '<div class="nd-solve-err" hidden></div>' +
            '</div>';
   }
 
@@ -1987,9 +2160,18 @@
         { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
     formEl.scrollTop = 0;
 
+    /* The document picker, where this database can keep one. Asked once
+       and remembered, so opening the form again costs nothing. */
+    accessToken().then(function (t) {
+      return t ? docsAvailable(t) : false;
+    }).then(function (on) {
+      var fld = formEl.querySelector('.nd-doc-fld');
+      if (fld) fld.hidden = !on;
+    });
+
     var nurs = formEl.querySelector('#nd-f-nursery');
     if (nurs.options.length <= 1) {
-      nurs.innerHTML = opt('', '— none —') +
+      nurs.innerHTML = opt('', '— none —') + opt(NURSERY_ALL, NURSERY_ALL) +
         Object.keys(NURSERY_PLOTS).map(function (n) { return opt(n, NURSERY_LABEL[n]); }).join('');
     }
 
@@ -2072,8 +2254,14 @@
     var n = formEl.querySelector('#nd-f-nursery').value;
     var plot = formEl.querySelector('#nd-f-plot');
     plot.disabled = !n;
+    /* A case about every nursery is not about one plot, but nothing is
+       gained by refusing to name one either — so all of them are offered,
+       in nursery order. */
+    var list = n === NURSERY_ALL
+      ? Object.keys(NURSERY_PLOTS).reduce(function (all, k) { return all.concat(NURSERY_PLOTS[k]); }, [])
+      : (NURSERY_PLOTS[n] || []);
     plot.innerHTML = opt('', n ? '— none —' : 'Nursery first') +
-      (NURSERY_PLOTS[n] || []).map(function (p) { return opt(p, p); }).join('');
+      list.map(function (p) { return opt(p, p); }).join('');
   }
 
   /* The due date the chosen work normally gets, counted from today. No
@@ -2094,19 +2282,68 @@
      the save handler can show it and leave the form filled in — better
      than a case that quietly lost its photo. */
   var MAX_PHOTO = 8 * 1024 * 1024;
-  async function uploadPhoto(token) {
+    /* Does this database know about doc_url / doc_name? Asked once, by
+     selecting the two columns and seeing whether PostgREST has heard of
+     them — the same test the column tiers above use. The picker stays
+     hidden until the answer is yes: one that takes a file and loses it at
+     the insert is worse than none. */
+  var _docsOn = null;
+  async function docsAvailable(token) {
+    if (_docsOn !== null) return _docsOn;
+    try {
+      var res = await fetch(CFG.url + '/rest/v1/nelos_cases?select=doc_url,doc_name&limit=1',
+                            { headers: authHeaders(token) });
+      _docsOn = res.ok;
+      if (!res.ok) warn('nelos_cases has no doc_url — run ' +
+                        'shared/RUN_ME_nelos_case_document.sql to let a case carry a document.');
+    } catch (_) { _docsOn = false; }
+    return _docsOn;
+  }
+
+  /* The document, as it came. NOT shrunk — a document is not a picture,
+     and 1600px of a PDF is a ruined PDF. */
+  var MAX_DOC = 25 * 1024 * 1024;
+  async function uploadDoc(token) {
+    var input = formEl.querySelector('#nd-f-doc');
+    var file = input && input.files && input.files[0];
+    if (!file) return undefined;
+    if (file.size > MAX_DOC) throw new Error('that file is over 25 MB — send a smaller one');
+
+    var safe = String(file.name || 'document').replace(/[^A-Za-z0-9._-]+/g, '_').slice(-80);
+    var path = new Date().toISOString().slice(0, 10) + '/' +
+               Math.random().toString(36).slice(2) + '-' + safe;
+    var res = await fetch(CFG.url + '/storage/v1/object/nelos-docs/' + path, {
+      method: 'POST',
+      headers: Object.assign({ 'Content-Type': file.type || 'application/octet-stream' },
+                             authHeaders(token)),
+      body: file
+    });
+    if (!res.ok) {
+      throw new Error(res.status === 404
+        ? 'the nelos-docs bucket is missing — run shared/RUN_ME_nelos_case_document.sql'
+        : 'the file store answered ' + res.status);
+    }
+    return CFG.url + '/storage/v1/object/public/nelos-docs/' + path;
+  }
+
+async function uploadPhoto(token) {
     var input = formEl.querySelector('#nd-f-photo');
     var file = input && input.files && input.files[0];
     if (!file) return undefined;
-    if (file.size > MAX_PHOTO) throw new Error('that photo is over 8 MB — take a smaller one');
+    /* Shrunk first, THEN weighed. An Android camera photo is routinely
+       over the limit as it comes off the phone and was refused outright;
+       at 1600px it is a few hundred kilobytes and goes through. The
+       limit stays for the file that will not shrink at all. */
+    var pic = await photoForUpload(file);
+    if (pic.bytes > MAX_PHOTO) throw new Error('that photo is over 8 MB — take a smaller one');
 
-    var ext = (file.name.split('.').pop() || 'jpg').toLowerCase().replace(/[^a-z0-9]/g, '');
+    var ext = (pic.name.split('.').pop() || 'jpg').toLowerCase().replace(/[^a-z0-9]/g, '');
     var path = new Date().toISOString().slice(0, 10) + '/' +
                Math.random().toString(36).slice(2) + '.' + ext;
     var res = await fetch(CFG.url + '/storage/v1/object/nelos-photos/' + path, {
       method: 'POST',
-      headers: Object.assign({ 'Content-Type': file.type || 'image/jpeg' }, authHeaders(token)),
-      body: file
+      headers: Object.assign({ 'Content-Type': pic.type || 'image/jpeg' }, authHeaders(token)),
+      body: pic.body
     });
     if (!res.ok) {
       var detail = '';
@@ -2169,6 +2406,19 @@
       reset();
       return formError('Could not add the photo — ' + (e && e.message ? e.message : 'try again') + '.');
     }
+    var docUrl, docName;
+    try {
+      if (await docsAvailable(token)) {
+        docUrl = await uploadDoc(token);
+        if (docUrl) {
+          var df = formEl.querySelector('#nd-f-doc').files[0];
+          docName = (df && df.name) || 'Document';
+        }
+      }
+    } catch (e) {
+      reset();
+      return formError('Could not add the file — ' + (e && e.message ? e.message : 'try again') + '.');
+    }
 
     var picSel = formEl.querySelector('#nd-f-pic');
     var picId  = picSel.value || null;
@@ -2202,6 +2452,7 @@
     // column when there is a photo, so a database without it still takes
     // the insert.
     if (photoUrl) row.photo_url = photoUrl;
+    if (docUrl) { row.doc_url = docUrl; row.doc_name = docName; }
 
     /* An edit changes what the case IS, never what it has become. Status,
        who raised it and where from are its history; a person fixing a typo
@@ -2214,6 +2465,7 @@
       delete row.raised_by;
       delete row.raised_by_id;
       if (!photoUrl) delete row.photo_url;
+      if (!docUrl) { delete row.doc_url; delete row.doc_name; }
       row.updated_by = u.name;
       row.updated_at = new Date().toISOString();
     }
@@ -2292,7 +2544,10 @@
       var box = formEl.querySelector('.nd-photo');
       var pick = formEl.querySelector('.nd-photo-pick');
       if (!f) return;
-      if (f.size > MAX_PHOTO) { this.value = ''; return formError('That photo is over 8 MB — take a smaller one.'); }
+      /* No size refusal here any more: the upload shrinks the photo to
+         1600px first, so the megabytes a phone hands over are not what
+         gets sent. A file that still will not fit is caught there, with
+         the case in front of the person rather than the picker. */
       formError('');
       var img = box.querySelector('img');
       if (img.src.indexOf('blob:') === 0) URL.revokeObjectURL(img.src);
@@ -2300,6 +2555,23 @@
       box.hidden = false;
       pick.hidden = true;
     });
+    var docIn = formEl.querySelector('#nd-f-doc');
+    docIn.addEventListener('change', function () {
+      var f = this.files && this.files[0];
+      var box = formEl.querySelector('.nd-doc');
+      var pickD = formEl.querySelector('.nd-doc-fld .nd-photo-pick');
+      if (!f) return;
+      formError('');
+      box.querySelector('.nd-doc-name').textContent = f.name || 'Document';
+      box.hidden = false;
+      pickD.hidden = true;
+    });
+    formEl.querySelector('.nd-doc-x').addEventListener('click', function () {
+      formEl.querySelector('.nd-doc').hidden = true;
+      formEl.querySelector('.nd-doc-fld .nd-photo-pick').hidden = false;
+      docIn.value = '';
+    });
+
     formEl.querySelector('.nd-photo-x').addEventListener('click', function () {
       var box = formEl.querySelector('.nd-photo');
       var img = box.querySelector('img');
@@ -2355,7 +2627,7 @@
       var wrap = detailEl.querySelector('.nd-shot');
       if (wrap) wrap.innerHTML =
         '<label><svg viewBox="0 0 24 24"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>' +
-        '<span>Add photo</span><input type="file" accept="image/*" capture="environment" class="nd-shot-in"></label>';
+        '<span>Add photo</span><input type="file" accept="image/*" class="nd-shot-in"></label>';
     });
     /* Delegated: the list is repainted on every refresh. */
     listEl.addEventListener('click', function (e) {

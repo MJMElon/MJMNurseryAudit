@@ -248,6 +248,8 @@
    *   nursery, plot, batch,        // optional subject of the case
    *   assigneeId, assigneeName,    // optional owner
    *   photoUrl,       // optional — one photo, in the nelos-photos bucket
+   *   docUrl,         // optional — one document, in the nelos-docs bucket
+   *   docName,        // what to call that document on screen
    *   assignedModule, assignedSeatNo,
    *                   // optional — the queue to put it in, overriding the
    *                   //   routing rules for this one case
@@ -296,6 +298,14 @@
       // column when there is actually a photo, so a database that has not
       // run that file yet still takes the insert.
       if (opts.photoUrl) row.photo_url = opts.photoUrl;
+      /* doc_url / doc_name arrive with RUN_ME_nelos_case_document.sql, and
+         the same rule applies: sent only when there is a document, and
+         dropped below if this database has never heard of the columns. A
+         case is worth more than its attachment. */
+      if (opts.docUrl) {
+        row.doc_url  = opts.docUrl;
+        row.doc_name = opts.docName || 'Document';
+      }
 
       // Where the case is to be WORKED, when the raiser chose rather than
       // leaving it to the routing rules. nelos_route_case() returns early on
@@ -304,7 +314,18 @@
       if (opts.assignedModule) row.assigned_module = opts.assignedModule;
       if (opts.assignedSeatNo) row.assigned_seat_no = Number(opts.assignedSeatNo);
 
-      const { data, error } = await supa.from('nelos_cases').insert([row]).select().single();
+      var ins = await supa.from('nelos_cases').insert([row]).select().single();
+      /* A database without the document columns refuses the whole insert
+         rather than ignoring them, so the case would be lost over its
+         attachment. Raise it without them and say where the columns come
+         from — the remark and the routing are the case; the file is not. */
+      if (ins.error && row.doc_url && /doc_url|doc_name/.test(ins.error.message || '')) {
+        console.warn('[nelos] nelos_cases has no doc_url — run ' +
+                     'shared/RUN_ME_nelos_case_document.sql. Raising the case without the document.');
+        delete row.doc_url; delete row.doc_name;
+        ins = await supa.from('nelos_cases').insert([row]).select().single();
+      }
+      const { data, error } = ins;
       if (error) return { data: null, error };
 
       if (opts.description) {

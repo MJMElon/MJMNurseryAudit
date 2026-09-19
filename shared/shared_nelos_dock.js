@@ -761,7 +761,10 @@
               color:#6d28d9; margin-bottom:9px; }
   .nd-solve-lab { font-size:10px; font-weight:900; letter-spacing:.08em; text-transform:uppercase;
                   color:#64748b; margin:12px 0 -2px; }
-  .nd-shot { display:flex; gap:8px; align-items:stretch; }
+  .nd-shot { display:flex; gap:8px; align-items:stretch; flex-wrap:wrap; }
+  /* A thumbnail sizes itself once there are several; one on its own still
+     fills the row beside the picker, the way it always did. */
+  .nd-shot .nd-shot-prev { flex:1 1 92px; min-width:92px; max-width:160px; }
   .nd-shot label { flex:1; display:flex; flex-direction:column; align-items:center;
                    justify-content:center; gap:3px; min-height:64px; cursor:pointer;
                    border:1.5px dashed #ddd6fe; border-radius:11px; background:#faf8ff;
@@ -785,6 +788,9 @@
                  overflow-wrap:anywhere; }
   .nd-doc-x { width:24px; height:24px; border-radius:999px; border:1px solid #e9d5ff;
               background:#fff; color:#7c3aed; font-size:12px; cursor:pointer; flex-shrink:0; }
+  .nd-solved-shots { display:flex; flex-wrap:wrap; gap:6px; margin:7px 0 2px; }
+  .nd-solved-shots img { width:100%; border-radius:9px; display:block; }
+  .nd-solved-shots a { flex:1 1 92px; min-width:92px; max-width:190px; }
   .nd-solve-err { margin-top:7px; padding:8px 10px; border-radius:9px; font-size:11.5px;
                   font-weight:700; line-height:1.35; color:#7f1d1d;
                   background:#fef2f2; border:1px solid #fecaca; }
@@ -1865,7 +1871,16 @@
      Upload first, then patch. That order matters: a failed upload
      leaves the case exactly as it was, whereas patching first would
      mark work solved and then lose the picture of it. */
-  var _shot = null;                    // the File chosen for this case
+  /* THE PHOTOS OF THE FIX, plural.
+
+     One was rarely the job — the gap before and the planting after, three
+     trays that needed the same thing, a wide shot and the close-up that
+     shows what it actually was — and the form took exactly one. It is a
+     list now, uploaded one after another; the FIRST still goes into
+     resolution_photo_url, so everything that reads one photo of a fix
+     goes on finding one, and all of them go into resolution_photo_urls
+     (shared/RUN_ME_nelos_solve_photos.sql). */
+  var _shots = [];                     // the Files chosen for this case
 
   /* Hands back the URL, or the REASON there is not one. It used to hand
      back null for every kind of failure and the caller had nothing to
@@ -1932,7 +1947,13 @@
     };
     say('');
 
-    var shot = _shot ? await uploadShot(id, _shot) : { url: null, why: '' };
+    var urls = [], shotWhy = '';
+    for (var si = 0; si < _shots.length; si++) {
+      var one = await uploadShot(id, _shots[si]);
+      if (!one.url) { shotWhy = (_shots.length > 1 ? 'photo ' + (si + 1) + ': ' : '') + one.why; break; }
+      urls.push(one.url);
+    }
+    var shot = { url: urls[0] || null, why: shotWhy };
     /* A PHOTO THAT DID NOT GO STOPS THE SOLVE.
 
        It used to carry on and save the remark, leaving the case marked
@@ -1941,7 +1962,7 @@
        stopping: the remark is still in the box, and the person can try
        again or take the photo off with the ✕ and solve without it. That
        is their call to make, not ours to make quietly. */
-    if (_shot && !shot.url) {
+    if (_shots.length && (shotWhy || urls.length !== _shots.length)) {
       _solving = false;
       if (btn) { btn.disabled = false; btn.textContent = 'Save & Solve'; }
       say('The photo did not upload — ' + (shot.why || 'unknown reason') +
@@ -1956,11 +1977,23 @@
       resolved_at: new Date().toISOString()
     };
     if (url) body.resolution_photo_url = url;
+    if (urls.length) body.resolution_photo_urls = urls;
 
     var out = await patchCase(id, body);
     /* 400 = this database has not run migration_nelos_solve_photo.sql.
        The remark and the status matter more than the picture, so save
        them rather than failing the whole thing. */
+    /* A database without resolution_photo_urls refuses the whole patch,
+       so the rest of the photos are dropped and the first one — in the
+       column that has been there all along — is kept. Only if THAT is
+       refused too is the remark saved on its own. */
+    if (!out.ok && out.status === 400 && urls.length) {
+      warn('nelos_cases has no resolution_photo_urls — run ' +
+           'shared/RUN_ME_nelos_solve_photos.sql to keep more than one photo of a fix. ' +
+           'Saving the first one.');
+      delete body.resolution_photo_urls;
+      out = await patchCase(id, body);
+    }
     if (!out.ok && out.status === 400 && url) {
       warn('nelos_cases has no resolution_photo_url — run ' +
            'shared/migration_nelos_solve_photo.sql. Saving the remark without the photo.');
@@ -1975,20 +2008,39 @@
       warn('could not save the resolution (http-' + out.status + ').');
       return;
     }
-    _shot = null;
+    _shots = [];
     delete _detailCache[id];
     showList();
     refresh();
   }
 
+  /* What has been picked so far: a thumbnail each, each with its own ✕,
+     and the picker still there so more can be added. */
+  function paintShots() {
+    var wrap = detailEl.querySelector('.nd-shot');
+    if (!wrap) return;
+    var picker =
+      '<label><svg viewBox="0 0 24 24"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>' +
+      '<circle cx="12" cy="13" r="4"/></svg><span>' +
+      (_shots.length ? 'Add more' : 'Take or attach photos') +
+      '</span><input type="file" accept="image/*" multiple class="nd-shot-in"></label>';
+    var thumbs = _shots.map(function (f, i) {
+      return '<div class="nd-shot-prev"><img alt="Photo of the fix" src="' +
+             URL.createObjectURL(f) + '">' +
+             '<button type="button" class="nd-shot-x" data-i="' + i +
+             '" aria-label="Remove this photo">&times;</button></div>';
+    }).join('');
+    wrap.innerHTML = picker + thumbs;
+  }
+
   function solveBlockHtml() {
     return '<div class="nd-solve">' +
              '<div class="nd-d-sec">Solve Case</div>' +
-             '<div class="nd-shot">' +
+             '<div class="nd-shot nd-shot-wrap">' +
                '<label>' +
                  '<svg viewBox="0 0 24 24"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>' +
-                 '<span>Take or attach a photo</span>' +
-                 '<input type="file" accept="image/*" class="nd-shot-in">' +
+                 '<span>Take or attach photos</span>' +
+                 '<input type="file" accept="image/*" multiple class="nd-shot-in">' +
                '</label>' +
              '</div>' +
              /* Labelled rather than prompted from inside the box: a
@@ -2010,13 +2062,30 @@
      they arrive only with the full read (select=*) that showDetail does.
      On the first paint, from the list row, this simply shows the solved
      half — which is what the list knows. */
+  /* Every photo of the fix. resolution_photo_urls holds them all and
+     resolution_photo_url the first — a case solved before that column
+     existed has only the second, and reads the same way. */
+  function solveShots(c) {
+    var list = c && c.resolution_photo_urls;
+    if (typeof list === 'string') { try { list = JSON.parse(list); } catch (_) { list = null; } }
+    if (Array.isArray(list) && list.length) return list.filter(Boolean);
+    return c && c.resolution_photo_url ? [c.resolution_photo_url] : [];
+  }
+  function solvedShotsHtml(c) {
+    var shots = solveShots(c);
+    if (!shots.length) return '';
+    return '<div class="nd-solved-shots">' + shots.map(function (u) {
+      return '<a href="' + esc(u) + '" target="_blank" rel="noopener">' +
+             '<img src="' + esc(u) + '" alt="Photo of the fix" loading="lazy"></a>';
+    }).join('') + '</div>';
+  }
+
   function solvedCardHtml(c) {
     var shut = c.status === 'closed';
     var solved = '<div class="nd-solved-card">' +
              '<div class="nd-solved-h">&#10003; Solved</div>' +
              '<div class="nd-solved-b">' + esc(c.resolution || '') + '</div>' +
-             (c.resolution_photo_url
-               ? '<img src="' + esc(c.resolution_photo_url) + '" alt="Photo of the fix">' : '') +
+             solvedShotsHtml(c) +
              '<div class="nd-solved-m">' + esc(c.resolved_by || 'unknown') +
                (c.resolved_at ? ' · ' + esc(String(c.resolved_at).slice(0, 10)) : '') +
                (shut ? '' : ' · waiting to be closed') + '</div>' +
@@ -2050,7 +2119,7 @@
     if (!c) return;
     view = 'detail';
     openCaseId = String(id);
-    _shot = null;
+    _shots = [];
     showPane('detail');
     panel.querySelector('.nd-head-t').textContent = c.case_no || 'Case';
     detailEl.innerHTML = detailHtml(c, undefined);
@@ -2611,23 +2680,22 @@ async function uploadPhoto(token) {
 
     /* Photo picking and clearing live in the detail pane, which is
        rebuilt on every open — so both are delegated. */
+    /* Picking ADDS rather than replaces: a phone's picker often only
+       takes a few at a time, and "choose again" should not throw away
+       what was chosen first. Each one can be taken off on its own. */
     detailEl.addEventListener('change', function (e) {
       var inp = e.target.closest('.nd-shot-in');
-      if (!inp || !inp.files || !inp.files[0]) return;
-      _shot = inp.files[0];
-      var wrap = detailEl.querySelector('.nd-shot');
-      if (!wrap) return;
-      var url = URL.createObjectURL(_shot);
-      wrap.innerHTML = '<div class="nd-shot-prev"><img alt="Photo of the fix" src="' + url + '">' +
-                       '<button type="button" class="nd-shot-x" aria-label="Remove photo">&times;</button></div>';
+      if (!inp || !inp.files || !inp.files.length) return;
+      for (var i = 0; i < inp.files.length; i++) _shots.push(inp.files[i]);
+      inp.value = '';
+      paintShots();
     });
     detailEl.addEventListener('click', function (e) {
-      if (!e.target.closest('.nd-shot-x')) return;
-      _shot = null;
-      var wrap = detailEl.querySelector('.nd-shot');
-      if (wrap) wrap.innerHTML =
-        '<label><svg viewBox="0 0 24 24"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>' +
-        '<span>Add photo</span><input type="file" accept="image/*" class="nd-shot-in"></label>';
+      var x = e.target.closest('.nd-shot-x');
+      if (!x) return;
+      var n = parseInt(x.dataset.i, 10);
+      if (Number.isFinite(n)) _shots.splice(n, 1);
+      paintShots();
     });
     /* Delegated: the list is repainted on every refresh. */
     listEl.addEventListener('click', function (e) {

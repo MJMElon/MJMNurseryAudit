@@ -555,16 +555,16 @@
 
   /* ── the round button ── */
   #nelos-dock-fab { position:relative; width:58px; height:58px; border:none; border-radius:50%;
-                    cursor:grab; padding:0; color:#fff; font-family:inherit; touch-action:none;
-                    background:linear-gradient(135deg,#7c3aed 0%,#a855f7 55%,#6d28d9 100%);
-                    box-shadow:0 10px 26px rgba(109,40,217,.42), 0 2px 6px rgba(15,23,42,.2);
+                    cursor:grab; padding:0; color:#4a2158; font-family:inherit; touch-action:none;
+                    background:linear-gradient(135deg,#c77fe4 0%,#e2a9f1 55%,#b06fd0 100%);
+                    box-shadow:0 10px 26px rgba(155,79,189,.38), 0 2px 6px rgba(15,23,42,.2);
                     display:flex; align-items:center; justify-content:center;
                     transition:transform .18s ease, box-shadow .18s ease; }
   #nelos-dock-fab:hover  { transform:translateY(-2px) scale(1.04);
-                           box-shadow:0 14px 32px rgba(109,40,217,.5), 0 3px 8px rgba(15,23,42,.24); }
+                           box-shadow:0 14px 32px rgba(155,79,189,.5), 0 3px 8px rgba(15,23,42,.24); }
   #nelos-dock-fab:active { transform:scale(.96); }
   #nelos-dock.nd-busy #nelos-dock-fab { cursor:grabbing; transform:scale(1.06);
-                                        box-shadow:0 18px 38px rgba(109,40,217,.55); transition:none; }
+                                        box-shadow:0 18px 38px rgba(155,79,189,.55); transition:none; }
   #nelos-dock-fab .nd-mark { font-size:15px; font-weight:900; letter-spacing:.06em; line-height:1; }
   #nelos-dock-fab .nd-sub  { font-size:7px; font-weight:900; letter-spacing:.14em; opacity:.82; margin-top:2px; }
   #nelos-dock-fab .nd-stack { display:flex; flex-direction:column; align-items:center; pointer-events:none; }
@@ -584,7 +584,7 @@
 
   /* ── the panel ── */
   #nelos-dock-panel { position:relative; width:370px; max-width:calc(100vw - 24px); max-height:min(70vh,560px);
-                      background:#fff; border:1.5px solid #ede9fe; border-radius:18px; overflow:hidden;
+                      background:#fff; border:1.5px solid #f3ddfb; border-radius:18px; overflow:hidden;
                       box-shadow:0 22px 55px rgba(15,23,42,.22); display:flex; flex-direction:column; }
   #nelos-dock-panel[hidden] { display:none; }
 
@@ -616,7 +616,7 @@
   @keyframes nd-in { from { opacity:0; transform:translateY(10px) scale(.96); } to { opacity:1; transform:none; } }
 
   .nd-head { display:flex; align-items:center; gap:9px; padding:13px 14px 11px 17px;
-             background:linear-gradient(135deg,#7c3aed 0%,#8b5cf6 100%); color:#fff; flex-shrink:0; }
+             background:linear-gradient(135deg,#b06fd0 0%,#e2a9f1 100%); color:#3d1c4a; flex-shrink:0; }
                   display:flex; align-items:center; justify-content:center;
                   font-size:11px; font-weight:900; flex-shrink:0; }
   .nd-head-t  { font-size:13px; font-weight:900; letter-spacing:.12em; text-transform:uppercase; line-height:1.1; }
@@ -625,14 +625,14 @@
             display:flex; align-items:center; justify-content:center; flex-shrink:0; }
   .nd-min:hover { background:rgba(255,255,255,.3); }
 
-  .nd-list { overflow-y:auto; flex:1; padding:0 10px 10px; background:#fbfaff;
+  .nd-list { overflow-y:auto; flex:1; padding:0 10px 10px; background:#fdfaff;
              -webkit-overflow-scrolling:touch; }
   .nd-list[hidden] { display:none; }
 
   /* the overdue block, pinned to the top of the scroll */
   .nd-sec { padding:11px 4px 6px; font-size:9px; font-weight:900; letter-spacing:.1em;
-            text-transform:uppercase; color:#94a3b8; background:#fbfaff; }
-  .nd-sec-over { position:sticky; top:0; z-index:2; color:#b91c1c; background:#fbfaff;
+            text-transform:uppercase; color:#94a3b8; background:#fdfaff; }
+  .nd-sec-over { position:sticky; top:0; z-index:2; color:#b91c1c; background:#fdfaff;
                  padding:11px 4px 6px; }
 
   /* A button, not a link: the case opens in this panel. The reset is
@@ -642,10 +642,10 @@
      button: three buttons live inside it, and a button cannot hold
      buttons — the reading part is the button. */
   .nd-row { display:flex; flex-direction:column; margin-bottom:8px; color:inherit;
-            background:#fff; border:1.5px solid #ede9fe; border-radius:13px;
+            background:#fff; border:1.5px solid #f3ddfb; border-radius:13px;
             box-shadow:0 1px 2px rgba(76,29,149,.04); }
   .nd-row:last-child { margin-bottom:0; }
-  .nd-row:hover { border-color:#c4b5fd; }
+  .nd-row:hover { border-color:#eec5f6; }
   .nd-row-over { background:#fffbfb; border-color:#fecaca; }
   .nd-row-over:hover { border-color:#fca5a5; }
   .nd-open { display:flex; align-items:flex-start; gap:9px; min-width:0;
@@ -660,7 +660,7 @@
   /* The case number heads the card; the work it is about sits under it,
      where it has the whole width and does not have to be cut short. */
   .nd-l1    { display:flex; align-items:center; gap:6px; min-width:0; }
-  .nd-no    { font-size:9.5px; font-weight:900; letter-spacing:.06em; color:#7c3aed;
+  .nd-no    { font-size:9.5px; font-weight:900; letter-spacing:.06em; color:#9a4fbd;
               flex-shrink:0; font-variant-numeric:tabular-nums; }
   .nd-title { font-size:12.5px; font-weight:700; color:#1e293b; line-height:1.3;
               display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical;
@@ -670,7 +670,7 @@
               display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
   .nd-due   { font-size:9.5px; font-weight:700; color:#94a3b8; line-height:1.5; margin-top:1px; }
   .nd-shotpic { width:40px; height:40px; object-fit:cover; border-radius:8px; flex-shrink:0;
-                border:1px solid #ede9fe; margin-top:1px; }
+                border:1px solid #f3ddfb; margin-top:1px; }
 
   /* Side by side along the foot of the card, inside its border, where
      three buttons read as three buttons rather than a column of marks
@@ -678,14 +678,14 @@
   .nd-acts { display:flex; justify-content:flex-end; gap:6px;
              padding:0 11px 9px; margin-top:-4px; }
   .nd-act { width:30px; height:26px; border-radius:8px; cursor:pointer; padding:0;
-            border:1px solid #e9e3fb; background:#fff; color:#7c3aed;
+            border:1px solid #f0d6f9; background:#fff; color:#9a4fbd;
             font-family:inherit; font-size:11px; font-weight:900; line-height:1;
             display:flex; align-items:center; justify-content:center; }
   .nd-act svg { width:12px; height:12px; fill:none; stroke:currentColor; stroke-width:2.2;
                 stroke-linecap:round; stroke-linejoin:round; }
   .nd-act-solve { border-color:#bbf7d0; color:#15803d; }
   .nd-act-solve:hover { background:#f0fdf4; }
-  .nd-act-edit:hover  { background:#f5f3ff; }
+  .nd-act-edit:hover  { background:#fcf6fe; }
   .nd-act-del { border-color:#fecaca; color:#dc2626; }
   .nd-act-del:hover { background:#fef2f2; }
 
@@ -706,7 +706,7 @@
             color:#94a3b8; margin:0 0 4px; }
   .nd-in  { width:100%; font-family:inherit; font-size:16px; font-weight:600; color:#1e293b;
             padding:9px 11px; border:1.5px solid #e2e8f0; border-radius:10px; background:#fff; outline:none; }
-  .nd-in:focus { border-color:#c4b5fd; box-shadow:0 0 0 3px rgba(196,181,253,.3); }
+  .nd-in:focus { border-color:#eec5f6; box-shadow:0 0 0 3px rgba(196,181,253,.3); }
   .nd-in::placeholder { color:#cbd5e1; font-weight:500; }
   textarea.nd-in { resize:none; line-height:1.45; }
   select.nd-in { appearance:none; background-image:linear-gradient(45deg,transparent 50%,#94a3b8 50%),
@@ -723,7 +723,7 @@
                    padding:16px 12px; border:1.5px dashed #cbd5e1; border-radius:11px;
                    font-size:12px; font-weight:800; color:#64748b; cursor:pointer;
                    background:#f8fafc; }
-  .nd-photo-pick:hover { border-color:#a78bfa; color:#6d28d9; }
+  .nd-photo-pick:hover { border-color:#d49aea; color:#7b3f93; }
   /* display:flex on the class outranks the browser's [hidden]{display:none},
      so hiding the picker behind a chosen photo needs saying explicitly. */
   .nd-photo-pick[hidden], .nd-photo[hidden] { display:none; }
@@ -747,18 +747,18 @@
   .nd-hist:hover { background:rgba(255,255,255,.28); }
   .nd-hist svg { width:14px; height:14px; fill:none; stroke:currentColor; stroke-width:2.1;
                  stroke-linecap:round; stroke-linejoin:round; }
-  .nd-hist.on { background:#fff; color:#6d28d9; }
+  .nd-hist.on { background:#fff; color:#7b3f93; }
 
   /* ── The solve block ──
      Under the case, not beside it: read what is being asked, then do
      it. A photo and a line of remark is the whole of what the field
      can add, and both are optional except the remark — a resolution
      nobody described is one nobody can check. */
-  .nd-solve { margin-top:16px; border-top:1px solid #e9e3fb; padding-top:13px; }
+  .nd-solve { margin-top:16px; border-top:1px solid #f0d6f9; padding-top:13px; }
   /* The heading over each of the two blocks — what is being asked, then
      the answer to it. Same mark in both places so they read as a pair. */
   .nd-d-sec { font-size:10px; font-weight:900; letter-spacing:.11em; text-transform:uppercase;
-              color:#6d28d9; margin-bottom:9px; }
+              color:#7b3f93; margin-bottom:9px; }
   .nd-solve-lab { font-size:10px; font-weight:900; letter-spacing:.08em; text-transform:uppercase;
                   color:#64748b; margin:12px 0 -2px; }
   .nd-shot { display:flex; gap:8px; align-items:stretch; flex-wrap:wrap; }
@@ -767,9 +767,9 @@
   .nd-shot .nd-shot-prev { flex:1 1 92px; min-width:92px; max-width:160px; }
   .nd-shot label { flex:1; display:flex; flex-direction:column; align-items:center;
                    justify-content:center; gap:3px; min-height:64px; cursor:pointer;
-                   border:1.5px dashed #ddd6fe; border-radius:11px; background:#faf8ff;
-                   color:#7c3aed; font-size:11px; font-weight:800; }
-  .nd-shot label:hover { background:#f5f3ff; border-color:#c4b5fd; }
+                   border:1.5px dashed #eed0f8; border-radius:11px; background:#fdfaff;
+                   color:#9a4fbd; font-size:11px; font-weight:800; }
+  .nd-shot label:hover { background:#fcf6fe; border-color:#eec5f6; }
   .nd-shot input[type=file] { display:none; }
   .nd-shot svg { width:19px; height:19px; fill:none; stroke:currentColor; stroke-width:1.9;
                  stroke-linecap:round; stroke-linejoin:round; }
@@ -777,17 +777,17 @@
                   overflow:hidden; background:#f1f5f9; }
   .nd-shot-prev img { width:100%; height:100%; object-fit:cover; display:block; }
   .nd-d-doc { display:flex; align-items:center; gap:7px; margin:9px 0 2px; padding:9px 11px;
-              border:1px solid #ede9fe; border-radius:11px; background:#faf8ff;
-              font-size:12px; font-weight:800; color:#4c1d95; text-decoration:none;
+              border:1px solid #f3ddfb; border-radius:11px; background:#fdfaff;
+              font-size:12px; font-weight:800; color:#4a2158; text-decoration:none;
               overflow-wrap:anywhere; }
-  .nd-d-doc:hover { border-color:#c4b5fd; background:#f5f3ff; }
+  .nd-d-doc:hover { border-color:#eec5f6; background:#fcf6fe; }
   .nd-doc { display:flex; align-items:center; gap:8px; padding:9px 11px; margin-top:6px;
-            border:1px solid #ede9fe; border-radius:11px; background:#faf8ff; }
+            border:1px solid #f3ddfb; border-radius:11px; background:#fdfaff; }
   .nd-doc[hidden] { display:none; }
-  .nd-doc-name { flex:1; font-size:11.5px; font-weight:700; color:#4c1d95;
+  .nd-doc-name { flex:1; font-size:11.5px; font-weight:700; color:#4a2158;
                  overflow-wrap:anywhere; }
   .nd-doc-x { width:24px; height:24px; border-radius:999px; border:1px solid #e9d5ff;
-              background:#fff; color:#7c3aed; font-size:12px; cursor:pointer; flex-shrink:0; }
+              background:#fff; color:#9a4fbd; font-size:12px; cursor:pointer; flex-shrink:0; }
   .nd-solved-shots { display:flex; flex-wrap:wrap; gap:6px; margin:7px 0 2px; }
   .nd-solved-shots img { width:100%; border-radius:9px; display:block; }
   .nd-solved-shots a { flex:1 1 92px; min-width:92px; max-width:190px; }
@@ -802,7 +802,7 @@
   .nd-solve textarea { width:100%; margin-top:9px; border:1px solid #e2e8f0; border-radius:10px;
                        padding:9px 10px; font-family:inherit; font-size:12.5px; color:#0f172a;
                        resize:vertical; min-height:64px; }
-  .nd-solve textarea:focus { outline:none; border-color:#c4b5fd; box-shadow:0 0 0 3px #ede9fe; }
+  .nd-solve textarea:focus { outline:none; border-color:#eec5f6; box-shadow:0 0 0 3px #f3ddfb; }
   .nd-solved-card { margin-top:14px; border:1px solid #bbf7d0; background:#f0fdf4;
                     border-radius:11px; padding:11px 12px; }
   .nd-solved-h { font-size:10px; font-weight:900; letter-spacing:.08em; text-transform:uppercase;
@@ -845,16 +845,16 @@
                white-space:pre-wrap; word-break:break-word; }
   .nd-d-none { margin-top:12px; font-size:12px; color:#94a3b8; font-style:italic; }
   .nd-d-open { display:inline-block; margin-top:14px; font-size:11px; font-weight:800;
-               color:#6d28d9; text-decoration:none; letter-spacing:.03em; }
+               color:#7b3f93; text-decoration:none; letter-spacing:.03em; }
   .nd-d-open:hover { text-decoration:underline; }
 
   .nd-foot { display:flex; gap:7px; padding:10px 12px; border-top:1px solid #f1f5f9; background:#fff; flex-shrink:0; }
   .nd-foot[hidden] { display:none; }
   .nd-btn  { flex:1; text-align:center; padding:9px 10px; border-radius:10px; text-decoration:none;
              font-size:9.5px; font-weight:900; letter-spacing:.07em; text-transform:uppercase; }
-  .nd-btn-a { background:#7c3aed; color:#fff; }  .nd-btn-a:hover { background:#6d28d9; }
-  .nd-btn-b { background:#f5f3ff; color:#6d28d9; border:1px solid #ddd6fe; }
-  .nd-btn-b:hover { background:#ede9fe; }
+  .nd-btn-a { background:#9a4fbd; color:#fff; }  .nd-btn-a:hover { background:#7b3f93; }
+  .nd-btn-b { background:#fcf6fe; color:#7b3f93; border:1px solid #eed0f8; }
+  .nd-btn-b:hover { background:#f3ddfb; }
   .nd-btn-c { background:#f8fafc; color:#64748b; border:1px solid #e2e8f0; }
   .nd-btn-c:hover { background:#f1f5f9; }
   /* Roughly 70/30 — the primary action earns the room. Declared after

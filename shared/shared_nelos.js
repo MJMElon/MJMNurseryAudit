@@ -433,7 +433,7 @@
                         color:#1e293b; white-space:nowrap; line-height:1.2; }
     .nelos-todo-all { position:absolute; left:0; top:50%; transform:translateY(-50%);
                       font-size:10px; font-weight:900; letter-spacing:.08em; text-transform:uppercase;
-                      color:#7c3aed; text-decoration:none; }
+                      color:#9a4fbd; text-decoration:none; }
     .nelos-todo-all:hover { text-decoration:underline; }
     .nelos-sec { font-size:9px; font-weight:900; letter-spacing:.1em; text-transform:uppercase;
                  color:#94a3b8; padding:9px 2px 4px; }
@@ -460,10 +460,10 @@
        pending, which is a different place every day. */
     .nelos-new { position:absolute; right:0; top:50%; transform:translateY(-50%);
                  display:inline-flex; align-items:center; gap:5px; height:30px; padding:0 12px;
-                 border-radius:999px; border:none; background:#7c3aed; color:white; font:inherit;
+                 border-radius:999px; border:none; background:#9a4fbd; color:white; font:inherit;
                  font-size:10px; font-weight:900; letter-spacing:.08em; text-transform:uppercase;
                  cursor:pointer; white-space:nowrap; text-decoration:none; transition:background .15s; }
-    .nelos-new:hover { background:#6d28d9; }
+    .nelos-new:hover { background:#7b3f93; }
     .nelos-new span[aria-hidden] { font-size:14px; line-height:1; letter-spacing:0; }
     /* On a phone the button is the + alone, and the hub link goes: three
        things cannot share a 300px row without the heading losing its

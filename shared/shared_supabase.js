@@ -12,3 +12,20 @@ const SHARED_SUPA_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYm
    <script src="../shared/shared_supabase.js"></script>
    const _supabase = supabase.createClient(SHARED_SUPA_URL, SHARED_SUPA_KEY);
 */
+
+/* "Sept" → "Sep" everywhere a date is formatted with the short month
+   name — same patch as shared_nelos_dock.js (see the comment there for
+   why), added here too for the pages that load this file but not that
+   dock. The guard keeps a page loading both from wrapping twice. */
+(function () {
+  if (Date.prototype._mjmSeptPatched) return;
+  Date.prototype._mjmSeptPatched = true;
+  const _toLocaleDateString = Date.prototype.toLocaleDateString;
+  Date.prototype.toLocaleDateString = function (...args) {
+    return _toLocaleDateString.apply(this, args).replace(/Sept\b/g, 'Sep');
+  };
+  const _toLocaleString = Date.prototype.toLocaleString;
+  Date.prototype.toLocaleString = function (...args) {
+    return _toLocaleString.apply(this, args).replace(/Sept\b/g, 'Sep');
+  };
+})();

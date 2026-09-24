@@ -10,6 +10,25 @@
    4. smartSave NEVER throws — always returns {offline:true} or result.
 ================================================================ */
 
+/* "Sept" → "Sep" everywhere a date is formatted with the short month
+   name — same patch as shared/shared_nelos_dock.js (see the comment
+   there for why), added here too since audit_index.html loads this file
+   without either of the two shared scripts that normally carry the
+   patch. The guard keeps a page loading more than one of these from
+   wrapping twice. */
+(function () {
+  if (Date.prototype._mjmSeptPatched) return;
+  Date.prototype._mjmSeptPatched = true;
+  const _toLocaleDateString = Date.prototype.toLocaleDateString;
+  Date.prototype.toLocaleDateString = function (...args) {
+    return _toLocaleDateString.apply(this, args).replace(/Sept\b/g, 'Sep');
+  };
+  const _toLocaleString = Date.prototype.toLocaleString;
+  Date.prototype.toLocaleString = function (...args) {
+    return _toLocaleString.apply(this, args).replace(/Sept\b/g, 'Sep');
+  };
+})();
+
 /* ── Load Dexie (local first, CDN fallback) ── */
 async function loadDexie(){
   if(window.Dexie) return;

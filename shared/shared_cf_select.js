@@ -38,8 +38,9 @@
         const style = document.createElement('style');
         style.id = STYLE_ID;
         style.textContent = `
-.cf-wrap{position:relative;display:inline-block;width:100%;}
-.cf-btn{display:flex;align-items:center;gap:8px;justify-content:space-between;width:100%;text-align:left;font-size:13px;font-weight:600;color:#1a150d;background:#fff;border:1.5px solid #e2d9c8;border-radius:12px;padding:10px 12px;cursor:pointer;transition:border-color .15s,box-shadow .15s;font-family:inherit;line-height:1.3;}
+/* No width here — see skin() below for why. */
+.cf-wrap{position:relative;display:inline-block;}
+.cf-btn{display:flex;align-items:center;gap:8px;justify-content:space-between;text-align:left;font-size:13px;font-weight:600;color:#1a150d;background:#fff;border:1.5px solid #e2d9c8;border-radius:12px;padding:10px 12px;cursor:pointer;transition:border-color .15s,box-shadow .15s;font-family:inherit;line-height:1.3;}
 .cf-btn:hover{border-color:#b9ac95;}
 .cf-btn.open{border-color:var(--cf-accent,#4a7a2e);box-shadow:0 0 0 3px var(--cf-accent-soft,rgba(74,122,46,.15));}
 .cf-btn:disabled{background:#f4f1ea;color:#9c8f7a;cursor:not-allowed;}
@@ -156,9 +157,21 @@ select.cf-native-hidden{display:none!important;}
 
         const wrap = document.createElement('div');
         wrap.className = 'cf-wrap';
+        // width:100% inline, not in the shared .cf-wrap/.cf-btn class rule —
+        // several pages already had their OWN hand-built .cf-* dropdown
+        // (same class names) with its own width (operation_booking.html's
+        // AL filter is md:w-48, a fixed 192px). A width in the shared class
+        // rule has equal specificity to that page's own .cf-btn rule, and
+        // since this stylesheet loads after the page's own <style>, it won
+        // every time regardless of the page's own width class — which is
+        // exactly what stretched that button to fill its row. Setting it
+        // inline instead only touches the elements THIS function creates,
+        // so a page's own pre-existing cf-* widget keeps its own sizing.
+        wrap.style.width = '100%';
         const btn = document.createElement('button');
         btn.type = 'button';
         btn.className = 'cf-btn';
+        btn.style.width = '100%';
         btn.disabled = select.disabled;
         btn.innerHTML = `<span class="cf-btn-label"></span>
 <svg class="cf-chevron" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M5 7l5 5 5-5"/></svg>`;

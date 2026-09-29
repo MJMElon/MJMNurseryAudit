@@ -185,31 +185,34 @@ input.input:focus{border-color:var(--green);background:var(--card);
 .tbtn-primary{background:var(--pn);border-color:var(--pn);color:#fff}
 .tbtn-primary:hover{background:#144a14;border-color:#144a14;color:#fff}
 
-/* ── REPORT HEADER (the letterhead) ── */
+/* ── REPORT HEADER (the letterhead) ──
+   Just the title/period/generated line now — no MJM Nursery wordmark or
+   company address. This report only ever opens inside the admin portal
+   that already says whose system it is; the logo was wording a reader
+   here doesn't need repeated back at them. */
 .report-header{background:var(--card);border:1px solid var(--line);border-radius:var(--r-lg);
-               padding:26px 20px;margin-bottom:14px;text-align:center;
+               padding:14px 20px;margin-bottom:14px;text-align:center;
                box-shadow:0 1px 3px rgba(16,40,60,.05)}
-.report-logo{font-size:26px;font-weight:800;color:var(--pn);letter-spacing:-.4px}
-.report-logo span{color:var(--green)}
-.report-company{font-size:10px;font-weight:700;color:var(--ink3);margin-top:4px;
-                text-transform:uppercase;letter-spacing:1.2px}
-.report-title{font-family:'DM Serif Display',serif;font-size:26px;color:var(--ink);
-              margin-top:14px;line-height:1.2}
+.report-title{font-family:'DM Serif Display',serif;font-size:22px;color:var(--ink);
+              line-height:1.2}
 .report-period{font-size:13px;font-weight:700;color:var(--ink2);margin-top:5px}
-.report-generated{font-size:10.5px;color:var(--ink3);margin-top:7px}
+.report-generated{font-size:10.5px;color:var(--ink3);margin-top:5px}
 
 /* ── SUMMARY ──
    auto-fit again: five figures across on a desk, two across on a phone.
    132 rather than a rounder 150 because five is the real count — at 150
    the fifth card dropped onto a row of its own on a tablet, which reads
-   as a sixth figure that failed to load rather than as a wrap. */
-.summary-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(132px,1fr));
-             gap:12px;margin-bottom:14px}
-.sum-card{background:var(--card);border:1px solid var(--line);border-radius:var(--r-lg);
-          padding:18px 14px;text-align:center;box-shadow:0 1px 3px rgba(16,40,60,.05)}
-.sum-val{font-size:32px;font-weight:900;color:var(--pn);line-height:1;font-variant-numeric:tabular-nums}
-.sum-label{font-size:9.5px;font-weight:800;color:var(--ink3);text-transform:uppercase;
-           letter-spacing:.9px;margin-top:7px}
+   as a sixth figure that failed to load rather than as a wrap. Cards
+   shrunk down from a 32px-figure showpiece to a plain compact stat — five
+   of them used to run to their own tall row before a single table row of
+   real data appeared underneath. */
+.summary-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));
+             gap:8px;margin-bottom:14px}
+.sum-card{background:var(--card);border:1px solid var(--line);border-radius:var(--r-md);
+          padding:8px 10px;text-align:center;box-shadow:0 1px 3px rgba(16,40,60,.05)}
+.sum-val{font-size:19px;font-weight:900;color:var(--pn);line-height:1;font-variant-numeric:tabular-nums}
+.sum-label{font-size:8.5px;font-weight:800;color:var(--ink3);text-transform:uppercase;
+           letter-spacing:.8px;margin-top:3px}
 
 /* ── NURSERY SECTION ── */
 .mod-section{background:var(--card);border:1px solid var(--line);border-radius:var(--r-lg);
@@ -332,8 +335,7 @@ body.is-full #btn-full{display:none}
 
 @media (max-width:640px){
   .content{padding:16px 14px 3rem}
-  .report-title{font-size:22px}
-  .sum-val{font-size:26px}
+  .report-title{font-size:19px}
   .mod-head{padding:14px 15px}
   .filter-card{padding:15px}
   .tbtn{flex:1;justify-content:center;padding:0 12px}
@@ -692,10 +694,23 @@ const MOD_COLS={
   ]
 };
 
+// Plot then Batch, both ascending — rows otherwise came back in whatever
+// order Supabase happened to return them (newest-entered first in
+// practice), which read as plot DESCENDING (B14, B12, B11, …) rather than
+// the field-walk order B01, B02, B03, … an auditor actually reads a
+// nursery in. Numeric-aware compare so B2 sorts before B10, not after it;
+// papan's batch column is batch_no, maintenance has no batch at all — ??
+// falls through to plot-only ordering for that one.
+function _auditPlotBatchSort(rows){
+  const natCmp=(a,b)=>String(a??'').localeCompare(String(b??''),undefined,{numeric:true,sensitivity:'base'});
+  return rows.slice().sort((a,b)=>natCmp(a.plot,b.plot)||natCmp(a.batch??a.batch_no,b.batch??b.batch_no));
+}
+
 function buildModTable(mod, rows){
   if(!rows||!rows.length) return '<div class="no-data">No records found.</div>';
   const cols=MOD_COLS[mod];
   if(!cols) return '<div class="no-data">No records found.</div>';
+  rows=_auditPlotBatchSort(rows);
 
   const head='<tr>'+cols.map(c=>`<th>${esc(c.h)}</th>`).join('')+'</tr>';
   let body='';
@@ -803,8 +818,6 @@ async function generateReport(){
 
     document.getElementById('report-output').innerHTML=`
       <div class="report-header">
-        <div class="report-logo">MJM <span>Nursery</span></div>
-        <div class="report-company">Mega Jutamas Sdn Bhd · Miri, Sarawak</div>
         <div class="report-title">Monthly Audit Report</div>
         <div class="report-period">${periodStr} · ${nurseryLabel}${plotQuery?' · Plot: '+esc(plotQuery):''}</div>
         <div class="report-generated">Generated: ${now.toLocaleString('en-MY',{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'})}</div>

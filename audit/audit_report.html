@@ -52,16 +52,19 @@
    ══════════════════════════════════════════════════════════════════ */
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{
-  --bg:#f1f5f9; --card:#fff; --line:#e6ecf2;
-  --ink:#16323f; --ink2:#5b7280; --ink3:#94a7b4;
-  --green:#22a34a;
-  /* The module hues, unchanged — they are what the badges, the summary
-     figures and the two nursery headers are colour-coded by, and they
-     match the module cards on the manage page. */
+  /* Operation Reports' own palette (operation/operation_reports.html) —
+     cream ground, brown ink, tan hairlines, olive accent — swapped in for
+     this page's former slate/admin one so the two report screens read as
+     one system. The module hues below are untouched: badges, summary
+     figures and the two nursery headers are colour-coded by THOSE, not by
+     the neutral tokens being replaced here. */
+  --bg:#f8f4ec; --card:#fdfaf4; --line:#e8dcc8;
+  --ink:#1a150d; --ink2:#3d2610; --ink3:#8a7a68;
+  --green:#4a7a2e;
   --pn:#1a5c1a; --mn:#1565c0; --papan:#e65100; --maint:#880e4f;
   --r-md:12px; --r-lg:16px;
 }
-html,body{min-height:100%;font-family:'DM Sans',sans-serif;font-size:16px;
+html,body{min-height:100%;font-family:'Outfit',system-ui,sans-serif;font-size:16px;
           background:var(--bg);color:var(--ink);-webkit-font-smoothing:antialiased}
 #app{min-height:100vh;background:var(--bg)}
 
@@ -73,12 +76,36 @@ html,body{min-height:100%;font-family:'DM Sans',sans-serif;font-size:16px;
 .section-head{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;
               color:var(--ink3);padding-left:2px}
 
-/* ── FILTERS ── */
-.filter-card{background:var(--card);border:1px solid var(--line);border-radius:var(--r-lg);
-             padding:18px 18px 16px;box-shadow:0 1px 3px rgba(16,40,60,.05);margin-bottom:24px}
-/* auto-fit, so the three selects sit in a row on a desk and stack on a
-   phone without a breakpoint having to name either case. */
-.filter-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:14px}
+/* ── FILTERS ──
+   Left accent bar + a bigger radius — Operation Reports' own glass-panel
+   treatment (border-left:12px solid #6aa83c, rounded-[2rem]) on its filter
+   card, ported here at a scale that still fits a plain border/box-shadow
+   card rather than that page's backdrop-blur one. */
+.filter-card{background:var(--card);border:1px solid var(--line);border-left:10px solid var(--green);
+             border-radius:1.75rem;padding:20px 22px 18px;box-shadow:0 1px 3px rgba(16,40,60,.05);
+             margin-bottom:24px}
+/* Month/Year narrow and fixed — a month name and a four-digit year never
+   need a 210px-wide column — Nursery sized to exactly fit its four chips
+   on one line (max-content, not 1fr, so it doesn't stretch or wrap), and
+   Plot takes whatever's left over. All four in the one row on a desk;
+   the 900px query below falls back to the old auto-fit wrap for anything
+   narrower. */
+.filter-grid{display:grid;grid-template-columns:130px 100px max-content minmax(200px,260px);gap:16px;align-items:end}
+@media (max-width:900px){
+  .filter-grid{grid-template-columns:repeat(auto-fit,minmax(210px,1fr))}
+}
+/* Second row: Modules to Include on the left, Generate Report on the
+   right, bottoms aligned — one balanced row instead of a label row, a
+   chip row and a button floating centred in white space below them.
+   A hairline above separates "what to report on" from "what to include
+   and go". On a phone the two stack and the button centres itself. */
+.filter-actions{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;
+                flex-wrap:wrap;margin-top:16px;padding-top:16px;border-top:1px solid var(--line)}
+.filter-actions .btn-generate{margin:0}
+@media (max-width:900px){
+  .filter-actions{flex-direction:column;align-items:stretch}
+  .filter-actions .btn-generate{align-self:center}
+}
 .filter-label{font-size:10px;font-weight:800;color:var(--ink3);text-transform:uppercase;
               letter-spacing:1px;margin-bottom:6px}
 .select-wrap{position:relative}
@@ -91,26 +118,44 @@ select.input{width:100%;height:44px;padding:0 34px 0 13px;font-size:13.5px;font-
              -webkit-appearance:none;appearance:none}
 select.input:hover{background:#eef3f8}
 select.input:focus{border-color:var(--green);background:var(--card);
-                   box-shadow:0 0 0 3px rgba(34,163,74,.12)}
+                   box-shadow:0 0 0 3px rgba(74,122,46,.15)}
+/* The Plot search box — same look as the selects above it, minus the
+   dropdown-arrow bits that only make sense on a <select>. */
+input.input{width:100%;height:44px;padding:0 13px;font-size:13.5px;font-weight:600;
+            font-family:inherit;border:1px solid var(--line);border-radius:var(--r-md);
+            background:#f8fafc;color:var(--ink);outline:none}
+input.input::placeholder{color:var(--ink3);font-weight:600}
+input.input:hover{background:#eef3f8}
+input.input:focus{border-color:var(--green);background:var(--card);
+                  box-shadow:0 0 0 3px rgba(74,122,46,.15)}
 
-.mod-checks{display:flex;flex-wrap:wrap;gap:8px}
-.mod-check{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:700;
-           color:var(--ink2);cursor:pointer;background:#f8fafc;border:1px solid var(--line);
-           padding:8px 14px;border-radius:999px;transition:background .15s,color .15s,border-color .15s;
+/* Tick chips — Month/Year stay plain selects, but Nursery (Pre-Nursery /
+   BNN / UNN 1 / UNN 2) and Modules to Include are both multi-select-by-
+   ticking now, in the one shared style: a real checkbox in a pill, same as
+   the Locations chips on Operation Reports (operation_reports.html's own
+   .nursery-chip) — not the old borderless colour-swap pill neither row
+   used to be a checkbox at all. */
+.tick-row{display:flex;flex-wrap:wrap;gap:8px}
+.tick-chip{display:inline-flex;align-items:center;gap:7px;font-size:12px;font-weight:700;
+           color:var(--ink2);cursor:pointer;background:#fff;border:1.5px solid var(--line);
+           padding:8px 14px;border-radius:10px;transition:background .15s,border-color .15s;
            -webkit-tap-highlight-color:transparent;user-select:none}
-.mod-check:hover{background:#eef3f8}
-.mod-check.checked{background:var(--pn);color:#fff;border-color:var(--pn)}
+.tick-chip:hover{background:#f5f0e4}
+.tick-chip:has(input:checked){background:#e8f5da;border-color:var(--green)}
+.tick-chip input{accent-color:var(--green)}
 
 /* Same block as the manage page's "Visit 555 Auditor Portal" — this is the
-   one thing to press on the card, and it should look like it. */
-.btn-generate{display:flex;align-items:center;justify-content:center;gap:9px;width:100%;
-              margin-top:18px;padding:15px 22px;border:none;border-radius:var(--r-lg);
-              background:linear-gradient(135deg,#2f9c4f,#1b6b32);color:#fff;font-family:inherit;
-              font-weight:900;font-size:13px;letter-spacing:.1em;text-transform:uppercase;
-              cursor:pointer;box-shadow:0 10px 26px -8px rgba(27,107,50,.5);transition:all .15s}
-.btn-generate:hover{transform:translateY(-1px);box-shadow:0 14px 30px -8px rgba(27,107,50,.55)}
+   one thing to press on the card, and it should look like it. Sized to its
+   own content and centred, not a full-width bar — the filter card already
+   makes clear it's the only action on it. */
+.btn-generate{display:flex;align-items:center;justify-content:center;gap:8px;width:fit-content;
+              margin:18px auto 0;padding:10px 22px;border:none;border-radius:var(--r-md);
+              background:linear-gradient(135deg,#6aa83c,#4a7a2e);color:#fff;font-family:inherit;
+              font-weight:900;font-size:11px;letter-spacing:.08em;text-transform:uppercase;
+              cursor:pointer;box-shadow:0 8px 20px -4px rgba(74,122,46,.5);transition:all .15s}
+.btn-generate:hover{transform:translateY(-1px);box-shadow:0 12px 24px -6px rgba(74,122,46,.55)}
 .btn-generate:active{transform:translateY(1px)}
-.btn-generate svg{width:17px;height:17px;fill:none;stroke:currentColor;stroke-width:2.2;
+.btn-generate svg{width:14px;height:14px;fill:none;stroke:currentColor;stroke-width:2.2;
                   stroke-linecap:round;stroke-linejoin:round}
 
 /* The filter card folds away once a report is on screen — on a phone it is
@@ -388,28 +433,39 @@ body.is-full #btn-full{display:none}
           </div>
           <div>
             <div class="filter-label">Nursery</div>
-            <div class="select-wrap">
-              <select class="input" id="f-nursery" aria-label="Nursery">
-                <option value="both">Pre Nursery + Main Nursery (All)</option>
-                <option value="pn">Pre Nursery only</option>
-                <option value="mn">Main Nursery only</option>
-              </select>
+            <!-- No `checked` — Nursery, Modules and Plot below all start
+                 empty now (see generateReport()'s own guard), so a report
+                 is always what was deliberately ticked/typed, never
+                 whatever happened to be preselected. -->
+            <div class="tick-row" id="f-nursery-chips">
+              <label class="tick-chip"><input type="checkbox" class="f-nurs-cb" value="PN">Pre-Nursery</label>
+              <label class="tick-chip"><input type="checkbox" class="f-nurs-cb" value="BNN">BNN</label>
+              <label class="tick-chip"><input type="checkbox" class="f-nurs-cb" value="UNN1">UNN 1</label>
+              <label class="tick-chip"><input type="checkbox" class="f-nurs-cb" value="UNN2">UNN 2</label>
             </div>
+          </div>
+          <div>
+            <div class="filter-label">Plot</div>
+            <input class="input" id="f-plot" type="text" placeholder="e.g. P10, B7…" autocomplete="off"
+                   aria-label="Plot number">
           </div>
         </div>
 
-        <div class="filter-label" style="margin:16px 0 8px">Modules to Include</div>
-        <div class="mod-checks">
-          <label class="mod-check checked" onclick="toggleMod(this,'plot')">📋 Plot Condition</label>
-          <label class="mod-check checked" onclick="toggleMod(this,'height')">📏 Seedling Height</label>
-          <label class="mod-check checked" onclick="toggleMod(this,'papan')">🪧 Papan Tanda</label>
-          <label class="mod-check checked" onclick="toggleMod(this,'maint')">🔧 Maintenance</label>
+        <div class="filter-actions">
+          <div>
+            <div class="filter-label" style="margin:0 0 8px">Modules to Include</div>
+            <div class="tick-row">
+              <label class="tick-chip"><input type="checkbox" class="mod-cb" onchange="toggleMod(this,'plot')">📋 Plot Condition</label>
+              <label class="tick-chip"><input type="checkbox" class="mod-cb" onchange="toggleMod(this,'height')">📏 Seedling Height</label>
+              <label class="tick-chip"><input type="checkbox" class="mod-cb" onchange="toggleMod(this,'papan')">🪧 Papan Tanda</label>
+              <label class="tick-chip"><input type="checkbox" class="mod-cb" onchange="toggleMod(this,'maint')">🔧 Maintenance</label>
+            </div>
+          </div>
+          <button class="btn-generate" onclick="generateReport()">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+            <span>Generate Report</span>
+          </button>
         </div>
-
-        <button class="btn-generate" onclick="generateReport()">
-          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
-          <span>Generate Report</span>
-        </button>
       </div>
     </div>
 
@@ -470,10 +526,26 @@ let toastTimer=null;
 function showToast(msg){const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');clearTimeout(toastTimer);toastTimer=setTimeout(()=>t.classList.remove('show'),2800);}
 function setLoading(on){document.getElementById('loading-overlay').classList.toggle('hidden',!on);}
 
-const selectedMods=new Set(['plot','height','papan','maint']);
-function toggleMod(el,mod){
-  if(selectedMods.has(mod)){if(selectedMods.size===1){showToast('⚠ At least one module required');return;}selectedMods.delete(mod);el.classList.remove('checked');}
-  else{selectedMods.add(mod);el.classList.add('checked');}
+// Starts empty — Nursery, Modules and Plot all start unset now (see the
+// markup's own comment), so nothing is presumed picked until a report is
+// actually generated. generateReport() is what enforces "at least one
+// module" and "at least one nursery", not the tick itself — ticking or
+// unticking any one of these is otherwise unconstrained.
+const selectedMods=new Set();
+// cb is the checkbox itself now (see the .tick-chip markup) — its own
+// .checked is the state, not a class toggled by hand on the label.
+function toggleMod(cb,mod){
+  if(cb.checked) selectedMods.add(mod); else selectedMods.delete(mod);
+}
+
+// Nursery — Pre-Nursery / BNN / UNN 1 / UNN 2 — same tick-chip idea as
+// Modules above, replacing the old three-way "both/pn/mn" select with one
+// checkbox per nursery so any combination can be picked, not just the
+// three the select happened to offer. Read straight off the DOM at
+// generate time — no separate Set to keep in sync the way selectedMods
+// needs one.
+function selectedAuditNurseries(){
+  return [...document.querySelectorAll('.f-nurs-cb:checked')].map(cb=>cb.value);
 }
 
 /* ── FILTERS FOLD AWAY ──
@@ -561,6 +633,18 @@ async function fetchData(month,year){
 
 function filterByNursery(rows,nurseries){
   return(rows||[]).filter(r=>nurseries.includes(r.nursery));
+}
+
+// The Plot search box (#f-plot) — a case-insensitive substring match on
+// each row's own plot field, every module table carries one. Empty query
+// means no filter at all, same "nothing typed = show everything" rule the
+// Nursery/Module ticks don't get (those default empty and mean "show
+// nothing" until picked — a search box works the other way round).
+function filterByPlot(rows,query){
+  if(!query) return rows||[];
+  const q=query.trim().toLowerCase();
+  if(!q) return rows||[];
+  return(rows||[]).filter(r=>String(r.plot||'').toLowerCase().includes(q));
 }
 
 /* ── COLUMNS ──
@@ -658,28 +742,46 @@ function buildNurserySection(label, sub, headClass, data, nurseries){
 }
 
 async function generateReport(){
+  // Nursery and Modules both start untied to anything — see their markup's
+  // own comment — so a click with nothing ticked in either is "forgot to
+  // pick", not "meant everything". Caught here rather than by re-ticking a
+  // checkbox on uncheck (which would have made "nothing ticked" an
+  // impossible state to ever be in, including the moment the page loads).
+  if(selectedMods.size===0){showToast('⚠ Select at least one module');return;}
+  const tickedNurseries=selectedAuditNurseries();
+  if(tickedNurseries.length===0){showToast('⚠ Select at least one nursery');return;}
+
   const month=parseInt(document.getElementById('f-month').value);
   const year=parseInt(document.getElementById('f-year').value);
-  const nurseryFilter=document.getElementById('f-nursery').value;
+  const plotQuery=document.getElementById('f-plot').value.trim();
+  // Whichever of Pre-Nursery/BNN/UNN1/UNN2 are ticked (see the tick-chip
+  // row) — Main Nursery is no longer all-or-nothing: BNN can be included
+  // without UNN1/UNN2, same as PN can sit alongside just one of them.
+  const showPN=tickedNurseries.includes('PN');
+  const mnNurseries=MN_NURSERIES.filter(n=>tickedNurseries.includes(n));
+  const showMN=mnNurseries.length>0;
   const periodStr=`${MONTHS[month-1]} ${year}`;
   setLoading(true);
   try{
     const data=await fetchData(month,year);
-    const showPN=nurseryFilter==='both'||nurseryFilter==='pn';
-    const showMN=nurseryFilter==='both'||nurseryFilter==='mn';
+    // Plot search narrows every module's rows before anything downstream
+    // (summary counts, the nursery-section tables) ever sees them, so
+    // there's exactly one place this filter has to be applied.
+    if(plotQuery) for(const m of ['plot','height','papan','maint']) if(data[m]) data[m]=filterByPlot(data[m],plotQuery);
     const countAll=(d,n)=>[...selectedMods].reduce((s,m)=>s+(filterByNursery(d[m],n).length),0);
     const pnTotal=showPN?countAll(data,PN_NURSERIES):0;
-    const mnTotal=showMN?countAll(data,MN_NURSERIES):0;
+    const mnTotal=showMN?countAll(data,mnNurseries):0;
     const grandTotal=pnTotal+mnTotal;
     const now=new Date();
-    const nurseryLabel=nurseryFilter==='pn'?'Pre Nursery':nurseryFilter==='mn'?'Main Nursery':'All Nurseries';
+    const nurseryLabel = (showPN && mnNurseries.length===MN_NURSERIES.length) ? 'All Nurseries'
+      : [...(showPN?['Pre Nursery']:[]), ...mnNurseries].join(', ');
 
     // Count per module across selected nurseries
-    const selectedNurseries = [...(showPN?PN_NURSERIES:[]), ...(showMN?MN_NURSERIES:[])];
-    const plotTotal   = filterByNursery(data.plot||[],   selectedNurseries).length;
-    const heightTotal = filterByNursery(data.height||[], selectedNurseries).length;
-    const papanTotal  = filterByNursery(data.papan||[],  selectedNurseries).length;
-    const maintTotal  = filterByNursery(data.maint||[],  selectedNurseries).length;
+    const countedNurseries = [...(showPN?PN_NURSERIES:[]), ...mnNurseries];
+    const plotTotal   = filterByNursery(data.plot||[],   countedNurseries).length;
+    const heightTotal = filterByNursery(data.height||[], countedNurseries).length;
+    const papanTotal  = filterByNursery(data.papan||[],  countedNurseries).length;
+    const maintTotal  = filterByNursery(data.maint||[],  countedNurseries).length;
 
     let summaryCards=`<div class="sum-card"><div class="sum-val">${fmtNum(grandTotal)}</div><div class="sum-label">Total Audits</div></div>`;
     if(selectedMods.has('plot'))   summaryCards+=`<div class="sum-card"><div class="sum-val" style="color:var(--pn)">${fmtNum(plotTotal)}</div><div class="sum-label">Plot Condition</div></div>`;
@@ -689,14 +791,22 @@ async function generateReport(){
 
     let sections='';
     if(showPN) sections+=buildNurserySection('Pre Nursery (PN)','Plots P01 – P52','mod-head-pn',data,PN_NURSERIES);
-    if(showMN) sections+=buildNurserySection('Main Nursery (BNN + UNN1 + UNN2)','B01–B14 · U01–U18 · N01–N20','mod-head-mn',data,MN_NURSERIES);
+    if(showMN){
+      // Range shown under the heading follows whichever of BNN/UNN1/UNN2
+      // actually made it in, not always all three.
+      const MN_RANGES={BNN:'B01–B14',UNN1:'U01–U18',UNN2:'N01–N20'};
+      sections+=buildNurserySection(
+        `Main Nursery (${mnNurseries.join(' + ')})`,
+        mnNurseries.map(n=>MN_RANGES[n]).join(' · '),
+        'mod-head-mn',data,mnNurseries);
+    }
 
     document.getElementById('report-output').innerHTML=`
       <div class="report-header">
         <div class="report-logo">MJM <span>Nursery</span></div>
         <div class="report-company">Mega Jutamas Sdn Bhd · Miri, Sarawak</div>
         <div class="report-title">Monthly Audit Report</div>
-        <div class="report-period">${periodStr} · ${nurseryLabel}</div>
+        <div class="report-period">${periodStr} · ${nurseryLabel}${plotQuery?' · Plot: '+esc(plotQuery):''}</div>
         <div class="report-generated">Generated: ${now.toLocaleString('en-MY',{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'})}</div>
       </div>
       <div class="summary-row">${summaryCards}</div>

@@ -50,24 +50,38 @@
     return String(s == null ? '' : s).split(/[,;/|]+/).map(batchKey).filter(Boolean);
   }
 
-  /* ── THE MAIN NURSERY MOVEMENT REPORT, AND NOTHING ELSE ─────────────────
+  /* ── WHAT A WORK RECORD'S PLOT AND BATCH IS WORTH ───────────────────────
 
-     One number for a plot and batch, and it is the one the report prints:
+     The Main Nursery Movement Report's Balance column, as at the work date,
+     less any 2nd culling that had happened by then.
 
        Balance = transplanted from PN + transfer in
                - sold - 3rd culled - transfer out + stock adjustment
+               - 2nd culled
 
-     That is MOVE_COLS.main in operation_reports.html, column for column.
-     Every other transaction type has no column there and takes no part here:
-     the 1st and 2nd cullings and Planted are pre-nursery, and Seed Damage
-     never entered a tray to be lost from one.
+     The first line is MOVE_COLS.main in operation_reports.html, column for
+     column. The second is this file's own, and is the difference between
+     this number and the report's: the report leaves the 2nd culling out
+     because it is Tab 6's running snapshot of a batch working through the
+     3rd culling, but a worker spraying the plot the morning after a 2nd
+     culling is spraying what is left, not what was there before it.
 
-     Two of those columns carry a condition, applied where the events are
-     built rather than here, because both need the remark:
-       · a 3rd culling counts only once the drone map has been keyed
-         (MapQty:) — until the plot has been flown the figure is a claim;
-       · a stock calibration counts only once [APPROVED …], and keeps its
-         own sign.
+     THE PHONE'S BATCH LIST DOES NOT DO THIS. shared_plot_batch_balance is
+     the report exactly, so the batches offered for a plot and the figure
+     beside each match the report row for row. The two are different
+     questions and the answers differ by the dead count; that is deliberate.
+
+     Worked example — U1 batch 250, 100 transplanted, 2nd culled 10 Sep with
+     5 dead, 25 sold on the 18th:
+         work on  1 Sep → 100   nothing has happened yet
+         work on 11 Sep →  95   the 5 dead are off
+         work on 18 Sep →  70   and the 25 sold, the same day counting
+         work on 28 Sep →  70   nothing since
+
+     Two columns carry the report's own condition, applied where the events
+     are built because both need the remark: a 3rd culling counts only once
+     the drone map has been keyed (MapQty:) — until the plot has been flown
+     the figure is a claim — and a stock calibration only once [APPROVED …].
 
      Stock_Calibration is already signed when it reaches here — a Found is
      positive, a Stolen negative — so it is returned as given rather than
@@ -80,7 +94,8 @@
       // splits it so the plot it arrived at gains and the one it left loses.
       case 'Cull3_Transfer_In':
         return Math.abs(q);
-      case '3rd_Culling': case 'Sold': case 'Cull3_Transfer_Out':
+      case '3rd_Culling': case '2nd_Culling': case 'Sold':
+      case 'Cull3_Transfer_Out':
         return -Math.abs(q);
       case 'Stock_Calibration':
         return q;
@@ -120,7 +135,7 @@
       const [logsRes, dosRes] = await Promise.all([
         fetchAll(() => supabase.from('shared_inventory_logs')
           .select('transaction_type, transaction_date, created_at, remark, plot_name, batch_name, quantity_change')
-          .in('transaction_type', ['Transplanted', '3rd_Culling',
+          .in('transaction_type', ['Transplanted', '2nd_Culling', '3rd_Culling',
               // A transfer plot (-R) is filled entirely by these. Without them
               // such a plot has no movement at all, and every quantity on it
               // reads as a dash.
@@ -205,9 +220,9 @@
     }
   }
 
-  /* What the report's Balance column says for one plot and batch, up to a
-     date. Every event already carries the report's own sign, and the ones
-     it does not count never became events, so this is a plain sum. */
+  /* What one plot and batch is worth, up to a date. Every event already
+     carries its own sign and the ones that take no part never became
+     events, so this is a plain sum. */
   function liveCount(evs) {
     return evs.reduce((sum, e) => sum + signed(e.type, e.qty), 0);
   }

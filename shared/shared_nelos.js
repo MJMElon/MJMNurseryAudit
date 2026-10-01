@@ -635,8 +635,55 @@
     return total;
   }
 
+  /* ════════════════════════════════════════════════════════════════
+     A CASE ONE MODULE HAS FILLED IN, HANDED TO THE NELOS FORM
+
+     The form lives on the Nelos page, and most of a prefill fits in the
+     query string — which is how the To-Do widget's "new case" link has
+     always worked. A PHOTO does not fit in a query string, and a module
+     that draws the sheet the case is about has one to attach.
+
+     So the answers travel in sessionStorage instead: same origin, same tab,
+     gone when the tab is, and big enough for a picture. TAKEN ONCE, because
+     a reload of the Nelos page must not re-open a form somebody closed, and
+     thrown away when it is stale, because a hand-off nobody followed is not
+     an instruction five minutes later.
+     ════════════════════════════════════════════════════════════════ */
+  const HANDOFF_KEY = 'mjm_nelos_prefill';
+  const HANDOFF_TTL = 2 * 60 * 1000;
+
+  /* Put a filled-in case where the Nelos form will find it, then send the
+     person there. Returns false when the browser will not keep it, so a
+     caller can still navigate with whatever fits in the link. */
+  function handOff(data) {
+    try {
+      sessionStorage.setItem(HANDOFF_KEY,
+        JSON.stringify(Object.assign({ at: Date.now() }, data || {})));
+      return true;
+    } catch (e) {
+      console.warn('[nelos] the case could not be handed over:', e);
+      return false;
+    }
+  }
+
+  /* The form's side of it. Removes what it reads, whatever it decides. */
+  function takeHandOff() {
+    let raw = null;
+    try {
+      raw = sessionStorage.getItem(HANDOFF_KEY);
+      sessionStorage.removeItem(HANDOFF_KEY);
+    } catch (_) { return null; }
+    if (!raw) return null;
+    try {
+      const d = JSON.parse(raw);
+      if (!d || !d.at || Date.now() - d.at > HANDOFF_TTL) return null;
+      return d;
+    } catch (_) { return null; }
+  }
+
   const api = {
     init, raise, pending, countPending, mountTodo,
+    handOff, takeHandOff,
     scope, inScope, applyScope,
     homeHref, caseHref,
     PENDING, PRIORITY_LABEL, STATUS_LABEL, SOURCE_LABEL, PRIORITY_RANK,

@@ -220,17 +220,48 @@
     }
   }
 
+  /* ── INTERROW SPRAYING COUNTS WHAT WAS THERE BEFORE THE 2ND CULLING ─────
+
+     Every other job is paid on what is standing: spraying P & D, manuring and
+     weeding all happen TO the seedlings, so a batch 2nd culled the week before
+     is that many fewer to treat.
+
+     Interrow spraying is not done to the seedlings. It is the ground BETWEEN
+     the rows, and a 2nd culling takes the dead seedling out of a polybag that
+     is still sitting exactly where it was — same rows, same gaps, same walk,
+     same spray. So the quantity for an interrow row is the one BEFORE the 2nd
+     culling comes off, and the office has been keying it over by hand on every
+     interrow row of every plot.
+
+     It is the quantity, so it is also the piece-rate money: this is read by
+     the Work Maintenance list, the Worker Record capacity totals and the
+     payroll salary claim alike, which is why the rule lives here rather than
+     in any one of them.
+
+     The maintenance list writes "Meracun rumput secara selingan"; anything
+     carrying the word interrow is the same job under another spelling. */
+  function isInterrow(jenis) {
+    const s = String(jenis == null ? '' : jenis).toLowerCase();
+    return s.indexOf('rumput secara selingan') >= 0 || s.indexOf('interrow') >= 0;
+  }
+
   /* What one plot and batch is worth, up to a date. Every event already
      carries its own sign and the ones that take no part never became
-     events, so this is a plain sum. */
-  function liveCount(evs) {
-    return evs.reduce((sum, e) => sum + signed(e.type, e.qty), 0);
+     events, so this is a plain sum.
+
+     opts.keepCull2 leaves the 2nd culling standing — see isInterrow above. */
+  function liveCount(evs, opts) {
+    const keep2 = !!(opts && opts.keepCull2);
+    return evs.reduce((sum, e) => {
+      if (keep2 && e.type === '2nd_Culling') return sum;
+      return sum + signed(e.type, e.qty);
+    }, 0);
   }
 
   /* The linked quantity for one work record.
      Returns null when it cannot be resolved (data not loaded, no plot, or the
      plot/batch has no movement at all) so the caller can fall back gracefully. */
-  function linkedQty(plot, batchStr, tarikh) {
+  function linkedQty(plot, batchStr, tarikh, opts) {
     if (!_ready || !_events || !plot) return null;
     const pk = plotKey(plot);
     if (!pk) return null;
@@ -248,12 +279,18 @@
       if (ev.ms > cutoff) continue;
       (per[ev.batchKey] ||= { evs: [], label: ev.batch }).evs.push(ev);
     }
-    Object.values(per).forEach(b => { b.closing = liveCount(b.evs); });
+    const keep2 = !!(opts && opts.keepCull2);
+    Object.values(per).forEach(b => { b.closing = liveCount(b.evs, opts); });
 
     const keys = Object.keys(per);
     if (!keys.length) return null;
-    let raw = 0;
-    keys.forEach(k => { raw += per[k].closing; });
+    let raw = 0, cull2 = 0;
+    keys.forEach(k => {
+      raw += per[k].closing;
+      per[k].evs.forEach(e => {
+        if (e.type === '2nd_Culling') cull2 += Math.abs(Number(e.qty || 0));
+      });
+    });
     return {
       // NOT floored at zero: the movement report shows a negative balance
       // because it is a figure to look into, and a work record quoting 0 for
@@ -262,15 +299,25 @@
       raw: Math.round(raw),
       batches: keys.map(k => per[k].label),
       allBatches: wanted.length === 0,
-      asOf: asOf == null ? null : tarikh
+      asOf: asOf == null ? null : tarikh,
+      /* How much 2nd culling this figure is carrying, and whether it was left
+         standing — so a screen can say WHY an interrow row reads higher than
+         the P & D row beside it on the same plot and the same day. */
+      cull2: Math.round(cull2),
+      keptCull2: keep2 && cull2 > 0
     };
   }
 
   /* Quantity shown for a record: a keyed value always wins; otherwise the
-     linked one. */
+     linked one.
+
+     The work type is read off the record here rather than asked for, so every
+     caller — the maintenance list, the capacity totals, the salary claim —
+     gets the interrow rule without having to know it exists. */
   function recQty(r) {
     if (r && (r.qty === 0 || r.qty)) return { value: Number(r.qty), linked: false };
-    const link = linkedQty(r && r.plot, r && r.batch, r && r.tarikh);
+    const opts = { keepCull2: isInterrow(r && (r.jenis || r.work_type)) };
+    const link = linkedQty(r && r.plot, r && r.batch, r && r.tarikh, opts);
     if (!link) return { value: null, linked: false };
     return { value: link.qty, linked: true, info: link };
   }
@@ -281,6 +328,6 @@
     error: () => _err,
     events: () => _events,
     parseDate, logDate, plotKey, batchKey, batchList,
-    signed, liveCount, linkedQty, recQty
+    signed, liveCount, linkedQty, recQty, isInterrow
   };
 })(window);

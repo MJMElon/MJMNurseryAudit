@@ -69,6 +69,38 @@
     return m ? parseInt(m[1], 10) : 0;
   }
 
+  /* THE CALENDAR WEEK A SCHEDULED ROW BELONGS TO, off the SLOT it came from.
+
+     The round LABEL used to be the week number, so reading "Round 3" off the
+     chemical told you both which round it was and which week it sat in. It no
+     longer does: a round is now numbered by its position among the weeks the
+     schedule actually uses, so a nursery spraying in weeks 1 and 3 has a
+     Round 1 and a Round 2.
+
+     The week is still the week, and it is in the slot — pd|W3|P|B1,
+     wd|R3|B1, mn|2|0|B2, ir|2|0|B1 — which nothing on the screen can edit.
+     Pairing a field record to an office row is a question about the WEEK the
+     work was done in, so it asks this and not the label.
+
+     A row with no slot is somebody's own, has no week, and falls back to its
+     label, which is the best guess available and what it has always done. */
+  function srcWeek(src) {
+    const parts = String(src || '').split('|');
+    const tag = parts[0], a = parts[1] || '';
+    if (tag === 'pd' || tag === 'wd') {            // 'W3' / 'R3'
+      const n = parseInt(a.replace(/[^0-9]/g, ''), 10);
+      return n >= 1 && n <= 4 ? n : 0;
+    }
+    if (tag === 'mn' || tag === 'ir') {            // 0-based slot index
+      const n = parseInt(a, 10);
+      return (n >= 0 && n <= 3) ? n + 1 : 0;
+    }
+    return 0;
+  }
+
+  /* The week to pair a row on: its slot's, else whatever its label says. */
+  const rowWeek = (r) => srcWeek(r && r._src) || recRound(r && r.racun);
+
   /* Which seven-day block of the month a date falls in — the 29th on is the
      4th, the same way the schedule's last round runs to the end of the month. */
   function weekOfDate(iso) {
@@ -177,7 +209,7 @@
     const pairs = {}, used = new Set();
     (records || []).forEach(r => {
       if (skipChecked && r.checked) return;
-      const week = recRound(r.racun);
+      const week = rowWeek(r);
       let key = week ? fieldKey(r.jenis, r.plot, week) : null;
       let g = key ? idx[key] : null;
       if (!g) {
@@ -228,7 +260,7 @@
   }
 
   global.MJMMaintField = {
-    JENIS, plotKey, chemKey, recRound, weekOfDate, isoMonthLabel,
+    JENIS, plotKey, chemKey, recRound, srcWeek, rowWeek, weekOfDate, isoMonthLabel,
     fieldKey, fieldChemKey, credits, summarise, index, pair, creditsByRecord,
     nameKey, nameResolver
   };

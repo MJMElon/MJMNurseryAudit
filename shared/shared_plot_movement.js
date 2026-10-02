@@ -238,11 +238,27 @@
      payroll salary claim alike, which is why the rule lives here rather than
      in any one of them.
 
+     A BATCH KEYED ON THE ROW STILL DECIDES, interrow included. Interrow is
+     usually the whole plot — the worker walks the lot in one go — and leaving
+     the batch cell empty is how that is said, because empty has always meant
+     every batch standing there. But somebody who writes a batch on the row
+     has answered the question, and this does not overrule them: the rule
+     above is about the 2nd culling and nothing else.
+
      The maintenance list writes "Meracun rumput secara selingan"; anything
-     carrying the word interrow is the same job under another spelling. */
+     carrying the word interrow is the same job under another spelling. The job
+     is read off the record's JENIS and never off its chemical: the chemical
+     changes round to round — Monex one round, something else the next — and
+     says nothing about which job it is. */
   function isInterrow(jenis) {
     const s = String(jenis == null ? '' : jenis).toLowerCase();
     return s.indexOf('rumput secara selingan') >= 0 || s.indexOf('interrow') >= 0;
+  }
+
+  /* How a record's quantity is to be counted. One place, so the quantity, the
+     batch names and every caller agree. */
+  function qtyOpts(r) {
+    return { keepCull2: isInterrow(r && (r.jenis || r.work_type)) };
   }
 
   /* What one plot and batch is worth, up to a date. Every event already
@@ -297,7 +313,7 @@
       // the same plot and batch would be quietly disagreeing with it.
       qty: Math.round(raw),
       raw: Math.round(raw),
-      batches: keys.map(k => per[k].label),
+      batches: keys.map(k => per[k].label).sort((a, b) => String(a).localeCompare(String(b), 'en', { numeric: true })),
       allBatches: wanted.length === 0,
       asOf: asOf == null ? null : tarikh,
       /* How much 2nd culling this figure is carrying, and whether it was left
@@ -316,10 +332,29 @@
      gets the interrow rule without having to know it exists. */
   function recQty(r) {
     if (r && (r.qty === 0 || r.qty)) return { value: Number(r.qty), linked: false };
-    const opts = { keepCull2: isInterrow(r && (r.jenis || r.work_type)) };
-    const link = linkedQty(r && r.plot, r && r.batch, r && r.tarikh, opts);
+    const link = linkedQty(r && r.plot, r && r.batch, r && r.tarikh, qtyOpts(r));
     if (!link) return { value: null, linked: false };
     return { value: link.qty, linked: true, info: link };
+  }
+
+  /* WHICH BATCHES A RECORD COVERS.
+
+     An empty batch cell is not "unknown", it is EVERY batch standing on that
+     plot that day — that is what leaving it blank has always meant, and it is
+     what the quantity beside it is already counting. So the names are answered
+     from the ledger instead of drawn as a dash, which read as nobody knowing
+     while the answer sat in the batch report.
+
+     Keyed wins, exactly as the quantity does — for every job, interrow
+     included. */
+  function recBatches(r) {
+    const keyed = String((r && r.batch) || '').trim();
+    if (keyed) return { value: keyed, linked: false };
+    const link = linkedQty(r && r.plot, r && r.batch, r && r.tarikh, qtyOpts(r));
+    if (!link || !link.batches.length) return { value: keyed, linked: false };
+    const shown = link.batches.filter(b => b && b !== '—').join(', ');
+    if (!shown) return { value: keyed, linked: false };
+    return { value: shown, linked: shown !== keyed, info: link };
   }
 
   global.PlotMovement = {
@@ -328,6 +363,6 @@
     error: () => _err,
     events: () => _events,
     parseDate, logDate, plotKey, batchKey, batchList,
-    signed, liveCount, linkedQty, recQty, isInterrow
+    signed, liveCount, linkedQty, recQty, recBatches, isInterrow, qtyOpts
   };
 })(window);

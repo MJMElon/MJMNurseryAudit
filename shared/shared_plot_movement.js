@@ -330,11 +330,46 @@
      The work type is read off the record here rather than asked for, so every
      caller — the maintenance list, the capacity totals, the salary claim —
      gets the interrow rule without having to know it exists. */
+  /* ── CHECKED FREEZES THE FIGURE ──────────────────────────────────────
+
+     A linked quantity is a live sum of the batch ledger: a sale, a 3rd
+     culling, a stock adjustment on that plot all move it, and they move it
+     on rows that were settled months ago. Checked means the office has gone
+     through the row and agreed it. After that the figure must stop being a
+     formula and become a number — otherwise what was signed off is not what
+     anybody reads later, and the piece-rate money moves with it.
+
+     So checking a row writes what it was reading at that moment into
+     qtyFrozen, and unchecking throws it away and the link comes back. The
+     order is: a figure the office KEYED, then the frozen one, then the link.
+     Keyed still wins, because that was always somebody's own answer.
+
+     batchFrozen does the same for the batch names, which are drawn from the
+     same ledger and would otherwise go on changing under a settled row. */
   function recQty(r) {
     if (r && (r.qty === 0 || r.qty)) return { value: Number(r.qty), linked: false };
+    if (r && r.qtyFrozen != null && r.qtyFrozen !== '')
+      return { value: Number(r.qtyFrozen), linked: false, frozen: true };
     const link = linkedQty(r && r.plot, r && r.batch, r && r.tarikh, qtyOpts(r));
     if (!link) return { value: null, linked: false };
     return { value: link.qty, linked: true, info: link };
+  }
+
+  /* What to write into a row being checked, and nothing at all for a row
+     whose figure is already the office's own or cannot be resolved. Returns
+     the fields to set, so the caller does not have to know the names. */
+  function freezeFor(r) {
+    const out = {};
+    if (!r) return out;
+    if (!(r.qty === 0 || r.qty)) {
+      const link = linkedQty(r.plot, r.batch, r.tarikh, qtyOpts(r));
+      if (link && link.qty != null) out.qtyFrozen = link.qty;
+    }
+    if (!String(r.batch || '').trim()) {
+      const b = recBatches(r);
+      if (b && b.linked && b.value) out.batchFrozen = b.value;
+    }
+    return out;
   }
 
   /* WHICH BATCHES A RECORD COVERS.
@@ -350,6 +385,8 @@
   function recBatches(r) {
     const keyed = String((r && r.batch) || '').trim();
     if (keyed) return { value: keyed, linked: false };
+    const frozen = String((r && r.batchFrozen) || '').trim();
+    if (frozen) return { value: frozen, linked: false, frozen: true };
     const link = linkedQty(r && r.plot, r && r.batch, r && r.tarikh, qtyOpts(r));
     if (!link || !link.batches.length) return { value: keyed, linked: false };
     const shown = link.batches.filter(b => b && b !== '—').join(', ');
@@ -363,6 +400,7 @@
     error: () => _err,
     events: () => _events,
     parseDate, logDate, plotKey, batchKey, batchList,
-    signed, liveCount, linkedQty, recQty, recBatches, isInterrow, qtyOpts
+    signed, liveCount, linkedQty, recQty, recBatches, freezeFor,
+    isInterrow, qtyOpts
   };
 })(window);

@@ -75,12 +75,69 @@
     return out;
   }
 
-  /* nursery → [plot], base plus whatever loadCustom() returned. */
+  /* THE TRANSFER PLOTS, AND EVERY OTHER PLOT SEEDLING STOCK KNOWS.
+
+     A "-R" plot is made by a 3rd-culling transfer and is in no hardcoded list
+     anywhere. The schedule grew ways to draw one -- a capacity keyed against
+     it, or rows of its own -- and the SALARY CLAIM never did. So a
+     maintenance record on B3-R resolved to no nursery at all, landed on the
+     orphan list, and its capacity paid nobody: the same shape as the UNN 2
+     bug above, pointing at a different set of plots.
+
+     shared_plots is where the office says which nursery a plot is in, and is
+     the same table the Setting page's capacity grid is built from. The
+     nursery is named there the way Seedling Stock spells it -- "UNN 1" with
+     the space -- so it is matched on letters and digits, like everything else
+     that crosses this boundary.
+
+     Soft, for the same reason loadCustom is: a table that cannot be read
+     gives back nothing rather than taking the claim down. */
+  async function loadStock(sb) {
+    const out = {};
+    if (!sb) return out;
+    const res = await sb.from('shared_plots').select('nursery_name, plot_name')
+      .then(r => r, e => ({ error: e }));
+    if (res.error) return out;
+    const byKey = {};
+    NURSERIES.forEach(n => { byKey[plotKey(n)] = n; });
+    (res.data || []).forEach(r => {
+      const n = byKey[plotKey(r && r.nursery_name)];
+      const p = String((r && r.plot_name) || '').trim();
+      if (!n || !p) return;
+      (out[n] || (out[n] = [])).push(p);
+    });
+    return out;
+  }
+
+  /* Both at once. Either one failing still gives back what the other found,
+     because half a plot list is better than none and the base list is still
+     right for every plot but these. */
+  async function loadAll(sb) {
+    const [custom, stock] = await Promise.all([loadCustom(sb), loadStock(sb)]);
+    const out = {};
+    [custom, stock].forEach(src => Object.keys(src).forEach(n => {
+      (out[n] || (out[n] = [])).push(...src[n]);
+    }));
+    return out;
+  }
+
+  /* nursery → [plot], base plus whatever was loaded.
+     Deduped on LETTERS AND DIGITS, not on the string: Seedling Stock and a
+     hand-added plot can spell the same plot two ways, and "B 4" twice is one
+     plot drawn twice. */
   function merged(custom) {
     const out = base();
+    const seen = {};
+    Object.keys(out).forEach(n => {
+      seen[n] = new Set(out[n].map(plotKey));
+    });
     Object.keys(custom || {}).forEach(n => {
-      if (!out[n]) out[n] = [];
-      (custom[n] || []).forEach(p => { if (!out[n].includes(p)) out[n].push(p); });
+      if (!out[n]) { out[n] = []; seen[n] = new Set(); }
+      (custom[n] || []).forEach(p => {
+        const k = plotKey(p);
+        if (!k || seen[n].has(k)) return;
+        out[n].push(p); seen[n].add(k);
+      });
     });
     return out;
   }
@@ -97,5 +154,6 @@
     return (idx || {})[plotKey(plot)] || null;
   }
 
-  global.MJMMaintPlots = { NURSERIES, base, merged, index, nurseryOfPlot, plotKey, loadCustom };
+  global.MJMMaintPlots = { NURSERIES, base, merged, index, nurseryOfPlot, plotKey,
+                           loadCustom, loadStock, loadAll };
 })(typeof window !== 'undefined' ? window : globalThis);

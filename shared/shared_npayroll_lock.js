@@ -210,9 +210,15 @@
     return error;
   }
 
-  async function verify(supabase, ym, sheet, scope, who) {
+  /* `snapshot` is optional and sheet-specific — Work Maintenance is the only
+     one that freezes one today (see buildMaintSnapshot in npayroll_script.js),
+     because it is the only claim priced from a screen this lock does not
+     touch (Worker Record). A sheet with nothing to freeze just passes
+     nothing, and the column stays null for it. */
+  async function verify(supabase, ym, sheet, scope, who, snapshot) {
     const { error } = await supabase.from('mjmnpayroll_verifications')
-      .upsert({ month: ym, sheet, scope: scope || '', verified_by: who || null },
+      .upsert({ month: ym, sheet, scope: scope || '', verified_by: who || null,
+                snapshot: snapshot || null },
               { onConflict: 'month,sheet,scope' });
     if (!error) await load(supabase);
     return error;

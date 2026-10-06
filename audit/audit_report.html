@@ -61,7 +61,7 @@
   --bg:#f8f4ec; --card:#fdfaf4; --line:#e8dcc8;
   --ink:#1a150d; --ink2:#3d2610; --ink3:#8a7a68;
   --green:#4a7a2e;
-  --pn:#1a5c1a; --mn:#1565c0; --papan:#e65100; --maint:#880e4f;
+  --pn:#1a5c1a; --mn:#1565c0; --papan:#e65100; --maint:#880e4f; --batch:#5b3fa8;
   --r-md:12px; --r-lg:16px;
 }
 html,body{min-height:100%;font-family:'Outfit',system-ui,sans-serif;font-size:16px;
@@ -220,6 +220,9 @@ input.input:focus{border-color:var(--green);background:var(--card);
 .mod-head{padding:16px 20px;display:flex;align-items:center;justify-content:space-between;gap:12px}
 .mod-head-pn{background:linear-gradient(135deg,#2f9c4f,#1b6b32)}
 .mod-head-mn{background:linear-gradient(135deg,#2f86d8,#12508f)}
+/* Height by Batch is neither nursery -- it is one section about batches,
+   so it gets a hue of its own rather than borrowing PN's. */
+.mod-head-batch{background:linear-gradient(135deg,#7d5fd0,#4a3090)}
 .mod-head-title{font-size:13px;font-weight:900;color:#fff;letter-spacing:.07em;text-transform:uppercase}
 .mod-head-sub{font-size:11px;color:rgba(255,255,255,.72);margin-top:3px;font-weight:600}
 .mod-head-badge{font-size:11px;font-weight:800;background:rgba(255,255,255,.22);color:#fff;
@@ -249,8 +252,21 @@ input.input:focus{border-color:var(--green);background:var(--card);
        white-space:nowrap;flex-shrink:0}
 .badge-plot{background:#e8f5e9;color:var(--pn)}
 .badge-height{background:#e0f2fe;color:#0369a1}
+/* A cell that covers a whole run of rows sits in the middle of it, across
+   and down, so it reads as belonging to the block rather than to its top
+   line. Left-aligned it hangs off one edge of a tall empty box and looks
+   like a stray figure; centred, the box reads as the block's own. */
+.rec-table td.grp{vertical-align:middle;text-align:center;background:#fbfdff;
+                  border-left:1px solid var(--line);font-size:14px;
+                  font-variant-numeric:tabular-nums;color:var(--pn)}
+.rec-table th.grp{text-align:center;border-left:1px solid var(--line)}
 .badge-papan{background:#fff3e0;color:var(--papan)}
 .badge-maint{background:#fce4ec;color:var(--maint)}
+.badge-batch{background:#ede7fb;color:var(--batch)}
+/* The four age figures, inside the section rather than up with the page's
+   own summary: they are about these batches, not about the report. */
+.age-row{padding:12px 14px 2px}
+.sum-foot{font-size:9px;font-weight:700;color:var(--ink3);margin-top:3px}
 .no-data{text-align:center;padding:26px 16px;color:var(--ink3);font-size:12.5px;font-weight:600}
 
 /* ── STATES ── */
@@ -321,6 +337,9 @@ body.is-full #btn-full{display:none}
                         letter-spacing:.7px;text-transform:uppercase;color:var(--ink3);
                         text-align:left}
   .rec-table tbody tr:hover td{background:transparent}
+  /* A card row is a label on the left and its answer on the right; the
+     centring the table wants would put this one in neither place. */
+  .rec-table td.grp{text-align:right;border-left:none;font-size:inherit}
   /* The first cell becomes the card's header rather than just another
      row: without it a card of eight identical grey-label rows gives no
      answer to "where does one record stop and the next begin". */
@@ -365,6 +384,7 @@ body.is-full #btn-full{display:none}
   .rec-table tr{break-inside:avoid;page-break-inside:avoid}
   .mod-head-pn{background:#1b6b32!important;-webkit-print-color-adjust:exact;print-color-adjust:exact}
   .mod-head-mn{background:#12508f!important;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  .mod-head-batch{background:#4a3090!important;-webkit-print-color-adjust:exact;print-color-adjust:exact}
   .mod-block-head,.rec-table .total-row td{background:#f5f8fa!important;
     -webkit-print-color-adjust:exact;print-color-adjust:exact}
   .badge{-webkit-print-color-adjust:exact;print-color-adjust:exact}
@@ -461,6 +481,11 @@ body.is-full #btn-full{display:none}
               <label class="tick-chip"><input type="checkbox" class="mod-cb" onchange="toggleMod(this,'height')">📏 Seedling Height</label>
               <label class="tick-chip"><input type="checkbox" class="mod-cb" onchange="toggleMod(this,'papan')">🪧 Papan Tanda</label>
               <label class="tick-chip"><input type="checkbox" class="mod-cb" onchange="toggleMod(this,'maint')">🔧 Maintenance</label>
+              <!-- Not a module of audit records like the four above: it is
+                   the height records read batch by batch instead of plot by
+                   plot. It draws a section of its own, outside the two
+                   nursery sections, which is why NURSERY_MODS exists. -->
+              <label class="tick-chip"><input type="checkbox" class="mod-cb" onchange="toggleMod(this,'bheight')">📦 Height by Batch</label>
             </div>
           </div>
           <button class="btn-generate" onclick="generateReport()">
@@ -626,7 +651,11 @@ async function fetchData(month,year){
   const out={};
   const tasks=[];
   if(selectedMods.has('plot'))   tasks.push(sb.select('audit_plot_audits',   `select=audit_id,nursery,plot,batch,pest,tikus,disease,warna_daun,auditor_name,date&${df}`).then(r=>out.plot=r).catch(()=>out.plot=[]));
-  if(selectedMods.has('height')) tasks.push(sb.select('audit_height_records', `select=record_id,nursery,plot,batch,sample_1,sample_2,sample_3,avg_height,auditor_name,date&${df}`).then(r=>out.height=r).catch(()=>out.height=[]));
+  /* Height by Batch is the same records read a different way, so it asks
+     for them too -- and through the same slot, so the Plot search below
+     narrows both or neither. */
+  if(selectedMods.has('height')||selectedMods.has('bheight'))
+                                 tasks.push(sb.select('audit_height_records', `select=record_id,nursery,plot,batch,sample_1,sample_2,sample_3,avg_height,auditor_name,date&${df}`).then(r=>out.height=r).catch(()=>out.height=[]));
   if(selectedMods.has('papan'))  tasks.push(sb.select('audit_papan_audits',   `select=audit_id,nursery,plot,batch_no,presence,info_correct,condition,auditor_name,date&${df}`).then(r=>out.papan=r).catch(()=>out.papan=[]));
   if(selectedMods.has('maint'))  tasks.push(sb.select('audit_maintenance_audits',`select=audit_id,nursery,plot,task_type,result,auditor_name,date&${df}`).then(r=>out.maint=r).catch(()=>out.maint=[]));
   await Promise.all(tasks);
@@ -674,7 +703,12 @@ const MOD_COLS={
     {h:'S1 (cm)',  v:r=>r.sample_1||'—',           num:true},
     {h:'S2 (cm)',  v:r=>r.sample_2||'—',           num:true},
     {h:'S3 (cm)',  v:r=>r.sample_3||'—',           num:true},
-    {h:'Avg (cm)', v:r=>`<b>${esc(r.avg_height||'—')}</b>`, raw:true, num:true}
+    {h:'Avg (cm)', v:r=>`<b>${esc(r.avg_height||'—')}</b>`, raw:true, num:true},
+    /* One cell for the whole group, not the same figure on every line --
+       see `group` in buildModTable. */
+    {h:'Plot Avg (cm)', label:'Plot average that day',
+     group:r=>String(r.date||'')+'|'+String(r.plot||'').trim().toUpperCase(),
+     v:(r,i,rows)=>`<b>${_heightPlotAvg(r,rows)}</b>`, raw:true, num:true}
   ],
   papan:[
     {h:'#',        v:(r,i)=>i+1, label:'Record', num:true},
@@ -703,33 +737,342 @@ const MOD_COLS={
 // falls through to plot-only ordering for that one.
 function _auditPlotBatchSort(rows){
   const natCmp=(a,b)=>String(a??'').localeCompare(String(b??''),undefined,{numeric:true,sensitivity:'base'});
-  return rows.slice().sort((a,b)=>natCmp(a.plot,b.plot)||natCmp(a.batch??a.batch_no,b.batch??b.batch_no));
+  /* Plot, then the DAY, then batch.
+     The day was not in here, so a plot audited twice in a month came out
+     interleaved by batch -- the 5th and the 19th alternating down the page,
+     which is two visits read as one. It also made the plot average
+     unmergeable: a figure about a day can only be drawn once over the rows it
+     covers if those rows are together.
+     Dates are ISO in this table, so comparing them as text is comparing them
+     as dates. */
+  return rows.slice().sort((a,b)=>natCmp(a.plot,b.plot)
+                               ||natCmp(a.date,b.date)
+                               ||natCmp(a.batch??a.batch_no,b.batch??b.batch_no));
+}
+
+/* THE PLOT'S AVERAGE FOR THAT DAY.
+
+   An auditor walks a plot and measures several batches standing in it, one
+   row each. The height that describes the PLOT is the mean of those rows, and
+   until now the report had every batch and no plot figure at all, so it was
+   worked out by hand off the paper.
+
+   The mean of the row averages, which is what was asked for and what the Avg
+   column already shows. Grouped on the day as well as the plot, because the
+   same plot measured a fortnight later is a different reading, not more of
+   the same one.
+
+   Drawn ONCE over the rows it covers (see `group` in buildModTable), because
+   the same figure printed on seven lines reads as seven measurements. */
+function _heightPlotAvg(r, rows){
+  const key=(x)=>String(x.date||'')+'|'+String(x.plot||'').trim().toUpperCase();
+  const k=key(r);
+  /* An EMPTY reading is not a zero. Number(null) is 0 and 0 is a finite
+     number, so a row the auditor left blank would have been averaged in as a
+     seedling of no height and pulled the plot down. A real 0 still counts --
+     it is the blank that is thrown away, tested for before anything is
+     converted. */
+  const vals=(rows||[]).filter(x=>key(x)===k)
+                       .map(x=>x.avg_height)
+                       .filter(v=>v!==null&&v!==undefined&&String(v).trim()!=='')
+                       .map(Number)
+                       .filter(v=>Number.isFinite(v));
+  if(!vals.length) return '—';
+  const mean=vals.reduce((a,b)=>a+b,0)/vals.length;
+  return (Math.round(mean*10)/10).toLocaleString();
+}
+
+/* ── HEIGHT BY BATCH ──────────────────────────────────────────────────
+
+   Seedling Height is audited PLOT by plot in the Pre-Nursery — the form has
+   no batch box on it at all, and audit_script.js says why. So "how tall is
+   batch 268" is a question the height records cannot answer on their own.
+   The ledger answers the first half: which plots a batch was sown into. The
+   plot's own reading answers the second.
+
+   WHICH BATCHES: the ones the Batch Record page calls Pre-Nursery — seeds
+   received 1 to 4 months ago and not yet transplanted. Both tests are that
+   page's own (operation_batch_record.html, processBatchLogic): the age is
+   anchored on the KEYED transaction_date and never on the row's insert time,
+   and any of the three Transplanted types means the batch has gone out.
+
+   THREE PLAIN MEANS, one per level, each the average of the level below:
+
+     plot  — its readings on its LAST audit day in the month
+     batch — the mean of its plots
+     age   — the mean of its batches
+
+   A batch standing in three plots is ONE batch in its age group's figure,
+   not three, which is why the group is not simply every reading in it
+   averaged.
+
+   AS AT THE MONTH, NOT AS AT TODAY. September's report has to read the same
+   in December as it did in September: a batch is however old it was at the
+   end of that month, and one transplanted afterwards was still standing in
+   it. Same rule Life of Seedlings follows — the As At date cuts the lines
+   off.                                                                   */
+const BATCH_AGE_GROUPS=[1,2,3,4];
+const DAYS_PER_MONTH=30.44;          // the Batch Record's own divisor
+
+function _canonPlot(raw){
+  const s=String(raw||'').trim().toUpperCase();
+  const m=s.match(/^([A-Z]+)(\d+)(-R)?$/);
+  return m?m[1]+m[2].padStart(2,'0')+(m[3]||''):s;
+}
+function _logDay(r){
+  const v=r&&(r.transaction_date||r.created_at);
+  return v?String(v).slice(0,10):'';
+}
+function fmt1(n){
+  return n==null||!Number.isFinite(Number(n))?'—'
+    :(Math.round(Number(n)*10)/10).toLocaleString();
+}
+
+/* Supabase answers with AT MOST 1000 rows and says nothing about it, so one
+   read of the inventory ledger drops the oldest batches in silence. The
+   Batch Record page pages for the same reason; this is that, through the
+   audit portal's own fetch. */
+async function sbAllRows(table,query){
+  const PAGE=1000;
+  let all=[];
+  for(let off=0;;off+=PAGE){
+    const rows=await sbFetch(`${table}?${query}&order=id.asc&limit=${PAGE}&offset=${off}`);
+    all=all.concat(rows||[]);
+    if(!rows||rows.length<PAGE) return all;
+  }
+}
+
+async function fetchBatchLedger(month,year){
+  const{end}=monthRange(month,year);
+  const today=new Date().toISOString().slice(0,10);
+  // A month still running is as at today; a month gone by, as at its end.
+  const asOf=end<today?end:today;
+  const LOG='shared_inventory_logs';
+  const[seeds,planted,gone]=await Promise.all([
+    sbAllRows(LOG,'select=batch_name,transaction_date,created_at&transaction_type=eq.Seeds_Received'),
+    sbAllRows(LOG,'select=batch_name,plot_name&transaction_type=eq.Planted'),
+    sbAllRows(LOG,'select=batch_name,transaction_date,created_at'
+                 +'&transaction_type=in.(Transplanted,Transplanted_Premium,Transplanted_DoubleTone)')
+  ]);
+  return{asOf,seeds,planted,gone};
+}
+
+/* The plot's figure is its LAST audit day in the month, not the month
+   averaged: a plot walked on the 5th and again on the 19th grew in between,
+   and the 19th is how tall it is now. Blank readings are dropped before
+   anything is converted — Number(null) is 0, and a blank is not a seedling
+   of no height. A real 0 still counts. */
+function _plotHeightInMonth(plot,heightRows){
+  const mine=(heightRows||[]).filter(r=>_canonPlot(r.plot)===plot);
+  if(!mine.length) return null;
+  const day=mine.map(r=>String(r.date||'').slice(0,10)).filter(Boolean).sort().pop();
+  if(!day) return null;
+  const vals=mine.filter(r=>String(r.date||'').slice(0,10)===day)
+                 .map(r=>r.avg_height)
+                 .filter(v=>v!==null&&v!==undefined&&String(v).trim()!=='')
+                 .map(Number).filter(v=>Number.isFinite(v));
+  if(!vals.length) return null;
+  return{value:vals.reduce((a,b)=>a+b,0)/vals.length,date:day,n:vals.length};
+}
+
+function _mean(xs){
+  return xs.length?xs.reduce((a,b)=>a+b,0)/xs.length:null;
+}
+
+function buildBatchHeight(led,heightRows){
+  const asOf=led.asOf;
+  /* EARLIEST Seeds_Received per batch: one delivered in two lots is as old
+     as its first lot, not its last. */
+  const seedDay={};
+  (led.seeds||[]).forEach(r=>{
+    const b=String(r.batch_name||'').trim(),d=_logDay(r);
+    if(!b||!d) return;
+    if(!seedDay[b]||d<seedDay[b]) seedDay[b]=d;
+  });
+  const gone=new Set();
+  (led.gone||[]).forEach(r=>{
+    const b=String(r.batch_name||'').trim(),d=_logDay(r);
+    if(b&&d&&d<=asOf) gone.add(b);
+  });
+  const plotsOf={};
+  (led.planted||[]).forEach(r=>{
+    const b=String(r.batch_name||'').trim(),p=_canonPlot(r.plot_name);
+    if(!b||!p) return;
+    (plotsOf[b]||(plotsOf[b]=new Set())).add(p);
+  });
+
+  const asOfMs=new Date(asOf+'T00:00:00').getTime();
+  const natCmp=(a,b)=>String(a??'').localeCompare(String(b??''),undefined,{numeric:true,sensitivity:'base'});
+  const rows=[],byBatch=[];
+  Object.keys(seedDay).forEach(batch=>{
+    if(gone.has(batch)) return;
+    const days=Math.floor((asOfMs-new Date(seedDay[batch]+'T00:00:00').getTime())/86400000);
+    if(days<0) return;                                  // sown after the month
+    const months=days/DAYS_PER_MONTH;
+    const grp=Math.floor(months);
+    if(BATCH_AGE_GROUPS.indexOf(grp)<0) return;         // under 1, or over 4
+    /* A batch with no Planted log has no plot to read, and is shown saying
+       so rather than dropped: a batch missing from the ledger is the thing
+       somebody needs to see. */
+    const plots=[...(plotsOf[batch]||[])].sort(natCmp);
+    const mine=(plots.length?plots:['—']).map(plot=>({
+      batch,grp,months,seed:seedDay[batch],plot,
+      h:plot==='—'?null:_plotHeightInMonth(plot,heightRows)
+    }));
+    const avg=_mean(mine.filter(r=>r.h).map(r=>r.h.value));
+    mine.forEach(r=>{r.batchAvg=avg;});
+    rows.push(...mine);
+    byBatch.push({batch,grp,avg});
+  });
+
+  rows.sort((a,b)=>a.grp-b.grp||natCmp(a.batch,b.batch)||natCmp(a.plot,b.plot));
+
+  const groups={};
+  BATCH_AGE_GROUPS.forEach(g=>{
+    const mine=byBatch.filter(b=>b.grp===g);
+    groups[g]={
+      avg:_mean(mine.filter(b=>b.avg!=null).map(b=>b.avg)),
+      batches:mine.length,
+      unmeasured:mine.filter(b=>b.avg==null).length
+    };
+  });
+  return{asOf,rows,groups,batches:byBatch.length};
+}
+
+const BATCH_HEIGHT_COLS=[
+  {h:'#',        v:(r,i)=>i+1, label:'Row', num:true},
+  /* Everything that is about the BATCH is drawn once over its plots —
+     same merge the Plot Avg column uses. */
+  {h:'Batch',    group:r=>r.batch, v:r=>`<b>${esc(r.batch)}</b>`, raw:true},
+  {h:'Seeds In', group:r=>r.batch, v:r=>fmtDate(r.seed)},
+  /* TRUNCATED, never rounded: the group is the whole months the batch has
+     behind it, so an age shown as "2 mth" beside a group of "1 Month" reads
+     as a mistake. 1.97 months is 1.9, and that is the same answer twice. */
+  {h:'Age',      group:r=>r.batch, v:r=>(Math.floor(r.months*10)/10).toFixed(1)+' mth', num:true},
+  {h:'Age Group',group:r=>r.batch, v:r=>r.grp+' Month'+(r.grp>1?'s':'')},
+  {h:'Plot',     v:r=>`<b>${esc(r.plot)}</b>`, raw:true},
+  {h:'Audited',  label:'Last audited', v:r=>r.h?fmtDate(r.h.date):'—'},
+  {h:'Plot Avg (cm)', label:'Plot height', v:r=>r.h?fmt1(r.h.value):'—', num:true},
+  {h:'Batch Avg (cm)',label:'Batch average', group:r=>r.batch,
+   v:r=>`<b>${fmt1(r.batchAvg)}</b>`, raw:true, num:true}
+];
+
+function buildBatchHeightSection(bh){
+  if(bh.error){
+    return`
+  <div class="mod-section">
+    <div class="mod-head mod-head-batch">
+      <div><div class="mod-head-title">Seedling Height by Batch</div>
+      <div class="mod-head-sub">Could not be worked out</div></div>
+    </div>
+    <div class="mod-block"><div class="mod-block-body"><div class="no-data">
+      The batch ledger could not be read, so no batch is listed here.<br>${esc(bh.error)}
+    </div></div></div>
+  </div>`;
+  }
+  const cards=BATCH_AGE_GROUPS.map(g=>{
+    const s=bh.groups[g];
+    return`<div class="sum-card">
+      <div class="sum-val" style="color:var(--batch)">${fmt1(s.avg)}</div>
+      <div class="sum-label">${g} Month${g>1?'s':''} Old</div>
+      <div class="sum-foot">${fmtNum(s.batches)} batch${s.batches===1?'':'es'}${
+        s.unmeasured?' · '+fmtNum(s.unmeasured)+' unmeasured':''}</div>
+    </div>`;
+  }).join('');
+  /* How many of these batches nobody has measured this month. Said out loud,
+     because four averages with no count beside them cannot say whether they
+     are drawn from everything or from half of it. */
+  const unmeasured=BATCH_AGE_GROUPS.reduce((s,g)=>s+bh.groups[g].unmeasured,0);
+  return`
+  <div class="mod-section">
+    <div class="mod-head mod-head-batch">
+      <div><div class="mod-head-title">Seedling Height by Batch</div>
+      <div class="mod-head-sub">Pre-Nursery batches 1–4 months old and not yet transplanted ·
+        age as at ${fmtDate(bh.asOf)}</div></div>
+      <span class="mod-head-badge">${fmtNum(bh.batches)} batches</span>
+    </div>
+    <div class="mod-block">
+      <div class="mod-block-head">
+        <span class="mod-block-name">Average Height by Age (cm)</span>
+        ${unmeasured?`<span class="badge badge-batch">${fmtNum(unmeasured)} with no reading</span>`:''}
+      </div>
+      <div class="mod-block-body">
+        <div class="age-row"><div class="summary-row">${cards}</div></div>
+        ${buildTable(BATCH_HEIGHT_COLS,bh.rows,'batch row')}
+      </div>
+    </div>
+  </div>`;
 }
 
 function buildModTable(mod, rows){
   if(!rows||!rows.length) return '<div class="no-data">No records found.</div>';
   const cols=MOD_COLS[mod];
   if(!cols) return '<div class="no-data">No records found.</div>';
-  rows=_auditPlotBatchSort(rows);
+  return buildTable(cols,_auditPlotBatchSort(rows),'record');
+}
 
-  const head='<tr>'+cols.map(c=>`<th>${esc(c.h)}</th>`).join('')+'</tr>';
+/* The table itself, given its columns and its rows ALREADY in the order they
+   are to be drawn in. The row merging below reads off that order, so a
+   caller that sorts after this has broken it. */
+function buildTable(cols, rows, noun){
+  if(!rows||!rows.length) return '<div class="no-data">No records found.</div>';
+
+  /* A merged column's heading is centred over it, or the heading and the
+     figure it names sit at opposite ends of the same column. */
+  const head='<tr>'+cols.map(c=>`<th${c.group?' class="grp"':''}>${esc(c.h)}</th>`).join('')+'</tr>';
+
+  /* A COLUMN THAT IS ONE CELL FOR A WHOLE GROUP.
+     The plot average is one figure about seven rows, and seven copies of it
+     is seven chances to read it as seven different measurements. A column
+     with `group` is drawn once, on the first row of its run, spanning the
+     rest -- so the table says plainly that the figure belongs to the block
+     beside it and not to any one line of it.
+
+     The run has to be CONSECUTIVE, which the caller's sort is what makes it:
+     a plot's rows for a day sit together, and so do a batch's plots. Keyed
+     off the array as given for that reason, not off the data. */
+  const spans=cols.map(c=>{
+    if(!c.group) return null;
+    const out=new Array(rows.length).fill(0);
+    let i=0;
+    while(i<rows.length){
+      let j=i;
+      while(j+1<rows.length && c.group(rows[j+1])===c.group(rows[i])) j++;
+      out[i]=j-i+1;
+      i=j+1;
+    }
+    return out;
+  });
+
   let body='';
   rows.forEach((r,i)=>{
-    body+='<tr>'+cols.map(c=>{
-      const val=c.v(r,i);
+    body+='<tr>'+cols.map((c,ci)=>{
+      // A row inside a group that is not its first draws no cell at all.
+      if(spans[ci] && !spans[ci][i]) return '';
+      /* rows as well as the row: a column can be a figure about the GROUP
+         this row is in -- see _heightPlotAvg. */
+      const val=c.v(r,i,rows);
+      const span=spans[ci] && spans[ci][i]>1 ? ` rowspan="${spans[ci][i]}"` : '';
+      const cls=[c.num?'num':'', spans[ci]?'grp':''].filter(Boolean).join(' ');
       /* c.label is what the cell announces itself as on a phone, where
          it is a card row rather than a column: "#" is a column heading
          and says nothing on its own once the heading row is gone. */
-      return `<td data-label="${esc(c.label||c.h)}"${c.num?' class="num"':''}>${c.raw?val:esc(val)}</td>`;
+      return `<td data-label="${esc(c.label||c.h)}"${cls?` class="${cls}"`:''}${span}>${c.raw?val:esc(val)}</td>`;
     }).join('')+'</tr>';
   });
-  body+=`<tr class="total-row"><td colspan="${cols.length}" data-label="">Total: ${fmtNum(rows.length)} record${rows.length!==1?'s':''}</td></tr>`;
+  const word=noun||'record';
+  body+=`<tr class="total-row"><td colspan="${cols.length}" data-label="">Total: ${fmtNum(rows.length)} ${esc(word)}${rows.length!==1?'s':''}</td></tr>`;
 
   return`<div class="tbl-wrap"><table class="rec-table"><thead>${head}</thead><tbody>${body}</tbody></table></div>`;
 }
 
+/* The modules that are a block INSIDE a nursery section. Height by Batch is
+   not one of them — it draws a section of its own, because the batches it
+   lists are not divided by nursery and its figures are about the batch. */
+const NURSERY_MODS=['plot','height','papan','maint'];
+
 function buildNurserySection(label, sub, headClass, data, nurseries){
-  const mods=[...selectedMods];
+  const mods=[...selectedMods].filter(m=>NURSERY_MODS.indexOf(m)>=0);
   const modLabels={plot:'📋 Plot Condition',height:'📏 Seedling Height',papan:'🪧 Papan Tanda',maint:'🔧 Maintenance'};
   const modBadge={plot:'badge-plot',height:'badge-height',papan:'badge-papan',maint:'badge-maint'};
   let total=0;
@@ -764,7 +1107,12 @@ async function generateReport(){
   // impossible state to ever be in, including the moment the page loads).
   if(selectedMods.size===0){showToast('⚠ Select at least one module');return;}
   const tickedNurseries=selectedAuditNurseries();
-  if(tickedNurseries.length===0){showToast('⚠ Select at least one nursery');return;}
+  /* The nursery tick decides what goes in the two nursery sections, so it is
+     only asked for when one of those is wanted. Height by Batch on its own
+     has no nursery to pick: it lists the batches that have not left the
+     Pre-Nursery yet, whichever nursery is ticked. */
+  const wantNurserySections=[...selectedMods].some(m=>NURSERY_MODS.indexOf(m)>=0);
+  if(wantNurserySections&&tickedNurseries.length===0){showToast('⚠ Select at least one nursery');return;}
 
   const month=parseInt(document.getElementById('f-month').value);
   const year=parseInt(document.getElementById('f-year').value);
@@ -772,9 +1120,9 @@ async function generateReport(){
   // Whichever of Pre-Nursery/BNN/UNN1/UNN2 are ticked (see the tick-chip
   // row) — Main Nursery is no longer all-or-nothing: BNN can be included
   // without UNN1/UNN2, same as PN can sit alongside just one of them.
-  const showPN=tickedNurseries.includes('PN');
+  const showPN=wantNurserySections&&tickedNurseries.includes('PN');
   const mnNurseries=MN_NURSERIES.filter(n=>tickedNurseries.includes(n));
-  const showMN=mnNurseries.length>0;
+  const showMN=wantNurserySections&&mnNurseries.length>0;
   const periodStr=`${MONTHS[month-1]} ${year}`;
   setLoading(true);
   try{
@@ -783,16 +1131,29 @@ async function generateReport(){
     // (summary counts, the nursery-section tables) ever sees them, so
     // there's exactly one place this filter has to be applied.
     if(plotQuery) for(const m of ['plot','height','papan','maint']) if(data[m]) data[m]=filterByPlot(data[m],plotQuery);
-    const countAll=(d,n)=>[...selectedMods].reduce((s,m)=>s+(filterByNursery(d[m],n).length),0);
+    const countAll=(d,n)=>[...selectedMods].filter(m=>NURSERY_MODS.indexOf(m)>=0)
+                                           .reduce((s,m)=>s+(filterByNursery(d[m],n).length),0);
+    /* The ledger reads are the one part of this report that can fail on its
+       own, and a section that quietly draws nothing is a section that says
+       there are no batches. It says what went wrong instead. */
+    let batchHeight=null;
+    if(selectedMods.has('bheight')){
+      try{ batchHeight=buildBatchHeight(await fetchBatchLedger(month,year),data.height||[]); }
+      catch(e){ console.error('[batch-height]',e); batchHeight={error:e.message}; }
+    }
     const pnTotal=showPN?countAll(data,PN_NURSERIES):0;
     const mnTotal=showMN?countAll(data,mnNurseries):0;
     const grandTotal=pnTotal+mnTotal;
     const now=new Date();
-    const nurseryLabel = (showPN && mnNurseries.length===MN_NURSERIES.length) ? 'All Nurseries'
-      : [...(showPN?['Pre Nursery']:[]), ...mnNurseries].join(', ');
+    /* What the heading says is what was DRAWN. With only Height by Batch
+       ticked there is no nursery section at all, so naming the nursery that
+       happens to be ticked would name a section that is not on the page. */
+    const drawnMN=showMN?mnNurseries:[];
+    const nurseryLabel = (showPN && drawnMN.length===MN_NURSERIES.length) ? 'All Nurseries'
+      : [...(showPN?['Pre Nursery']:[]), ...drawnMN].join(', ') || 'Batches';
 
     // Count per module across selected nurseries
-    const countedNurseries = [...(showPN?PN_NURSERIES:[]), ...mnNurseries];
+    const countedNurseries = [...(showPN?PN_NURSERIES:[]), ...drawnMN];
     const plotTotal   = filterByNursery(data.plot||[],   countedNurseries).length;
     const heightTotal = filterByNursery(data.height||[], countedNurseries).length;
     const papanTotal  = filterByNursery(data.papan||[],  countedNurseries).length;
@@ -803,6 +1164,7 @@ async function generateReport(){
     if(selectedMods.has('height')) summaryCards+=`<div class="sum-card"><div class="sum-val" style="color:var(--mn)">${fmtNum(heightTotal)}</div><div class="sum-label">Seedling Height</div></div>`;
     if(selectedMods.has('papan'))  summaryCards+=`<div class="sum-card"><div class="sum-val" style="color:var(--papan)">${fmtNum(papanTotal)}</div><div class="sum-label">Papan Tanda</div></div>`;
     if(selectedMods.has('maint'))  summaryCards+=`<div class="sum-card"><div class="sum-val" style="color:var(--maint)">${fmtNum(maintTotal)}</div><div class="sum-label">Maintenance</div></div>`;
+    if(batchHeight&&!batchHeight.error) summaryCards+=`<div class="sum-card"><div class="sum-val" style="color:var(--batch)">${fmtNum(batchHeight.batches)}</div><div class="sum-label">Batches 1–4 Mth</div></div>`;
 
     let sections='';
     if(showPN) sections+=buildNurserySection('Pre Nursery (PN)','Plots P01 – P52','mod-head-pn',data,PN_NURSERIES);
@@ -815,6 +1177,11 @@ async function generateReport(){
         mnNurseries.map(n=>MN_RANGES[n]).join(' · '),
         'mod-head-mn',data,mnNurseries);
     }
+    /* Last, and outside both: these batches are in the Pre-Nursery by
+       definition (they have not been transplanted), but the section answers
+       a question about batches rather than about a nursery's audits, so it
+       does not hang off either nursery's tick. */
+    if(batchHeight) sections+=buildBatchHeightSection(batchHeight);
 
     document.getElementById('report-output').innerHTML=`
       <div class="report-header">

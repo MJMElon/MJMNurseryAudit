@@ -713,22 +713,21 @@ async function saveAudit(){
   const user=JSON.parse(localStorage.getItem('mjm_user')||'{}');
   setLoading(true);
   try{
-    // Photo only uploaded on the Unsatisfied branch — a Satisfied audit
-    // leaves photo_url null in the DB, which is the honest signal that
-    // no exception photo was needed.
-    let photoUrl = null;
-    if (isUnsat && formState.photo) {
-      photoUrl = formState.photo;
-      if (photoUrl && photoUrl.startsWith('data:'))
-        photoUrl = await sb.uploadPhoto('audit-photos','maint_'+t.plot+'_'+Date.now(),photoUrl);
-    }
+    // The photo is compulsory for BOTH results now (see the validation
+    // above), so it is uploaded for both. These lines used to branch on
+    // `isUnsat` — a variable whose definition left with the old
+    // photo-only-when-Unsatisfied design — and the dangling reference
+    // threw before anything was written: every save, Satisfied or not,
+    // ended in "Save failed".
+    let photoUrl = formState.photo || null;
+    if (photoUrl && photoUrl.startsWith('data:'))
+      photoUrl = await sb.uploadPhoto('audit-photos','maint_'+t.plot+'_'+Date.now(),photoUrl);
     const payload={
       task_id:parseInt(formTaskId),
       nursery:t.nursery,plot:t.plot,task_type:t.type,
       result:formState.result,
-      // Satisfied → drop any residual remark too; only the Unsatisfied
-      // branch is supposed to carry commentary.
-      remarks: isUnsat ? (remarks || null) : null,
+      // Remarks are optional on both branches — keep whatever was keyed.
+      remarks: remarks || null,
       photo_url: photoUrl,
       auditor_name:user.name||'',
       date:todayISO()

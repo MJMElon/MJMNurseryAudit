@@ -331,6 +331,81 @@ const PLOT_TO_NURSERY_M = (function(){
   return m;
 })();
 
+/* ── WHICH NURSERY A PLOT IS IN ──────────────────────────────────────
+   The hardcoded list below is P01-P52, B01-B14, U01-U18, N01-N20 and
+   nothing else, so a job on any other plot used to be dropped on the
+   floor without a word - the audit simply never appeared and there was
+   nothing on screen to say one was missing.
+
+   The live case is the TRANSFER PLOTS. A "-R" plot is made by a
+   3rd-culling transfer and is in no hardcoded list anywhere. The office
+   schedule grew ways to draw one, the salary claim was taught to resolve
+   one, and this page never was. Plots past the end of a range - B15, U19
+   - go the same way.
+
+   shared/shared_maint_plots.js is the list the schedule and the claim
+   already share. It reads shared_plots (where Seedling Stock says which
+   nursery a plot is in) and nops_maint_custom_plots (plots added by
+   hand), and matches on letters and digits. This page now reads it too.
+
+   Four answers are tried, and the last of them cannot fail:
+     1. the shared list, which knows -R and anything the office added;
+     2. the hardcoded list, for when that file or its tables cannot be
+        read - it is still right for every ordinary plot;
+     3. the nursery the RECORD itself states;
+     4. the plot letter - B is Batu Niah, U is Ulu Niah 1, N is Ulu Niah
+        2, P is the Pre-Nursery.
+   Anything that survives all four is COUNTED AND NAMED on the page
+   rather than dropped. A job nobody can see is a job nobody does. */
+let PLOT_IDX = null;          // from shared_maint_plots, once loaded
+let unplacedTasks = [];       // {plot, type} that no rule could place
+
+/* MJMMaintPlots wants a supabase-js client and this page has its own
+   thin one. Two methods is the whole of what it asks for. */
+const _plotSb = {
+  from(table){
+    return {
+      select(cols){
+        return sb.select(table, 'select=' + String(cols).replace(/\s+/g, ''))
+                 .then(rows => ({ data: rows || [] }), error => ({ error }));
+      }
+    };
+  }
+};
+
+async function _loadPlotIndex(){
+  try{
+    if (typeof MJMMaintPlots === 'undefined') return;
+    PLOT_IDX = MJMMaintPlots.index(await MJMMaintPlots.loadAll(_plotSb));
+  }catch(e){
+    console.warn('[maint-audit] shared plot list unavailable, using the built-in one', e);
+  }
+}
+
+const _PREFIX_NURSERY = { P:'PN', B:'BNN', U:'UNN1', N:'UNN2' };
+
+function _nurseryOfPlot(rawPlot, statedNursery){
+  const canon = _canonicalPlot(rawPlot);
+  if (!canon) return null;
+
+  if (PLOT_IDX && typeof MJMMaintPlots !== 'undefined'){
+    const hit = MJMMaintPlots.nurseryOfPlot(rawPlot, PLOT_IDX)
+             || MJMMaintPlots.nurseryOfPlot(canon, PLOT_IDX);
+    if (hit) return hit;
+  }
+  if (PLOT_TO_NURSERY_M[canon]) return PLOT_TO_NURSERY_M[canon];
+
+  /* The record says where it was. Letters and digits only, the same rule
+     every other crossing of this boundary uses, so "UNN 1" finds UNN1. */
+  const said = String(statedNursery || '').replace(/[^a-z0-9]/gi, '').toUpperCase();
+  if (['PN','BNN','UNN1','UNN2'].indexOf(said) !== -1) return said;
+
+  /* The letter the plot starts with. A plot past the end of a range is
+     still plainly in its nursery. */
+  const letter = canon.charAt(0).toUpperCase();
+  return _PREFIX_NURSERY[letter] || null;
+}
+
 /* --- LOAD ---
    Tasks now come from the operation Maintenance module's own ledger
    (nops_maint_field_records). Every row there is a completed job the
@@ -341,7 +416,12 @@ const PLOT_TO_NURSERY_M = (function(){
    renders something rather than staying blank. */
 async function loadAll(){
   setLoading(true);
+  unplacedTasks = [];
   try{
+    /* Before anything is placed. Soft on its own - a failure here leaves
+       the built-in list standing, which is right for every ordinary
+       plot. */
+    await _loadPlotIndex();
     // nops_maint_field_records is the SINGLE source of truth for tasks
     // now. As soon as a field worker keys a work_date over on the
     // operation Maintenance page, the row shows up here as a Pending
@@ -383,8 +463,11 @@ async function loadAll(){
       // counts honest).
       if (SKIP_WORK_TYPES.has(r.work_type)) return;
       const plot    = _canonicalPlot(r.plot_name);
-      const nursery = plot ? PLOT_TO_NURSERY_M[plot] : null;
-      if(!nursery) return;                              // stray plot in the log
+      const nursery = _nurseryOfPlot(r.plot_name, r.nursery_name);
+      if(!nursery){                                     // nothing could place it
+        if (plot) unplacedTasks.push({ plot, type: WORK_TYPE_LABEL[r.work_type] || 'Others' });
+        return;
+      }
       // photo_urls is a comma-separated TEXT column, not JSONB.
       const photos = (typeof r.photo_urls === 'string' && r.photo_urls.length)
         ? r.photo_urls.split(',').map(s => s.trim()).filter(Boolean)
@@ -428,12 +511,22 @@ async function loadAll(){
       const workType = JENIS_TO_WORKTYPE[rec.jenis] || 'other';
       if (SKIP_WORK_TYPES.has(workType)) return;
       const workDate = _tarikhToISO(rec.tarikh);
-      if (!workDate) return;                                // still pending on the office
+      /* A row counts as done when the office has DATED it or TICKED it.
+         The comment above this block has always said "or ticks Check" and
+         the code only ever asked about the date, so a row the office had
+         confirmed but not dated was silently not auditable - the job was
+         done, the tick said so, and no card ever appeared. A row that is
+         neither dated nor ticked is genuinely still pending and stays
+         out. */
+      if (!workDate && !rec.checked) return;
       const plot = _canonicalPlot(rec.plot);
-      const nursery = plot ? PLOT_TO_NURSERY_M[plot] : null;
-      if (!nursery) return;
+      const nursery = _nurseryOfPlot(rec.plot, rec.nursery || rec.nursery_name);
+      if (!nursery){
+        if (plot) unplacedTasks.push({ plot, type: WORK_TYPE_LABEL[workType] || 'Others' });
+        return;
+      }
       const round = _parseRound(rec.racun);
-      const key = nursery + '|' + plot + '|' + (rec.batch||'') + '|' + (WORK_TYPE_LABEL[workType]||'Others') + '|' + workDate;
+      const key = nursery + '|' + plot + '|' + (rec.batch||'') + '|' + (WORK_TYPE_LABEL[workType]||'Others') + '|' + (workDate||'');
       if (seenKey.has(key)) return;                         // field portal already carried this
       seenKey.add(key);
       tasks.push({
@@ -447,7 +540,7 @@ async function loadAll(){
         worker:        '',                                  // office records don't carry a worker name
         qty:           rec.qty ?? null,
         remark:        rec.remark || '',
-        completedDate: workDate,
+        completedDate: workDate || '',
         workerPhotos:  [],
         createdAt:     rec.updated_at || officeBlob?.updated_at || null,
         _source:       'office'
@@ -525,15 +618,31 @@ function renderLists(){
   const _dc=document.getElementById('done-count');
   if(_dc)_dc.textContent = fmtNum(done.length) + ' task' + (done.length!==1?'s':'');
 
+  /* Anything no rule could place is NAMED here rather than dropped. It
+     is the only thing on this page that can still go missing, so it has
+     to be the one thing that announces itself - a job nobody can see is
+     a job nobody does. */
+  const unplacedHtml = unplacedTasks.length
+    ? '<div class="empty-state" style="border:1.5px solid #fde68a;background:#fffbeb;' +
+      'border-radius:14px;padding:12px 14px;margin-bottom:12px;text-align:left">' +
+      '<h3 style="margin:0 0 4px;font-size:13px;color:#78350f">' +
+      fmtNum(unplacedTasks.length) + ' job' + (unplacedTasks.length!==1?'s':'') +
+      ' could not be placed in a nursery</h3>' +
+      '<p style="margin:0;font-size:12px;color:#78350f">' +
+      unplacedTasks.slice(0,12).map(u => u.plot + ' (' + u.type + ')').join(', ') +
+      (unplacedTasks.length>12 ? ' and ' + fmtNum(unplacedTasks.length-12) + ' more' : '') +
+      '. Add the plot in Seedling Stock and it appears here.</p></div>'
+    : '';
+
   const pendingEl = document.getElementById('pending-list');
   if(!pending.length){
     pendingEl.innerHTML=`<div class="empty-state">
       <div class="empty-state-icon"><svg viewBox="0 0 24 24"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg></div>
       <h3>No tasks to audit</h3>
-      <p>Once a worker keys in a work date on the Maintenance system, it appears here automatically.</p>
-    </div>`;
+      <p>Once a worker keys in a work date on the Maintenance system, or the office ticks the row, it appears here automatically.</p>
+    </div>` + unplacedHtml;
   } else {
-    pendingEl.innerHTML = _timelineHtml(pending, /*isAudited=*/false);
+    pendingEl.innerHTML = unplacedHtml + _timelineHtml(pending, /*isAudited=*/false);
   }
 
   const doneEl = document.getElementById('done-list');
@@ -712,32 +821,59 @@ async function saveAudit(){
   const remarks = remEl ? remEl.value.trim() : '';
   const user=JSON.parse(localStorage.getItem('mjm_user')||'{}');
   setLoading(true);
+  let result;
   try{
-    // The photo is compulsory for BOTH results now (see the validation
-    // above), so it is uploaded for both. These lines used to branch on
-    // `isUnsat` — a variable whose definition left with the old
-    // photo-only-when-Unsatisfied design — and the dangling reference
-    // threw before anything was written: every save, Satisfied or not,
-    // ended in "Save failed".
-    let photoUrl = formState.photo || null;
-    if (photoUrl && photoUrl.startsWith('data:'))
-      photoUrl = await sb.uploadPhoto('audit-photos','maint_'+t.plot+'_'+Date.now(),photoUrl);
+    /* The photo goes into the payload as the data: URL it already is, and
+       smartSave uploads it. It is NOT uploaded here first.
+
+       It used to be, and that quietly undid everything smartSave does for
+       a photo. sb.uploadPhoto returns null when storage refuses the write
+       — a missing audit-photos bucket, a policy saying no — so the record
+       saved photo-less, on a form that makes the photo compulsory. Worse,
+       it THROWS on a network error or a malformed data URL, and a throw
+       here lands in the catch below having written nothing and queued
+       nothing: the audit, the remark and the photo are all gone, and the
+       auditor is standing in the plot being told "Save failed".
+
+       smartSave fails the online save when an upload is rejected, keeps
+       the photo in IndexedDB, and retries it on the next sync. That is
+       the behaviour this screen is supposed to have. */
     const payload={
       task_id:parseInt(formTaskId),
       nursery:t.nursery,plot:t.plot,task_type:t.type,
       result:formState.result,
       // Remarks are optional on both branches — keep whatever was keyed.
       remarks: remarks || null,
-      photo_url: photoUrl,
+      photo_url: formState.photo || null,
       auditor_name:user.name||'',
       date:todayISO()
     };
-    const result=await smartSave('audit_maintenance_audits',editMode?'update':'insert',
+    result=await smartSave('audit_maintenance_audits',editMode?'update':'insert',
       editMode?payload:{...payload,audit_id:nextAuditID()},
       editMode?editId:null);
-    showToast(result?.offline?'📴 Saved offline — will sync later':editMode?'✓ Audit updated':'✓ Audit saved');
-    await loadAll();setView('list');
-  }catch(e){showToast('⚠ Save failed');console.error(e);setLoading(false);}
+  }catch(e){
+    /* smartSave does not throw — it queues instead — so anything caught
+       here happened before it. Say which: "Save failed" on its own sent
+       somebody to the database looking for a fault that was never there. */
+    console.error('Maintenance audit save failed', e);
+    const why = (typeof sb !== 'undefined' && sb.lastPhotoError) || e?.message || '';
+    showToast('⚠ Save failed' + (why ? ' — ' + String(why).slice(0, 80) : ''));
+    setLoading(false);
+    return;
+  }
+
+  showToast(result?.offline?'📴 Saved offline — will sync later':editMode?'✓ Audit updated':'✓ Audit saved');
+
+  /* Outside the try on purpose. This is the redraw AFTER the record is
+     safely away; a failure here is a stale list, not a lost audit, and
+     reporting it as "Save failed" over the top of the tick the auditor
+     just saw is how a saved record gets entered twice. */
+  try{
+    await loadAll();
+  }catch(e){
+    console.error('Saved, but the list could not be refreshed', e);
+  }
+  setView('list');
 }
 
 /* --- DETAIL --- */

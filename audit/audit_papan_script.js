@@ -12,6 +12,11 @@
 
 const NURSERY_LABELS = {PN:'PN',BNN:'BNN',UNN1:'UNN 1',UNN2:'UNN 2'};
 
+/* B is Batu Niah, U is Ulu Niah 1, N is Ulu Niah 2, P is the Pre-Nursery.
+   The last resort when a plot is in no list - a plot past the end of a
+   range, or one made by a transfer, is still plainly in its nursery. */
+const _PREFIX_NURSERY_P = { P:'PN', B:'BNN', U:'UNN1', N:'UNN2' };
+
 const NURSERY_PLOTS = {
   PN:   Array.from({length:52},(_,i)=>'P'+String(i+1).padStart(2,'0')),
   BNN:  Array.from({length:14},(_,i)=>'B'+String(i+1).padStart(2,'0')),
@@ -410,7 +415,15 @@ async function _loadAllLive(){
     (lRows||[]).forEach(l => {
       const plot = _canonicalPlot(l.plot_name);
       const batch = String(l.batch_name||'').trim();
-      const nursery = plot ? PLOT_TO_NURSERY_P[plot] : null;
+      /* Same rule the maintenance audit uses, and for the same reason: the
+         hardcoded list is P01-P52, B01-B14, U01-U18, N01-N20, so a batch
+         standing on a TRANSFER plot (B3-R, made by a 3rd-culling transfer)
+         or on a plot past the end of a range got no Papan Tanda card at
+         all - and nothing said so. The letter a plot starts with places
+         it when every list has failed. */
+      const nursery = plot
+        ? (PLOT_TO_NURSERY_P[plot] || _PREFIX_NURSERY_P[plot.charAt(0).toUpperCase()] || null)
+        : null;
       if(!nursery || !plot || !batch) return;
       const key = nursery + '|' + plot + '|' + batch;
       if(manualKeys.has(key)) return;

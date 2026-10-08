@@ -106,7 +106,18 @@ function canOpenAuditPage(page) {
     const p = u.permissions || {};
     // audit_actions is authoritative; audit_pages mirrors it.
     const acts = p.audit_actions && p.audit_actions[page];
-    if (acts) return !!acts.view;
+    /* `view` MISSING is not `view` false. User Access lists Record a new
+       audit and Edit and delete past audits for each page, so a saved row
+       can easily read { record:true, edit:false } with no `view` key in
+       it at all — and `!!acts.view` then denied the page to somebody the
+       office had just granted. Every module card vanished and the only
+       tile left on screen was the one not covered by this map.
+       Access fails OPEN here the way it does everywhere else: an absent
+       answer is nobody has been asked, and only an explicit false is a
+       no. */
+    if (acts && acts.view === false) return false;
+    if (acts && acts.view === true)  return true;
+    if (acts) return true;
     const lvl = p.audit_pages && p.audit_pages[page];
     if (lvl) return lvl !== 'none';
     // Nothing configured for this user: unchanged behaviour, everything open.

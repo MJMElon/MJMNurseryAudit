@@ -362,10 +362,10 @@ function verdict(anonRead, userRead) {
     body = 'There is no shared_profiles row whose id matches your auth user id, so the ' +
            'audit policy cannot grant you anything. Send this screen over — this needs an SQL fix.';
   } else if (findings.includes('NO_AUDIT_PERM')) {
-    title = 'Your account has no access to the audit module';
-    body = 'modules.audit is not set to admin or normal in shared_profiles, so the RLS ' +
-           'policy filters every row away. Grant the Audit module in User Access, or ' +
-           'send this screen over for the SQL.';
+    title = 'This account has not been given the Audit module';
+    body = 'Nobody has granted it in Settings, User Access, Edit Access — the email in ' +
+           'section 2 above is the account to find there. It is an office action, not a ' +
+           'fault: grant Audit (Normal) and this phone works. No SQL is needed for it.';
   } else if (findings.includes('CANNOT_SAVE')) {
     title = 'This login cannot save - and would not have been told until it tried';
     body = 'Section 7 names each audit the database would refuse and why. Nothing ' +

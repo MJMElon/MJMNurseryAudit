@@ -125,6 +125,39 @@ function _countdownChip(t){
 }
 
 let tasks=[], audits=[];
+
+/* ── OFFLINE CACHE ──
+   The same thing Plot Condition, Seedling Height and Papan Tanda have
+   had for a while, and the one module that did not. Three live reads in
+   loadAll below and the middle one, audit_maintenance_audits, has no
+   .catch of its own -- a failure there throws past the whole function,
+   tasks never gets set, and the page shows "Failed to load" with an
+   empty list. With no line that is every single time, so an auditor
+   standing in a plot with no signal had nothing to record AGAINST,
+   however well the outbox worked underneath.
+
+   Cached is the PROCESSED state, the same shape renderLists() already
+   reads, so restoring it needs no re-derivation and no second copy of
+   the placement rules. */
+const _MAINT_CACHE_KEY = 'mjm_maint_cache_v1';
+function _saveOfflineCache(){
+  try {
+    localStorage.setItem(_MAINT_CACHE_KEY, JSON.stringify({
+      tasks, audits, unplacedTasks, savedAt: Date.now()
+    }));
+  } catch(e) { /* storage full or unavailable — no fallback next time, not fatal now */ }
+}
+function _loadOfflineCache(){
+  try {
+    const raw = localStorage.getItem(_MAINT_CACHE_KEY);
+    if (!raw) return null;
+    const c = JSON.parse(raw);
+    tasks         = c.tasks         || [];
+    audits        = c.audits        || [];
+    unplacedTasks = c.unplacedTasks || [];
+    return c.savedAt || 0;
+  } catch(e) { return null; }
+}
 let activeTab='audit';
 // Default filter is 'All' — the first tile in the row is pre-selected
 // and the type filter is a no-op until the auditor picks a specific
@@ -418,6 +451,23 @@ async function loadAll(){
   setLoading(true);
   unplacedTasks = [];
   try{
+    /* Offline: three requests would just be three round trips to the
+       service workers synthetic 503 — send none of them, and use
+       whatever this device last saw while it still had a signal. No
+       cache at all (never loaded successfully here before) falls through
+       to the live attempt, which fails exactly as it always did. */
+    if (!navigator.onLine) {
+      const savedAt = _loadOfflineCache();
+      if (savedAt) {
+        console.log('[maint-audit] offline — served from cache saved',
+          new Date(savedAt).toLocaleString());
+        renderLists();
+        updateStats();
+        setLoading(false);
+        return;
+      }
+    }
+
     /* Before anything is placed. Soft on its own - a failure here leaves
        the built-in list standing, which is right for every ordinary
        plot. */
@@ -592,8 +642,24 @@ async function loadAll(){
       }
     })();
     updateStats();
+    _saveOfflineCache();
   }catch(e){
-    showToast('⚠ Failed to load');console.error(e);
+    /* A read that fails WITH a line — a flaky tower, a refusal — used to
+       leave the same empty screen as no line at all. Yesterday's list is
+       a better answer than nothing: the auditor can still record, and
+       the record goes to the outbox either way. */
+    const savedAt = _loadOfflineCache();
+    if (savedAt) {
+      console.warn('[maint-audit] load failed — falling back to the cache saved',
+        new Date(savedAt).toLocaleString(), e);
+      renderLists();
+      updateStats();
+      showToast('📴 No line — showing the list saved ' +
+                new Date(savedAt).toLocaleString(undefined,
+                  {day:'2-digit', month:'short', hour:'2-digit', minute:'2-digit'}), 5000);
+    } else {
+      showToast('⚠ Failed to load');console.error(e);
+    }
   }
   setLoading(false);
 }

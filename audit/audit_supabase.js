@@ -1,4 +1,4 @@
-/* BUILD: 2026-08-21k */
+/* BUILD: 2026-10-08a */
 /* ================================================================
    MJM NURSERY — SUPABASE SHARED CONFIG
    supabase.js
@@ -321,6 +321,29 @@ const sb = {
       }
       throw e;
     }
+  },
+  /* Can this login save at all? Asked at sign in, before an auditor
+     spends a day filling in forms the database is going to refuse.
+
+     It answers per table, reading the real policy out of the catalogue —
+     shared/RUN_ME_audit_save_check.sql installs it. A null answer means
+     the function is not there or could not be reached, and that is NOT a
+     no: access fails open here the way it does everywhere else in this
+     system, so a check that cannot run never takes the module away from
+     somebody who was working fine a minute ago. */
+  async canISave() {
+    try {
+      const token = await accessToken();
+      const res = await fetch(`${SUPA_URL}/rest/v1/rpc/audit_can_i_save`, {
+        method: 'POST',
+        headers: { 'apikey': SUPA_KEY, 'Authorization': `Bearer ${token || SUPA_KEY}`,
+                   'Content-Type': 'application/json' },
+        body: '{}'
+      });
+      if (!res.ok) return null;
+      const rows = await res.json();
+      return Array.isArray(rows) ? rows : null;
+    } catch (e) { return null; }
   },
   async insert(table, data) {
     return sbFetch(table, { method: 'POST', body: JSON.stringify(data), prefer: 'return=representation' });

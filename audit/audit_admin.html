@@ -3,6 +3,9 @@
 <head>
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate"/>
+<meta http-equiv="Pragma" content="no-cache"/>
+<meta http-equiv="Expires" content="0"/>
   <title>MJM Nursery — Auditor Portal</title>
   <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 32 32%27%3E%3Crect width=%2732%27 height=%2732%27 rx=%277%27 fill=%27%234a7a2e%27/%3E%3Ctext x=%2716%27 y=%2722%27 font-family=%27system-ui,sans-serif%27 font-size=%2715%27 font-weight=%27900%27 fill=%27%23fff%27 text-anchor=%27middle%27%3EAI%3C/text%3E%3C/svg%3E">
   <link rel="preconnect" href="https://fonts.googleapis.com"/>
@@ -544,6 +547,26 @@
         <div class="fc-ttl" style="color:#b91c4a">Settings</div>
         <div class="fc-desc">User access — which audits each person may open and record — and the system settings for this installation.</div>
         <div class="fc-enter" style="color:#b91c4a">
+          <span>Enter Module</span>
+          <svg viewBox="0 0 24 24"><line x1="4" y1="12" x2="19" y2="12"/><polyline points="13 6 19 12 13 18"/></svg>
+        </div>
+      </a>
+
+      <!-- Diagnostics. The page has existed for a while and nothing has
+           ever linked to it, so the only way in was typing the file name
+           — which means that when an auditor phone would not empty, the
+           question came by video of a number not moving. It reads the
+           outbox straight out of the phone and says which of the two it
+           is: records the server refused, with the reason against each,
+           or records no sweep has reached. Open it ON THE PHONE that is
+           stuck; it reports that phone, not this one. -->
+      <a class="fc-card" href="audit_diagnostics.html">
+        <div class="fc-ico" style="background:#eef2f7">
+          <svg viewBox="0 0 24 24" style="stroke:#3d5570"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+        </div>
+        <div class="fc-ttl" style="color:#3d5570">Diagnostics</div>
+        <div class="fc-desc">What a phone is actually doing — the sign-in, the permissions, the code it is running, and every finished audit still waiting to be sent, with the reason against each one.</div>
+        <div class="fc-enter" style="color:#3d5570">
           <span>Enter Module</span>
           <svg viewBox="0 0 24 24"><line x1="4" y1="12" x2="19" y2="12"/><polyline points="13 6 19 12 13 18"/></svg>
         </div>

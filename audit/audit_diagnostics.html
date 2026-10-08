@@ -42,6 +42,8 @@
 <div class="grp"><h2>3 · Reading the audit table</h2><div id="g-rest"></div></div>
 <div class="grp"><h2>4 · Your permissions</h2><div id="g-perm"></div></div>
 <div class="grp"><h2>5 · Service worker &amp; cache</h2><div id="g-sw"></div></div>
+<div class="grp"><h2>6 · What is still waiting to be sent</h2><div id="g-queue"></div></div>
+<div class="grp"><h2>7 · Can this login actually save</h2><div id="g-save"></div></div>
 
 <button class="b1" onclick="hardReset()">Force update — clear cache &amp; reload</button>
 <button class="b2" onclick="reLogin()">Sign out &amp; sign in again</button>
@@ -199,7 +201,141 @@ async function run() {
     row('g-sw', 'caches', keys.join(', ') || '(none)', 'dim');
   } catch (e) { row('g-sw', 'failed', e.message, 'bad'); }
 
+  await readQueue();
+  await askCanSave(sess);
+
   verdict(anonRead, userRead);
+}
+
+/* ── 6. The outbox, read straight out of IndexedDB ─────────────────────
+   An auditor phone held seventy finished audits and the only thing on
+   screen about them was a count in a green bar. Whether they were
+   refused, or waiting, or going up right now and simply slow, there was
+   nowhere to look -- so the answer came by video, of a number not
+   moving, and a day went on guessing.
+
+   Read with plain indexedDB rather than through audit_dexie_offline.js,
+   for the same reason as everything else on this page: it must still
+   answer when the file it is reporting on is the broken one. The photo
+   bodies are never read, only counted -- there can be seventy of them
+   and they are the reason a sweep takes minutes. */
+function openQueueDb() {
+  return new Promise(res => {
+    let done = false;
+    const finish = v => { if (!done) { done = true; res(v); } };
+    setTimeout(() => finish(null), 4000);
+    try {
+      const rq = indexedDB.open('MJMAuditV5');
+      rq.onsuccess = () => finish(rq.result);
+      rq.onerror = () => finish(null);
+      rq.onblocked = () => finish(null);
+    } catch (e) { finish(null); }
+  });
+}
+function readStore(db, name) {
+  return new Promise(res => {
+    try {
+      if (!db.objectStoreNames.contains(name)) return res([]);
+      const rq = db.transaction(name, 'readonly').objectStore(name).getAll();
+      rq.onsuccess = () => res(rq.result || []);
+      rq.onerror = () => res([]);
+    } catch (e) { res([]); }
+  });
+}
+async function readQueue() {
+  const db = await openQueueDb();
+  if (!db) { row('g-queue', 'outbox', 'could not be opened on this phone', 'bad'); return; }
+
+  const all = (await readStore(db, 'queue')).filter(r => !r.synced);
+  const waiting = all.filter(r => !r.blocked);
+  const stuck   = all.filter(r => r.blocked);
+
+  row('g-queue', 'waiting to go up', String(waiting.length), waiting.length ? 'warn' : 'ok');
+  row('g-queue', 'stuck (server refused)', String(stuck.length), stuck.length ? 'bad' : 'ok');
+
+  if (all.length) {
+    const oldest = Math.min.apply(null, all.map(r => r.created_at || Date.now()));
+    const days   = Math.floor((Date.now() - oldest) / 86400000);
+    const hours  = Math.floor((Date.now() - oldest) / 3600000);
+    row('g-queue', 'oldest was recorded', new Date(oldest).toLocaleString() +
+        '  (' + (days >= 1 ? days + ' day' + (days > 1 ? 's' : '') : hours + ' h') + ' ago)',
+        days >= 1 ? 'bad' : 'warn');
+
+    const byTable = {};
+    all.forEach(r => { byTable[r.table] = (byTable[r.table] || 0) + 1; });
+    Object.keys(byTable).sort().forEach(t => row('g-queue', t, String(byTable[t]), 'dim'));
+
+    /* How many tries each has had says which of the two shapes this is:
+       all on nought means no sweep has ever reached them, which is a
+       sweep that is not finishing rather than a server that is saying
+       no. That one distinction is the whole of what was missing. */
+    const tries = waiting.map(r => r.retries || 0);
+    if (tries.length) {
+      const most = Math.max.apply(null, tries);
+      row('g-queue', 'most tries any waiting record has had', String(most),
+          most === 0 ? 'bad' : 'dim');
+      if (most === 0 && waiting.length > 2) {
+        row('g-queue', 'what that means',
+            'none of them has been tried even once - the sweep is not finishing, ' +
+            'it is not the server refusing', 'bad');
+        findings.push('SWEEP_NOT_FINISHING');
+      }
+    }
+
+    const why = {};
+    stuck.forEach(r => { const k = r.last_error || 'no reason recorded';
+                         why[k] = (why[k] || 0) + 1; });
+    Object.keys(why).forEach(k => row('g-queue', why[k] + ' stuck because', k, 'bad'));
+    if (stuck.length) findings.push('QUEUE_STUCK');
+    if (waiting.length) findings.push('QUEUE_WAITING');
+  } else {
+    row('g-queue', 'outbox', 'empty - everything on this phone has reached the server', 'ok');
+  }
+
+  const photos = await readStore(db, 'photos');
+  row('g-queue', 'photos held on this phone', String(photos.length), 'dim');
+  try { db.close(); } catch (e) {}
+}
+
+/* ── 7. Would a save be taken, table by table ──────────────────────────
+   Section 4 reads the permission the OLD policy used to check. This asks
+   the database itself whether a row would be accepted right now, which is
+   the question an auditor about to start a round actually has, and the
+   one nothing asked until seventy finished audits had piled up on a phone
+   with nowhere to go.
+
+   Installed by shared/RUN_ME_audit_save_check.sql. Not installed is not a
+   no -- it says so and nothing else, the same way access fails open
+   everywhere else here. */
+async function askCanSave(sess) {
+  if (!sess || !sess.access_token) {
+    row('g-save', 'skipped', 'no session to ask with', 'warn');
+    return;
+  }
+  let rows = null, status = 0;
+  try {
+    const r = await fetch(SUPA_URL + '/rest/v1/rpc/audit_can_i_save', {
+      method: 'POST',
+      headers: { apikey: SUPA_KEY, Authorization: 'Bearer ' + sess.access_token,
+                 'Content-Type': 'application/json' },
+      body: '{}'
+    });
+    status = r.status;
+    if (r.ok) rows = await r.json();
+  } catch (e) { /* reported below */ }
+
+  if (!Array.isArray(rows)) {
+    row('g-save', 'the check', status === 404 || status === 0
+        ? 'not installed on this database -- run shared/RUN_ME_audit_save_check.sql'
+        : 'could not be asked (status ' + status + ')', 'warn');
+    row('g-save', 'what that means',
+        'unknown, not refused. Nothing is concluded from a question that could not be put.', 'dim');
+    return;
+  }
+  const no = rows.filter((r) => r && r.ok === false);
+  rows.forEach((r) => row('g-save', r.tbl, r.ok ? 'a row would be accepted' : 'REFUSED -- ' + (r.why || ''),
+                          r.ok ? 'ok' : 'bad'));
+  if (no.length) findings.push('CANNOT_SAVE');
 }
 
 function verdict(anonRead, userRead) {
@@ -230,10 +366,30 @@ function verdict(anonRead, userRead) {
     body = 'modules.audit is not set to admin or normal in shared_profiles, so the RLS ' +
            'policy filters every row away. Grant the Audit module in User Access, or ' +
            'send this screen over for the SQL.';
+  } else if (findings.includes('CANNOT_SAVE')) {
+    title = 'This login cannot save - and would not have been told until it tried';
+    body = 'Section 7 names each audit the database would refuse and why. Nothing ' +
+           'recorded on this phone will reach the server until that is fixed, so do ' +
+           'not start a round on it. Send this screen over.';
+  } else if (findings.includes('SWEEP_NOT_FINISHING')) {
+    title = 'The records are not being refused - the sync is not finishing';
+    body = 'There are records waiting that have never been tried once, which is what a ' +
+           'sweep that stops part-way looks like from here. Tap "Force update" below so ' +
+           'this phone picks up the current code, then open the audit module and watch ' +
+           'the green bar: it now counts "Sending 3 of 69" as it goes.';
+  } else if (findings.includes('QUEUE_STUCK')) {
+    title = 'Some finished audits were refused by the server';
+    body = 'Section 6 above gives the reason against each one. They are still on this ' +
+           'phone and nothing is lost - once the reason is fixed, tap the red bar at the ' +
+           'top of the audit screen and they go up.';
   } else if (userRead && userRead.n > 0) {
     title = 'Everything checks out'; good = true;
-    body = 'Your login can read ' + userRead.n + ' record(s). If a list still looks empty, ' +
-           'it is a filter on that screen — the nursery tab or the month — not access.';
+    body = 'Your login can read ' + userRead.n + ' record(s)' +
+           (findings.includes('QUEUE_WAITING')
+             ? ', and the records in section 6 are on their way up - leave the audit screen ' +
+               'open with a signal until the green bar is gone.'
+             : '. If a list still looks empty, it is a filter on that screen — the nursery ' +
+               'tab or the month — not access.');
   } else if (userRead && userRead.status && userRead.status !== 200) {
     title = 'The database refused the read';
     body = 'Status ' + userRead.status + '. ' + String(userRead.body).slice(0, 240);

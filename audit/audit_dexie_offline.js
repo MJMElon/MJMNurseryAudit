@@ -1,4 +1,4 @@
-/* BUILD: 2026-08-31b */
+/* BUILD: 2026-10-08b */
 /* ================================================================
    MJM NURSERY AUDIT — OFFLINE STORAGE v5
    dexie_offline.js
@@ -175,9 +175,33 @@ async function uploadPhoto(table, field, base64){
   return await sb.uploadPhoto('audit-photos', name, base64);
 }
 
-/* ── Timeout wrapper ── */
+/* Write an uploaded photo url into the queued payload, so the record
+   stops depending on a photo that is about to be deleted from the phone.
+   The local item is updated too, so a retry within the same sweep sees
+   it. */
+async function _rememberPhotoUrl(item, field, url){
+  try{
+    const db = await getDB();
+    const p  = JSON.parse(item.payload);
+    p[field] = url;
+    item.payload = JSON.stringify(p);
+    await db.queue.update(item.id, {payload: item.payload});
+  }catch(e){
+    console.warn('[Sync] could not write the photo url back:', e.message);
+  }
+}
+
+/* ── Timeout wrapper ──
+   The timer is cleared when the work wins the race. It was not, which on
+   a sweep of sixty-nine records left sixty-nine live timers behind,
+   each still holding its closure for forty-five seconds after the thing
+   it was watching had finished. */
 function withTimeout(p, ms){
-  return Promise.race([p, new Promise((_,r)=>setTimeout(()=>r(new Error('timeout '+ms+'ms')),ms))]);
+  let t;
+  return Promise.race([
+    Promise.resolve(p).finally(()=>clearTimeout(t)),
+    new Promise((_,r)=>{ t = setTimeout(()=>r(new Error('timeout '+ms+'ms')), ms); })
+  ]);
 }
 
 /* ================================================================
@@ -321,6 +345,31 @@ async function smartSave(table, method, payload, editId=null){
    SYNC
 ================================================================ */
 let _syncing = false;
+/* When the sweep that owns the flag started. A sweep cannot outlive
+   CEILING because every call inside it is now wrapped in a timeout, so a
+   flag older than that belongs to a sweep that will never come back --
+   from the version of this file that wrapped none of them, still sitting
+   in a phone cache. Without this, those phones stay frozen until somebody
+   clears site data: _syncing is set, so the 30s timer returns at once,
+   every tap answers "already syncing", and a reload sets it again on the
+   same stalled upload. */
+let _syncStartedAt = 0;
+const SYNC_CEILING_MS = 10 * 60 * 1000;
+
+/* What the banner says while a sweep is in flight. A badge that reads
+   the same number for four minutes is, on a phone, indistinguishable
+   from one that has stopped -- which is the whole of what was reported.
+   null when no sweep is running. */
+let _syncProgress = null;
+
+/* A sweep that stops answering must not stop the queue. smartSave has
+   always wrapped its upload and its insert in a timeout; the sweep
+   wrapped neither, so one stalled upload on a weak signal held the
+   for-loop on item one for ever and the other sixty-eight were never
+   tried -- which is why none of them had reached the five-try park. The
+   photo gets longer because it is the bigger body of the two. */
+const UPLOAD_TIMEOUT_MS = 45000;
+const INSERT_TIMEOUT_MS = 20000;
 
 /* manual=true is a person tapping the Sync button, not the 30s timer
    or the 'online' event. The two silent early-returns below (already
@@ -331,9 +380,19 @@ let _syncing = false;
    quietly is what "automatic" is supposed to look like. */
 async function syncNow(manual){
   if(_syncing){
-    console.log('[Sync] Already running');
-    if(manual) showToast('🔄 Already syncing…');
-    return;
+    /* Taking over is safe: the abandoned sweep marks an item done only
+       after the server has taken it, so the worst the two can do is try
+       the same record twice -- and a second insert of a row already
+       there comes back 23505, which this loop already retires quietly. */
+    if(_syncStartedAt && (Date.now() - _syncStartedAt) > SYNC_CEILING_MS){
+      console.warn('[Sync] Previous sweep never came back after',
+                   Math.round((Date.now()-_syncStartedAt)/1000), 's - taking over');
+      _syncing = false;
+    } else {
+      console.log('[Sync] Already running');
+      if(manual) showToast('🔄 Already syncing…');
+      return;
+    }
   }
   if(!navigator.onLine){
     console.log('[Sync] No network');
@@ -352,10 +411,14 @@ async function syncNow(manual){
   }
 
   _syncing = true;
+  _syncStartedAt = Date.now();
   console.log('[Sync] Starting:', pending.length, 'pending');
-  refreshBadge();
 
   let ok=0, fail=0, lastErr='';
+
+  try{
+  _syncProgress = {done:0, total:pending.length};
+  refreshBadge();
 
   for(const item of pending){
     try{
@@ -377,21 +440,31 @@ async function syncNow(manual){
                photo. Delete the local one only once it is safely uploaded,
                and let a failure abort the item so it retries with the photo
                still in hand. */
-            const url = await uploadPhoto(item.table, rField, data);
+            const url = await withTimeout(uploadPhoto(item.table, rField, data), UPLOAD_TIMEOUT_MS);
             if(!url) throw new Error('photo upload rejected for '+rField);
             p[f] = url;
+            /* The url goes into the QUEUE ROW before the photo leaves the
+               phone, and before the insert that may still refuse. It used
+               to live only in this local p: the photo was deleted, the
+               insert failed, and the row went back to the queue still
+               saying __IMG__. The next sweep looked for a photo that was
+               no longer there, read null, and saved the audit photo-less
+               -- on a form that makes the photo compulsory, with nothing
+               on screen to say a picture had ever been taken. */
+            await _rememberPhotoUrl(item, f, url);
             await removePhotos(rKey);
           } else { p[f]=null; }
         } else if(v.startsWith('data:')){
-          const url = await uploadPhoto(item.table, f, v);
+          const url = await withTimeout(uploadPhoto(item.table, f, v), UPLOAD_TIMEOUT_MS);
           if(!url) throw new Error('photo upload rejected for '+f);
           p[f] = url;
+          await _rememberPhotoUrl(item, f, url);
         }
       }
 
       /* Save */
-      if(item.method==='insert') await sb.insert(item.table, p);
-      else await sb.update(item.table, item.edit_id, p);
+      if(item.method==='insert') await withTimeout(sb.insert(item.table, p), INSERT_TIMEOUT_MS);
+      else await withTimeout(sb.update(item.table, item.edit_id, p), INSERT_TIMEOUT_MS);
 
       await setDone(item.id);
       ok++;
@@ -441,10 +514,23 @@ async function syncNow(manual){
         await db.queue.update(item.id, {retries});
       }
     }
+    /* After the item, whichever way it went. Sixty-nine audits with a
+       photo each is minutes of work; the number has to come down while
+       it happens or the person watching has no way to tell this apart
+       from the thing they reported. */
+    _syncProgress.done++;
+    refreshBadge();
   }
 
   await clearDone();
-  _syncing = false;
+  }finally{
+    /* clearDone and refreshBadge sit outside every try in the loop. One
+       of them throwing used to leave the flag set, and a set flag is a
+       phone that never syncs again -- no timer, no tap, no reload. */
+    _syncing = false;
+    _syncStartedAt = 0;
+    _syncProgress = null;
+  }
   refreshBadge();
   if(fail===0) stampSyncOk();
   renderSyncPill();
@@ -458,6 +544,20 @@ async function syncNow(manual){
      Supabase (duplicate id, missing batch/task, RLS), not the network — and
      tapping again will never fix it, so the reason has to reach the phone. */
   if(fail>0) showToast('⚠ '+fail+' failed to sync — '+(lastErr||'unknown error'), 7000);
+
+  /* A record parked earlier is invisible while anything is still
+     waiting: the badge only offers its reason when NOTHING is pending,
+     and the tap goes to the sync instead. So a phone reading
+     "69 pending (1 stuck)" never says what the one is -- and that one is
+     a finished audit of a real plot. Say it at the foot of a clean
+     sweep, when there is nothing else competing for the toast. */
+  if(fail===0 && ok>0){
+    const parked = await getBlocked();
+    if(parked.length){
+      showToast('⚠ '+parked.length+' record'+(parked.length>1?'s':'')+' still stuck — '
+              + (parked[0].last_error || 'reason not recorded'), 8000);
+    }
+  }
 }
 
 /* ================================================================
@@ -579,6 +679,16 @@ async function refreshBadge(){
             if(await countBlocked()) showToast('Still stuck — the reason above has not been fixed yet.', 6000);
             return;
           }
+          /* Before the delete, the way to SEE what is here. Diagnostics
+             reads the outbox out of this phone and names every record
+             and its reason — which is the thing somebody needs in front
+             of them before throwing a finished audit away. */
+          if(confirm('Open Diagnostics to see exactly what is waiting and why?\n\n'
+                   + 'OK — open it.\n'
+                   + 'Cancel — go on to deleting them.')){
+            location.href = 'audit_diagnostics.html';
+            return;
+          }
           /* Deleting a completed audit is behind its own question, and
              says what it costs. */
           if(confirm('Delete '+noun+' permanently?\n\n'
@@ -598,6 +708,11 @@ async function refreshBadge(){
       b.style.cssText = 'position:fixed;top:0;left:0;right:0;margin:0 auto;width:fit-content;max-width:480px;padding:5px 18px;border-radius:0 0 12px 12px;font-size:11px;font-weight:700;z-index:99999;cursor:pointer;color:#fff;box-shadow:0 2px 8px rgba(0,0,0,.3);text-align:center;transition:background .15s';
       document.body.appendChild(b);
     }
+    /* Sits under the cannot-save warning when there is one. A record
+       waiting to go up matters; a login that can never send it matters
+       more, and the two must not be drawn on top of each other. */
+    const warn = document.getElementById('_save_check_bar');
+    b.style.top = warn ? (warn.offsetHeight + 'px') : '0';
     if(blocked>0 && n===0){
       // Nothing is going to happen on its own — say so, and prompt the
       // tap that surfaces the confirm dialog (reason + Delete option).
@@ -605,10 +720,14 @@ async function refreshBadge(){
       b.textContent = '⚠ '+blocked+' record'+(blocked>1?'s':'')+' stuck — tap to clear';
     } else if(n>0){
       b.style.background = navigator.onLine ? '#2d7a2d' : '#f59e0b';
-      b.textContent = navigator.onLine
-        ? '🔄 '+n+' pending — tap to sync now'
-          + (blocked ? ' ('+blocked+' stuck)' : '')
-        : '📴 Offline — '+n+' record'+(n>1?'s':'')+' saved locally';
+      b.textContent = !navigator.onLine
+        ? '📴 Offline — '+n+' record'+(n>1?'s':'')+' saved locally'
+        : _syncProgress
+          /* Mid-sweep. Each of these carries a photo, so a sweep is
+             minutes long and the count only falls as each one lands. */
+          ? '🔄 Sending '+(_syncProgress.done+1)+' of '+_syncProgress.total+'…'
+          : '🔄 '+n+' pending — tap to sync now'
+            + (blocked ? ' ('+blocked+' stuck)' : '');
     } else if(navigator.onLine){
       // Idle: everything is already synced. Quiet on purpose — this is
       // not a state anyone needs to react to — but still there, still
@@ -627,6 +746,96 @@ async function refreshBadge(){
   }catch(e){}
 }
 function showOfflineBadge(){ refreshBadge(); }
+
+/* ================================================================
+   ASK BEFORE THE WORK, NOT AFTER IT
+
+   Twice in one week an auditor filled in a day of audits and only then
+   found out the database would not take them — seventy of them on one
+   phone, and nobody in the office knew for days, because the only thing
+   that ever asked the question was the save itself.
+
+   So the phone asks at sign in. audit_can_i_save() answers per table by
+   reading the real policy out of the catalogue
+   (shared/RUN_ME_audit_save_check.sql), and if the answer is no this bar
+   says so before the first form is opened.
+
+   It FAILS OPEN, for the same reason everything else here does: a null
+   answer is the function not being there or the network being out, not a
+   refusal, and a check that cannot run must never take the module away
+   from somebody who was working fine a minute ago. Only an explicit no
+   from the database puts the bar up.
+================================================================ */
+const SAVE_CHECK_KEY = 'mjm_audit_save_check_v1';
+
+function _saveCheckBar(refused){
+  let b = document.getElementById('_save_check_bar');
+  if(!refused || !refused.length){ if(b){ b.remove(); refreshBadge(); } return; }
+  if(!b){
+    b = document.createElement('div');
+    b.id = '_save_check_bar';
+    b.setAttribute('role','alert');
+    b.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:99998;padding:9px 14px;'
+      + 'background:#b91c1c;color:#fff;font-size:12px;font-weight:700;line-height:1.45;'
+      + 'text-align:center;box-shadow:0 2px 10px rgba(0,0,0,.35);cursor:pointer';
+    /* Tapping goes where the detail is, rather than opening a dialog that
+       repeats the one sentence already on screen. */
+    b.onclick = ()=>{ location.href = 'audit_diagnostics.html'; };
+    document.body.appendChild(b);
+  }
+  /* The whole module, or one kind of audit: these read very differently
+     to somebody about to start a round, so they are said differently. */
+  const all = refused.length >= 6;
+  b.textContent = '⚠ This login cannot save '
+    + (all ? 'audits' : refused.map(r => _AUDIT_LABEL[r.tbl] || r.tbl).join(', '))
+    + ' — tell the office BEFORE you start. Nothing you record will reach the server. Tap for details.';
+  /* The queue badge lives at the top of the screen too. This one must not
+     be the one that gets covered, so the badge moves under it. */
+  refreshBadge();
+}
+
+const _AUDIT_LABEL = {
+  audit_plot_audits:        'plot condition audits',
+  audit_height_records:     'seedling height audits',
+  audit_papan_audits:       'papan tanda audits',
+  audit_batches:            'batch audits',
+  audit_maintenance_tasks:  'maintenance tasks',
+  audit_maintenance_audits: 'maintenance audits'
+};
+
+async function checkCanSave(){
+  /* Nobody signed in has nothing to be told. */
+  if(!localStorage.getItem('mjm_user')) { _saveCheckBar(null); return null; }
+  if(!navigator.onLine){
+    /* Offline is the normal state in a nursery and says nothing about
+       permission. Show the last answer if it was a no, so a conductor who
+       was told yesterday is still told today. */
+    try{
+      const last = JSON.parse(localStorage.getItem(SAVE_CHECK_KEY) || 'null');
+      if(last && last.refused && last.refused.length) _saveCheckBar(last.refused);
+    }catch(e){}
+    return null;
+  }
+  let rows = null;
+  try{ rows = await withTimeout(sb.canISave(), 10000); }catch(e){ rows = null; }
+  if(!rows){
+    /* Could not be answered. Not a no — leave whatever is on screen alone
+       and do not store an answer we do not have. */
+    console.log('[SaveCheck] no answer — failing open');
+    return null;
+  }
+  const refused = rows.filter(r => r && r.ok === false);
+  try{ localStorage.setItem(SAVE_CHECK_KEY, JSON.stringify({at:Date.now(), refused})); }catch(e){}
+  if(refused.length){
+    console.warn('[SaveCheck] this login cannot save:',
+                 refused.map(r => r.tbl + ' (' + (r.why||'') + ')').join('; '));
+  } else {
+    console.log('[SaveCheck] ✅ every audit table will take a row from this login');
+  }
+  _saveCheckBar(refused);
+  return refused;
+}
+window.checkCanSave = checkCanSave;
 
 /* ================================================================
    TOAST
@@ -717,12 +926,16 @@ async function initOffline(){
   // waiting to go up, so it is shown, not swept.
   refreshBadge();
   renderSyncPill();
+  /* Not awaited: a slow answer must not hold up the page an auditor is
+     trying to open. */
+  checkCanSave();
 
   window.addEventListener('online',()=>{
     console.log('[Net] Online');
     showToast('🔄 Back online — syncing...');
     refreshBadge();
     renderSyncPill();
+    checkCanSave();
     startSync();
   });
   window.addEventListener('offline',()=>{

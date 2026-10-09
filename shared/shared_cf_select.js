@@ -151,6 +151,26 @@ select.cf-native-hidden{display:none!important;}
         });
     }
 
+    // THE HIDE HAS TO SURVIVE THE PAGE RESTYLING ITS OWN SELECT.
+    // Several pages colour a <select> by state and do it the blunt way --
+    // `sel.className = 'lvl-select lvl-admin'` on the User Access drawer,
+    // `select.className = 'input-style ... t3-dest-plot'` on Tab 3's
+    // destination plot. An assignment to .className REPLACES the class
+    // list, so it takes cf-native-hidden with it, and the browser's own
+    // dropdown comes straight back BESIDE the button: two dropdowns on one
+    // row, both live, and nothing says which is the real one.
+    //
+    // So the hide is an INLINE style, which a className assignment cannot
+    // reach, and the class goes on beside it for anything keying off it.
+    // The observer in skin() puts both back if a page rewrites the style
+    // attribute wholesale as well. A page should not have to know this
+    // skin exists -- that was the whole bargain of rolling it out as one
+    // script tag.
+    function hideNative(select) {
+        if (!select.classList.contains('cf-native-hidden')) select.classList.add('cf-native-hidden');
+        if (select.style.display !== 'none') select.style.display = 'none';
+    }
+
     function skin(select) {
         if (select._cfWrap || select.classList.contains('cf-skip')) return;
         ensureStyle();
@@ -189,7 +209,7 @@ select.cf-native-hidden{display:none!important;}
 
         select.parentNode.insertBefore(wrap, select);
         wrap.appendChild(select);
-        select.classList.add('cf-native-hidden');
+        hideNative(select);
         wrap.appendChild(btn);
         wrap.appendChild(menu);
         select._cfWrap = wrap;
@@ -208,6 +228,11 @@ select.cf-native-hidden{display:none!important;}
         // dropdowns) should reach the button too.
         new MutationObserver(() => { btn.disabled = select.disabled; })
             .observe(select, { attributes: true, attributeFilter: ['disabled'] });
+
+        // And the hide has to survive the page restyling its own select --
+        // see hideNative() above for what that costs when it does not.
+        new MutationObserver(() => { hideNative(select); })
+            .observe(select, { attributes: true, attributeFilter: ['class', 'style'] });
     }
 
     function skinAll(root) {

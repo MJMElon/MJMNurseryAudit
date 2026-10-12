@@ -42,6 +42,25 @@
      work type raises no audit at all. */
   const DEFAULT_MAINT = { manuring: 3, weeding: 3, interrow: 5, other: 3, pd: 0 };
 
+  /* ── WHICH PLOTS A NURSERY HAS ──
+     The same four lists audit_pending.js, audit_height_script.js and
+     audit_papan_script.js each carry a copy of. This is the FOURTH, and
+     it is here rather than in the screen that needed it because this
+     file is the one place that already exists to stop the module
+     scripts keeping constants of their own.
+
+     Change one, change all four -- and the real fix is for the other
+     three to read plotsOf() instead, which is a refactor of three
+     shipped module scripts and deliberately not bundled into the change
+     that needed the list. */
+  const NURSERY_PLOTS = {
+    PN:   Array.from({length: 52}, (_, i) => 'P' + String(i + 1).padStart(2, '0')),
+    BNN:  Array.from({length: 14}, (_, i) => 'B' + String(i + 1).padStart(2, '0')),
+    UNN1: Array.from({length: 18}, (_, i) => 'U' + String(i + 1).padStart(2, '0')),
+    UNN2: Array.from({length: 20}, (_, i) => 'N' + String(i + 1).padStart(2, '0'))
+  };
+  const NURSERIES_OF = { MN: ['BNN', 'UNN1', 'UNN2'], PN: ['PN'] };
+
   const MODULES   = ['plot', 'height', 'papan'];
   const SCOPES    = ['MN', 'PN'];
   const WORKTYPES = ['manuring', 'weeding', 'interrow', 'pd', 'other'];
@@ -263,10 +282,34 @@
     return null;
   }
 
+  /* ── WHICH ROUND AN AUDIT ANSWERED, AND WHETHER IT WAS LATE ───────
+     A record dated 1 October is not an October audit. The round that
+     was open on the 1st was September round 3 -- its window was the
+     30th, and it stays open until somebody does the work, which is the
+     whole of the overdue rule. So the record IS the 30 Sep audit; the
+     auditor was simply a day late with it.
+
+     Nothing said so. The card printed "01 Oct 2026" and the reader was
+     left to work out which round that answered, which is the same
+     arithmetic that made the board look wrong in the first place.
+
+     It is the same question currentWindow already answers, asked on the
+     DAY OF THE AUDIT rather than on today -- so there is one rule and
+     not two. `late` is the audit landing after that window closed. */
+  function roundOf(scope, mod, dateISO) {
+    const d = String(dateISO || '').slice(0, 10);
+    if (d.length !== 10) return null;
+    const w = currentWindow(scope, mod, d);
+    if (!w) return null;
+    return { round: w.round, rounds: w.rounds, dueISO: w.dueISO, late: d > w.dueISO };
+  }
+
   global.MJMAuditSettings = {
+    plotsOf:     (nursery) => (NURSERY_PLOTS[nursery] || []).slice(),
+    nurseriesOf: (scope)   => (NURSERIES_OF[scope === 'PN' ? 'PN' : 'MN']).slice(),
     load, save, current, defaults, normalise,
     error: () => lastError,
-    windows, currentWindow, maintDays, ages, ageAllowed, ageMonths,
+    windows, currentWindow, roundOf, maintDays, ages, ageAllowed, ageMonths,
     MODULES, SCOPES, WORKTYPES,
     DEFAULT_SCHEDULE, DEFAULT_MAINT
   };

@@ -419,6 +419,30 @@ function _roundSuffix(){
                        : (typeof t === 'function' ? t('this_round') : 'This round');
   return ' \u00b7 ' + name + (d ? ' \u00b7 ' + (typeof t === 'function' ? t('due_by') : 'due') + ' ' + d : '');
 }
+
+/* THE ROUND A RECORD ANSWERED, WHERE IT WAS LATE.
+   A record dated 1 October is not an October audit -- the round open on
+   the 1st was September round 3, still open because an overdue round is
+   cleared by the work and not by the calendar. So the record IS the
+   30 Sep audit, with the auditor a day late. The card printed "01 Oct
+   2026" and left the reader to work that out.
+
+   Said only when it WAS late. On a record inside its own window the
+   date already says everything, and a tag on every row is a tag nobody
+   reads. */
+function _lateTag(dateISO){
+  try {
+    if (!(window.MJMAuditSettings && MJMAuditSettings.roundOf)) return '';
+    const r = MJMAuditSettings.roundOf(activeTab === 'PN' ? 'PN' : 'MN', 'height', dateISO);
+    if (!r || !r.late) return '';
+    /* Day and month, no year. The tag sits beside a full date already;
+       repeating the year makes a phone-width line wrap for nothing. */
+    const due = fmtDate(r.dueISO).replace(/ \d{4}$/, '');
+    const txt = (typeof t === 'function' ? t('late_for_round') : 'late for the {d} round');
+    return ' \u00b7 <span style="color:#9a6b00;font-weight:700">'
+         + txt.replace('{d}', due) + '</span>';
+  } catch (e) { return ''; }
+}
 function renderList(){
   const plots=NURSERY_PLOTS[activeTab]||[];
   // Count BATCHES (required only). A plot with 4 required batches counts
@@ -593,11 +617,12 @@ function openPlotDetail(plot){
        to trust the wrong one. */
     const _day = audit ? String(audit.date||'').slice(0,10) : '';
     const _dayTxt = _day ? fmtDate(_day) : '';
+    const _lateT = _day ? _lateTag(_day) : '';
     const metaHtml = done
-      ? `${audit.id||''}${_dayTxt?' · '+_dayTxt:''}`
+      ? `${audit.id||''}${_dayTxt?' · '+_dayTxt:''}${_lateT}`
       : lapsed
         ? `<span style="color:#9a6b00;font-weight:700">⟳ ${_roundLabel(_round)} due</span>`
-          + `${_dayTxt?' · last measured '+_dayTxt:''}`
+          + `${_dayTxt?' · last measured '+_dayTxt:''}${_lateT}`
       : notReq
         ? '<span style="color:#94a3b8;font-weight:600">✕ Not Required</span> · balance ≤ 0 in operation ledger'
         : 'Pending';

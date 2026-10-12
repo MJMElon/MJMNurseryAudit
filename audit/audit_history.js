@@ -114,8 +114,13 @@
     maint: {
       table: 'audit_maintenance_audits',
       key:   'audit_id',
-      cols:  'audit_id,nursery,plot,task_type,result,auditor_name,date,'
-           + 'photo_url',
+      /* remarks is read, and shown. It had always been written -- the
+         form keeps whatever the auditor typed -- and was on no screen
+         anywhere, so the one field that says WHY a task was marked
+         unsatisfied, or closed without an audit at all, could only be
+         seen in the database. */
+      cols:  'audit_id,task_id,nursery,plot,task_type,result,remarks,'
+           + 'auditor_name,date,photo_url',
       photos: ['photo_url'],
       name:  'Maintenance',
       /* The only one of the four with a real work type on the record.
@@ -126,8 +131,9 @@
       work:  { field: 'task_type', label: 'Work' },
       sub:   function (r) { return r.task_type || '—'; },
       fields: [
-        ['Task',   'task_type'],
-        ['Result', 'result']
+        ['Task',    'task_type'],
+        ['Result',  'result'],
+        ['Remarks', 'remarks']
       ]
     }
   };

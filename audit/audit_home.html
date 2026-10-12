@@ -384,6 +384,14 @@
     .hist-row.hist-missed{cursor:default;background:#fffbeb}
     .hist-row.hist-missed:hover{background:#fffbeb}
     .hist-row.hist-missed .hist-sub{color:#92400e;font-weight:700}
+    /* A plot an admin closed without an audit. Amber for the same reason
+       as a missed round -- it is a fact, not an alarm. */
+    .hist-closed{display:inline-block;padding:0 6px;border-radius:999px;
+      background:#fef3c7;color:#92400e;font-size:10.5px;font-weight:900;
+      letter-spacing:.02em;vertical-align:1px}
+    /* What the task owed, beside the tag. Red rather than amber: the tag
+       is a fact about the record, this is the reason it was allowed. */
+    .hist-overdue{color:#b91c1c;font-weight:800}
     .hist-empty{padding:26px 12px;text-align:center;font-size:12.5px;
                 font-weight:600;color:var(--fc-ink3)}
     /* ── AUDIT SCHEDULE BOARD ────────────────────────────────────────
@@ -693,6 +701,18 @@
     /* Opens the rest of the strip. Shaped like the circles it stands in
        for, but filled with the row's tone rather than outlined in it, so
        it reads as the odd one out — it is not a plot. */
+    /* The x on a plot chip. Admins only -- see _maintTypesHtml. It sits
+       ON the chip rather than beside it, so a row of twenty plots does
+       not become a row of forty targets. */
+    .tl-plot-wrap{position:relative;display:inline-block}
+    .tl-plot-x{position:absolute;top:-6px;right:-6px;width:19px;height:19px;
+      border-radius:50%;border:1.5px solid #fff;background:#b91c1c;color:#fff;
+      font-size:12px;font-weight:900;line-height:1;cursor:pointer;padding:0;
+      display:flex;align-items:center;justify-content:center;
+      box-shadow:0 1px 4px rgba(0,0,0,.25);opacity:.85;
+      transition:opacity .15s,transform .15s}
+    .tl-plot-x:hover{opacity:1;transform:scale(1.12)}
+    .tl-plot-x:focus-visible{outline:2px solid #b91c1c;outline-offset:2px;opacity:1}
     .tl-plots-toggle{display:inline-flex;align-items:center;gap:3px;
                      height:38px;min-width:38px;padding:0 9px;border-radius:19px;
                      flex:0 0 auto;cursor:pointer;
@@ -749,6 +769,41 @@
                 background:transparent;font:inherit;text-align:left;
                 transition:background .15s}
     .tl-wt-head:hover{background:rgba(0,0,0,.035)}
+    /* The header is itself a <button>, so the section close cannot be
+       nested inside it -- it sits BESIDE it in a bar of its own. */
+    /* A one-off round raised by the office, so it reads differently
+       from the monthly schedule beside it. */
+    .tl-special{display:inline-block;padding:1px 7px;border-radius:999px;
+      background:#7c3aed;color:#fff;font-size:9.5px;font-weight:900;
+      letter-spacing:.08em;text-transform:uppercase;vertical-align:1.5px}
+    .tl-note{font-size:11px;font-weight:700;color:#6d28d9;
+      overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:60%}
+    .tl-wt-bar{display:flex;align-items:center;gap:4px}
+    .tl-wt-bar .tl-wt-head{min-width:0}
+    /* Said quietly until it is hovered. It closes a dozen plots at once,
+       so it should not be the brightest thing in the row.
+
+       It carries a WORD as well as a cross. The head beside it is full
+       width, so the button lands at the far right of the row where a
+       lone x reads as unattached to the job it belongs to -- "Close all"
+       says both what it does and that it is not one plot. The word goes
+       on a narrow screen, where the row is short enough that the cross
+       sits beside the count anyway. */
+    .tl-wt-close{flex:0 0 auto;height:25px;margin-right:4px;gap:5px;
+      padding:0 9px 0 7px;border-radius:999px;border:1.5px solid #fecaca;
+      background:#fef2f2;color:#b91c1c;font-family:inherit;
+      font-size:11px;font-weight:900;line-height:1;letter-spacing:.02em;
+      cursor:pointer;display:flex;align-items:center;justify-content:center;
+      opacity:.85;
+      transition:background .15s,border-color .15s,color .15s,opacity .15s,transform .15s}
+    .tl-wt-close .tl-wt-x{font-size:13px;font-weight:900;line-height:1}
+    .tl-wt-close:hover{background:#b91c1c;border-color:#b91c1c;color:#fff;
+                       opacity:1;transform:scale(1.05)}
+    .tl-wt-close:focus-visible{outline:2px solid #b91c1c;outline-offset:2px;opacity:1}
+    @media (max-width:520px){
+      .tl-wt-close{padding:0;width:25px;gap:0}
+      .tl-wt-close .tl-wt-lbl{display:none}
+    }
     .tl-wt-caret{width:14px;height:14px;flex-shrink:0;fill:none;stroke:currentColor;
                  stroke-width:2.4;stroke-linecap:round;stroke-linejoin:round;
                  color:#94a3b8;transform:rotate(-90deg);transition:transform .18s}
@@ -1062,7 +1117,7 @@
   </div>
 </div>
 
-<script src="audit_lang.js?v=20261012a"></script>
+<script src="audit_lang.js?v=20261012g"></script>
 <script src="audit_supabase.js?v=20261008a"></script>
 <script src="audit_ribbon.js?v=20260826a"></script>
 <!-- Works out which plots still owe work, for the circles under each
@@ -1070,13 +1125,13 @@
 <script src="audit_pending.js?v=20260829a"></script>
 <!-- Rounds, maintenance windows and the ages being audited. Defaults to
      what used to be hardcoded below, so this cannot break the board. -->
-<script src="audit_settings.js?v=3"></script>
+<script src="audit_settings.js?v=5"></script>
 <!-- The record summary shared with the module pages' Completed Records.
      On this page it only exports MJMAuditSummary — the completed-records
      section it also carries is the manage view's and does not mount
      here. It injects the dialog's own styles, so this page needs no
      stylesheet of ours. -->
-<script src="audit_history.js?v=20260827d"></script>
+<script src="audit_history.js?v=20261012e"></script>
 <!-- The portal permission layer used to load here for the User Access card.
      That card lives on the back end now and nothing on the auditor view
      reads MJMAccess, so the three scripts came out: an auditor on nursery
@@ -1167,6 +1222,42 @@ setTimeout(()=>{if(!deferredPrompt&&!isIOS()&&!isInStandaloneMode())showInstallB
 /* The alert refresh, and the notification permission prompt that went with
    it, moved to the back end. Nothing on this page notifies now, so asking
    an auditor to allow notifications would be asking for nothing. */
+
+/* The one spelling of an admin closure, read by the board that writes it,
+   by Audit History below, by the maintenance module's own colour rule and
+   by the check query. A row written before any change here keeps its old
+   wording, so do not change the string itself.
+
+   It lives at SCRIPT scope rather than inside loadAuditTodo because both
+   halves of this page need it: the board writes the row and the history
+   has to recognise it. */
+const MAINT_CLOSED_RESULT = 'Closed by admin';
+
+/* ── WHEN WAS THIS MAINTENANCE TASK DUE ──
+   Keyed task_id -> { due, on }: the deadline, and the day the work was
+   done. Filled by loadMaintTimeline for EVERY task it walks, audited or
+   not, because the reader is Audit History and by the time a row is in
+   there the task has stopped being pending.
+
+   It is the board's own arithmetic -- work date plus the window that job
+   allows -- recorded rather than recomputed, so there is one rule and not
+   two. Nothing else can answer it: the deadline is nowhere in
+   audit_maintenance_audits, and a closure row dated today says only when
+   somebody closed it, never what it owed. */
+const MAINT_DUE = {};
+
+/* Whole days from a deadline to a day, both plain ISO. Built off UTC
+   midnights on purpose: a plain subtraction of two local Dates comes out
+   an hour short across a daylight boundary and floors to one day fewer.
+   Malaysia has no such boundary, but this reads dates the office types
+   and the rule should not depend on where it is run. */
+function _overdueBy(dueISO, onISO){
+  if (!dueISO || !onISO) return 0;
+  const a = Date.parse(dueISO + 'T00:00:00Z');
+  const b = Date.parse(onISO  + 'T00:00:00Z');
+  if (isNaN(a) || isNaN(b)) return 0;
+  return Math.round((b - a) / 86400000);
+}
 
 /* ── AUDIT SCHEDULE TO-DO ── */
 function loadAuditTodo(){
@@ -1467,11 +1558,42 @@ function loadAuditTodo(){
      work and the row stays, listing every plot, reading "lewat 68 hari",
      and it will go on doing that until somebody deletes something.
 
-     Every overdue row on the board was in that state. So the upper bound
-     on a CLOSED window runs to today: the work counts whenever it was
-     done. The lower bound does not move -- an audit from before the
-     window opened belongs to the round before this one and must not
-     close two.
+     Every overdue row on the board was in that state. So a CLOSED
+     window takes the batch's LATEST audit, whenever it was done: the
+     range opens at the beginning of time and runs to today.
+
+     The lower bound used to stay on the window, on the argument that an
+     audit from before it opened belongs to the round before this one
+     and must not close two. The office overruled that, twice, in the
+     same words both times -- "if auditor was late and do the latest
+     one, then the old records will be clear too but recorded as missed
+     audit", and then, looking at N02: "latest audit clears every
+     overdue round (if is not audit on time). but as long as not yet
+     audit, it will still showing there."
+
+     N02 is what the old bound looked like on screen. Batch 244 was
+     audited 30 Sep, inside September round 3, so it cleared. Batch 253
+     was audited 22 Sep -- round 2's slot -- so round 3 stayed red over
+     a plot somebody had walked eight days earlier, and nothing 253
+     could be given would ever close a window that shut on 30 September.
+
+     WHAT THIS COSTS, because it is not free. A batch audited once and
+     never again now clears every overdue round it ever accrues, so it
+     only appears on the board while a round is actually OPEN -- one day
+     a month on the MN plot schedule. The thing that keeps it visible is
+     the other half of the rule: every one of those rounds is filed in
+     Audit History as a MISSED audit, under the month that owed it. A
+     plot nobody walks does not go quiet; it accumulates a missed round
+     every round, which is the record somebody can act on.
+
+     A batch with NO audit at all is untouched by any of this and stays
+     on the board, which is the office's "as long as not yet audit, it
+     will still showing there".
+
+     An OPEN window is unchanged and must stay so. Letting an old audit
+     answer a round nobody has walked yet would mark work done before
+     anybody had a chance to do it, which is the one direction this
+     board must never be wrong in.
 
      A round cleared late is not a round done on time, and it is not
      thrown away either: strict() is the same test with the real window,
@@ -1490,7 +1612,12 @@ function loadAuditTodo(){
     const endISO  = iso(y, m, o.end);
     if (strict) return { fromISO: fromISO, toISO: endISO };
     const todayISO = iso(year, month, day);
-    return { fromISO: fromISO, toISO: endISO >= todayISO ? endISO : todayISO };
+    /* Still open: the real window, unchanged. */
+    if (endISO >= todayISO) return { fromISO: fromISO, toISO: endISO };
+    /* Closed: any audit this batch has ever had, up to today. The empty
+       string is the open lower bound -- every ISO date sorts above it,
+       and plotsAll() already uses it that way. */
+    return { fromISO: '', toISO: todayISO };
   }
 
   async function loadCompletions(){
@@ -1512,6 +1639,102 @@ function loadAuditTodo(){
       console.warn('Could not read what has been audited:', e);
       done = null;                      // show everything rather than hide it
     }
+  }
+
+  /* ── SPECIAL AUDITS ──────────────────────────────────────────────
+     A one-off round, raised from Settings to System Setting when
+     something happens and not expected again for months: "walk these
+     plots in BNN by the 20th".
+
+     It is a DEADLINE and never a window, which is the whole difference
+     from a scheduled round. It is owed the moment it is saved, it reads
+     due until its date has gone by and overdue after, and it stays on
+     the list until every plot it names has been audited -- no round rule
+     clears it and an audit from BEFORE it was raised cannot answer it,
+     because the request is a new question.
+
+     That last part is what `raised` is for: the range asked of
+     MJMAuditPending opens on the day it was raised rather than at the
+     beginning of time, so a plot walked last month does not silently
+     close a request made this morning. */
+  /* The note is free text an admin types, and it is dropped into a
+     template string that becomes innerHTML. Everything else on this
+     board is a plot code or a date; this is the first field on it that
+     a person writes, so it is the first that has to be escaped. */
+  const esc = (v) => String(v == null ? '' : v)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+
+  let SPECIAL_REQS = [];
+  async function loadSpecialAudits(){
+    try {
+      const rows = await sb.select('audit_special_audits',
+        'select=id,module,nursery,due_date,raised_on,all_plots,plots,note'
+        + '&cancelled_at=is.null');
+      SPECIAL_REQS = (rows || [])
+        .filter(r => r && r.module && r.nursery && r.due_date)
+        .map(r => ({
+          id:       r.id,
+          module:   r.module,
+          nursery:  r.nursery,
+          due:      String(r.due_date).slice(0, 10),
+          /* An older row with no raised_on falls back to its due date,
+             which is the conservative reading: it asks for work done on
+             or after that day rather than letting anything older count. */
+          raised:   String(r.raised_on || r.due_date).slice(0, 10),
+          allPlots: !!r.all_plots,
+          plots:    Array.isArray(r.plots) ? r.plots.map(String) : [],
+          note:     r.note || ''
+        }));
+    } catch (e) {
+      /* The table may simply not be installed yet. Nothing is owed that
+         was not owed before, so this is quiet. */
+      console.warn('[audit-home] special audits not read:', e && e.message);
+      SPECIAL_REQS = [];
+    }
+  }
+
+  /* The plots ONE special request still owes. The single place that
+     turns a request into a list of circles -- nurseryState, _plotsHtml
+     and plotsOwed all ask it, for exactly the reason winRange has one
+     copy: a row that clears while its circles remain is worse than the
+     bug it replaced.
+
+     null means "no basis to judge" -- the roster could not be read --
+     and every caller treats that as NOT done, so a refusal shows the
+     work rather than hiding it. */
+  function _specialOwed(o, nursery){
+    const r = o._special;
+    if (!r || r.nursery !== nursery) return [];
+    if (!window.MJMAuditPending || !MJMAuditPending.covers(o.mod, nursery)) return null;
+    let list = MJMAuditPending.plots(o.mod, nursery, r.raised, iso(year, month, day));
+    if (!r.allPlots) {
+      const want = new Set(r.plots);
+      list = list.filter(p => want.has(p));
+    }
+    return list;
+  }
+
+  /* One row per open request, placed in the month its DEADLINE falls in
+     so occStatus and dueInfo read it without knowing it is special. */
+  function specialOccurrences(){
+    const out = [];
+    SPECIAL_REQS.forEach(r => {
+      if (SCOPE_NURSERIES.indexOf(r.nursery) === -1) return;
+      const base = SET.find(sc => sc.mod === r.module);
+      if (!base) return;                      // module not run in this scope
+      const p = r.due.split('-').map(Number);
+      const dy = p[0], dm = p[1] - 1, dd = p[2];
+      if (!isFinite(dy) || !isFinite(dm) || !isFinite(dd)) return;
+      const o = { mod: base.mod, title: base.title, href: base.href,
+                  start: dd, end: dd, round: 0, _special: r };
+      /* Only stamped when the deadline is not in the month on screen --
+         the same marker a carried-over row uses, and for the same
+         reason: so nobody reads the date as this month. */
+      if (dy !== viewY || dm !== viewM) { o.fromY = dy; o.fromM = dm; }
+      out.push(o);
+    });
+    return out;
   }
 
   /* ── MAINTENANCE TIMELINE ────────────────────────────────────────
@@ -1667,14 +1890,24 @@ function loadAuditTodo(){
       const audited = new Set((aRows||[]).map(a => String(a.task_id)));
       diag.audited = audited.size;
       const buckets = new Map();                  // 'YYYY-MM-DD' → {y,m,d,nurseries:Set,plots:Map}
+      const _p2 = v => String(v).padStart(2, '0');
       const push = (id, workDateISO, workType, plotRaw, nurseryNameRaw) => {
-        if (_wtWinFor(workType) <= 0)              { diag.skippedPd++; return; }
-        if (audited.has(String(id)))               { diag.skippedAudited++; return; }
+        const win = _wtWinFor(workType);
+        if (win <= 0)                              { diag.skippedPd++; return; }
+        /* The date is read BEFORE the audited test now, so the deadline
+           can be recorded for a task that has already been audited --
+           Audit History needs it and the walk is the only thing that
+           knows it. The one visible effect is on the diagnostics: an
+           audited row with no work date counts as skippedNoDate rather
+           than skippedAudited. */
         if (!workDateISO)                          { diag.skippedNoDate++; return; }
         const [Y,M,D] = workDateISO.split('-').map(Number);
         const dl = new Date(Y, M-1, D);
-        dl.setDate(dl.getDate() + _wtWinFor(workType));
+        dl.setDate(dl.getDate() + win);
         const y = dl.getFullYear(), m = dl.getMonth(), d = dl.getDate();
+        const dueISO = y + '-' + _p2(m + 1) + '-' + _p2(d);
+        MAINT_DUE[String(id)] = { due: dueISO, on: workDateISO };
+        if (audited.has(String(id)))               { diag.skippedAudited++; return; }
         const plot = _canonPlot(plotRaw);
         const n = _nurseryFor(plot, nurseryNameRaw);
         if (!n)                                    { diag.skippedNoPlot++; return; }
@@ -1691,7 +1924,13 @@ function loadAuditTodo(){
            plots share a deadline because their windows happen to end
            together, not because the same job was done on them. Oldest case
            first needs the work date, not the deadline. */
-        bucket.items.push({ nursery: n, plot, wt: _wtCanon(workType), on: workDateISO });
+        /* The TASK ID rides with the item. A chip is a pending maintenance
+           record, and the only thing that can retire one is an
+           audit_maintenance_audits row carrying its task_id -- which is
+           what the admin close below writes. Without the id on the item
+           the chip knows which plot it is and not which record. */
+        bucket.items.push({ id: id, nursery: n, plot, wt: _wtCanon(workType),
+                            on: workDateISO, due: dueISO });
         diag.kept++;
         if (diag.sampleKept.length < 3) diag.sampleKept.push({ plot:plotRaw, workType, workDateISO, deadline: y+'-'+String(m+1).padStart(2,'0')+'-'+String(d).padStart(2,'0'), nursery: n });
       };
@@ -1810,7 +2049,12 @@ function loadAuditTodo(){
           const n = _nurseryFor(plot, nurseryNameRaw);
           if (!n) { unplaceable++; return; }            // cannot say which nursery
           if (SCOPE_NURSERIES.indexOf(n) === -1) return;
-          loose.push({ nursery: n, plot, wt: _wtCanon(workType), on: workDateISO });
+          /* The id rides here too. The today-bucket this list feeds is a
+             real row with real chips, and a chip with no id is a chip an
+             admin cannot close -- which showed up as the x appearing on
+             the overdue row and not on the one beside it. */
+          loose.push({ id: id, nursery: n, plot, wt: _wtCanon(workType), on: workDateISO,
+                       due: (MAINT_DUE[String(id)] || {}).due || '' });
         };
         (fRows||[]).forEach(r => pushLoose(r.id, r.work_date, r.work_type, r.plot_name, r.nursery_name));
         const looseOffice = (oRows && oRows[0] && Array.isArray(oRows[0].records))
@@ -1902,6 +2146,13 @@ function loadAuditTodo(){
       MAINT_OCCURRENCES = [];
       _paintMaintDebug(null, e);
     }
+    /* MAINT_DUE is only filled by the walk above, and Audit History is
+       loaded in parallel with it -- whichever lands first, the other has
+       to be told. A redraw costs one pass over a month of rows, and
+       without it the deadline shows up on a closure only after the page
+       is opened a second time. In the finally position on purpose: a
+       failed walk still has to release the history it left waiting. */
+    try { if (typeof renderHistory === 'function') renderHistory(); } catch (e2) {}
   }
   /* ── ON-SCREEN DIAGNOSTIC, NO DEVTOOLS NEEDED ──
      The console line above says everything, but a field auditor cannot
@@ -1941,6 +2192,13 @@ function loadAuditTodo(){
      is a different shape: each occurrence carries a set of nurseries
      that STILL have pending tasks on that deadline, so we invert it. */
   function nurseryState(o, y, m, strict){
+    /* A special request names ONE nursery, so the other two are not
+       "done", they are not asked. Returning just the one keeps isDone's
+       every() honest instead of making two absent answers vote. */
+    if (o._special) {
+      const list = _specialOwed(o, o._special.nursery);
+      return [{ nursery: o._special.nursery, done: list !== null && list.length === 0 }];
+    }
     if (o.mod === 'maint' && o._maintNurseries) {
       return SCOPE_NURSERIES.map(n => ({
         nursery: n,
@@ -2071,6 +2329,16 @@ function loadAuditTodo(){
      the list; a closed window with nothing recorded is overdue, not passed. */
   function occStatus(o, y, m){
     if (isDone(o, y, m)) return 'done';
+    /* A special request is owed the moment it is saved -- it is a
+       deadline, not a window, so it never reads "soon" or "upcoming"
+       the way a round whose window has not opened does. Without this a
+       request raised today for the 20th would draw greyed out and
+       refuse to open, which is the opposite of asking for it. */
+    if (o._special) {
+      const t0 = new Date(year, month, day);
+      const e0 = new Date(y, m, o.end);
+      return t0 > e0 ? 'overdue' : 'due';
+    }
     const t0 = new Date(year, month, day);
     const s0 = new Date(y, m, o.start), e0 = new Date(y, m, o.end);
     if (t0 > e0) return 'overdue';
@@ -2312,7 +2580,9 @@ function loadAuditTodo(){
 
     const byNursery = pending.map(x => {
       let list = [];
-      if (o.mod === 'maint') {
+      if (o._special) {
+        list = _specialOwed(o, x.nursery) || [];
+      } else if (o.mod === 'maint') {
         /* Already worked out while the timeline was built. */
         const set = o._maintPlots && o._maintPlots.get(x.nursery);
         list = set ? [...set].sort() : [];
@@ -2386,6 +2656,12 @@ function loadAuditTodo(){
      So: fall back to the flat strip the other modules use, and if that is
      empty too, say which of the two is missing. A silent gap is what made
      this hard to diagnose the first time. */
+  /* Every work-type group drawn this pass, so the section button can
+     find its plots at the moment it is pressed. Keyed by the same
+     rowKey|wt the fold uses, and overwritten on every draw — a stale
+     entry would close a list the screen is no longer showing. */
+  const _closeGroups = new Map();
+
   function _maintTypesHtml(o, oy, om, pending){
     /* `pending` is the nurseries a separate check thinks are unfinished.
        Where it has an answer, use it. Where it does not, fall back to the
@@ -2449,15 +2725,73 @@ function loadAuditTodo(){
         const key  = rowKey + '|' + g.wt;
         const open = !collapsedTypes.has(key);
         const name = WT_LABEL[g.wt] || WT_LABEL.other;
+        /* ── CLOSING A PLOT NOBODY IS EVER GOING TO AUDIT ──
+           A maintenance deadline that has been overdue for two months is
+           not work anybody is going to do: the job it was raised against
+           was finished in August and there is nothing left in the plot to
+           look at. It still sits on the board for ever, because the only
+           thing that retires a maintenance row is an audit against it.
+
+           So an admin may CLOSE one. What that writes is an ordinary
+           audit_maintenance_audits row against the same task_id, with its
+           result reading "Closed by admin" and a remark saying why -- so
+           it goes through the one door everything else goes through, it
+           leaves the board for the one reason anything leaves it, and it
+           lands in Audit History with a NAME and a DATE against it like
+           any other record. Nothing is deleted. The work record in
+           nops_maint_field_records is untouched; the field did that work
+           and said so, and no audit decision gets to unsay it.
+
+           Admins only, and that is read with isAuditAdmin() -- the same
+           answer the delete buttons on the module pages ask. A plain
+           auditor sees the chips exactly as before. */
+        const mayClose = (typeof isAuditAdmin === 'function') && isAuditAdmin();
         const circles = g.list.map(it => {
           const nur = NURSERY_LABELS[it.nursery] || it.nursery;
-          return `<a class="tl-plot"
+          const tip = `${nur} ${it.plot} — ${name}${it.on ? ', done ' + it.on : ''}`;
+          const link = `<a class="tl-plot"
                      href="${o.href}?nursery=${encodeURIComponent(it.nursery)}` +
                  `&plot=${encodeURIComponent(it.plot)}&from=home"
-                     title="${nur} ${it.plot} — ${name}${it.on ? ', done ' + it.on : ''}"
+                     title="${tip}"
                      aria-label="${label} — ${name} — ${nur} ${it.plot}">${it.plot}</a>`;
+          if (!mayClose || !it.id) return link;
+          /* The x is OUTSIDE the anchor. Inside it, every tap on the
+             cross would also follow the link. */
+          return `<span class="tl-plot-wrap">${link}<button type="button"
+                     class="tl-plot-x" data-close-task="${it.id}"
+                     data-close-plot="${it.plot}" data-close-nur="${it.nursery}"
+                     data-close-job="${name}" data-close-on="${it.on || ''}"
+                     data-close-due="${it.due || ''}"
+                     title="${t('close_plot_title')}"
+                     aria-label="${t('close_plot_title')} — ${nur} ${it.plot}">×</button></span>`;
         }).join('');
+        /* ── CLOSING A WHOLE SECTION ──
+           Closing eighteen cold weeding plots one cross at a time is
+           eighteen confirms for one decision, and the decision was never
+           per-plot: the job finished in August and there is nothing left
+           in ANY of those plots to look at. So the section header carries
+           its own close, and it writes exactly the rows the crosses would
+           have written, in ONE insert.
+
+           The group is parked in _closeGroups rather than re-derived when
+           the button is pressed. The button only has to name which group
+           it is, and the plots it closes are the plots that were on screen
+           when somebody read the count -- a second walk of the data could
+           quietly have one more in it. */
+        const items = g.list.filter(it => it.id).map(it => ({
+          id: it.id, nursery: it.nursery, plot: it.plot,
+          jobName: name, on: it.on || '', due: it.due || ''
+        }));
+        _closeGroups.set(key, { job: name, row: label, items: items });
+        const sectX = (mayClose && items.length)
+          ? `<button type="button" class="tl-wt-close" data-close-sect="${key}"
+                     title="${t('close_sect_title')}"
+                     aria-label="${t('close_sect_title')} — ${name}"
+                     ><span class="tl-wt-x" aria-hidden="true">×</span
+                     ><span class="tl-wt-lbl">${t('close_sect_btn')}</span></button>`
+          : '';
         return `<div class="tl-wt${open ? ' open' : ''}">
+          <div class="tl-wt-bar">
           <button type="button" class="tl-wt-head" data-wtkey="${key}"
                   aria-expanded="${open}"
                   aria-label="${name} — ${fmtNum(g.list.length)} plots, ${
@@ -2466,13 +2800,164 @@ function loadAuditTodo(){
               <polyline points="6 9 12 15 18 9"/></svg>
             <span class="tl-wt-name">${name}</span>
             <span class="tl-wt-count">${fmtNum(g.list.length)}</span>
-          </button>
+          </button>${sectX}
+          </div>
           <div class="tl-wt-plots">${circles}</div>
         </div>`;
       }).join('');
 
     return `<div class="tl-wts">${blocks}</div>`;
   }
+
+  /* ── THE CLOSE ITSELF, FOR ONE PLOT OR A WHOLE SECTION ──
+     One writer. The chip hands it a single item, the section header
+     hands it the whole group, and nothing else differs: the same row
+     shape, the same confirm, the same rebuild. Two code paths writing
+     the same record two ways is how they come to disagree.
+
+     The rows go up in ONE insert. Eighteen round trips on a nursery
+     signal is eighteen chances to half-finish, and a section half
+     closed is worse than one not closed at all. */
+  async function _closePlots(items, what){
+    if (!(typeof isAuditAdmin === 'function' && isAuditAdmin())) {
+      alert(t('close_plot_denied'));
+      return;
+    }
+    const list = (items || []).filter(it => it && it.id);
+    if (!list.length) return;
+    if (!confirm(what)) return;
+
+    const user = JSON.parse(localStorage.getItem('mjm_user') || '{}');
+    const who  = user.name || user.full_name || user.email || 'Admin';
+    const today = iso(year, month, day);
+    /* The remark is written rather than asked for. It says what an
+       admin closing a cold plot would have typed anyway — the job, and
+       the day the work was done — and it is the line Audit History
+       shows, so it has to carry its own context. */
+    const rows = list.map(it => ({
+      /* ── audit_id IS NOT NULL AND HAS NO DEFAULT ──
+         Every row in this table carries a readable id the forms write
+         themselves: the maintenance module writes "MTA-" plus a running
+         number (nextAuditID). Leaving it out is not an empty column, it
+         is a refused insert -- Supabase 23502, "null value in column
+         audit_id violates not-null constraint", which is what the first
+         version of this close got back.
+
+         It is NOT the module's running number, on purpose. That one is
+         audits.length + 1, which two people saving at once both answer
+         the same way (audit_script.js says so in its own comment), and
+         a section close writes a dozen rows in one go. Keyed on the task
+         instead: unique by construction, and it says at a glance which
+         rows in the table are closures rather than audits. */
+      audit_id:  'MTA-CL' + String(it.id),
+      task_id:   parseInt(it.id, 10),
+      nursery:   it.nursery || null,
+      plot:      it.plot || null,
+      task_type: it.jobName || null,
+      result:    MAINT_CLOSED_RESULT,
+      /* The deadline leads the remark. "Closed on 12 Oct" says only when
+         somebody pressed the button; what makes a closure defensible is
+         what it OWED and for how long, and the remark is the only part of
+         this row that travels with it into a report or an export. */
+      remarks:   (it.due ? 'Due ' + it.due + (_overdueBy(it.due, today) > 0
+                             ? ', ' + _overdueBy(it.due, today) + ' days overdue. ' : '. ')
+                         : '')
+                 + (list.length > 1
+                     ? 'Closed with the whole ' + (it.jobName || 'section') + ' section ('
+                       + list.length + ' plots)'
+                     : 'Closed without an audit')
+                 + (it.on ? ', work done ' + it.on : '') + '.',
+      photo_url: null,
+      auditor_name: who,
+      date: today
+    }));
+    try {
+      const res = await sb.insert('audit_maintenance_audits', rows);
+      if (res && res.error) throw new Error(res.error.message || 'refused');
+      /* Rebuild from the database rather than striking the chips off
+         the screen: the board is what somebody is about to act on, and
+         a screen that agrees with itself and not with the table is
+         worse than one that takes a second to catch up. */
+      await loadMaintTimeline();
+      renderAll();
+      /* loadHistory, not renderHistory: the record that was just written
+         is not in HIST_ALL yet, and the whole point of writing one is
+         that it lands in Audit History where somebody can see it. A
+         redraw of the old list would show the plot gone off the board
+         and nothing anywhere saying where it went. */
+      if (typeof loadHistory === 'function') await loadHistory();
+      else if (typeof renderHistory === 'function') renderHistory();
+    } catch (err) {
+      console.error('[audit-home] could not close the plot:', err);
+      alert(t('close_plot_failed') + ' ' + (err && err.message ? err.message : ''));
+    }
+  }
+
+  /* ── THE TWO BUTTONS ──
+     Delegated, like every other handler here: the timeline is rebuilt
+     from scratch on each draw, so anything bound to a button dies with
+     it. The admin test is asked AGAIN inside _closePlots rather than
+     trusted from the moment the button was drawn -- a button drawn
+     before a permission changed is still sitting on the screen.
+
+     Both buttons end in the same writer. The only difference between
+     them is how many items they hand it and what the confirm says. */
+  let _closing = false;
+
+  /* One plot. */
+  document.addEventListener('click', async (e) => {
+    const btn = e.target.closest('.tl-plot-x');
+    if (!btn) return;
+    e.preventDefault();
+    e.stopPropagation();
+    if (_closing) return;
+    const id   = btn.dataset.closeTask;
+    if (!id) return;
+    const plot = btn.dataset.closePlot || '';
+    const nurK = btn.dataset.closeNur || '';
+    const nur  = NURSERY_LABELS[nurK] || nurK || '';
+    const job  = btn.dataset.closeJob || '';
+    const on   = btn.dataset.closeOn || '';
+
+    /* Named in full, because the thing being closed is somebody else's
+       outstanding work and a bare "are you sure" names nothing. There
+       is no second step: the reason used to be asked for and is written
+       instead -- see the remark _closePlots builds. */
+    const what = t('close_plot_confirm')
+      .replace('{plot}', nur + ' ' + plot)
+      .replace('{job}', job)
+      .replace('{on}', on || '\u2014');
+
+    _closing = true;
+    try {
+      await _closePlots([{ id: id, nursery: nurK, plot: plot, jobName: job,
+                           on: on, due: btn.dataset.closeDue || '' }], what);
+    } finally { _closing = false; }
+  });
+
+  /* The whole section. */
+  document.addEventListener('click', async (e) => {
+    const btn = e.target.closest('.tl-wt-close');
+    if (!btn) return;
+    e.preventDefault();
+    e.stopPropagation();
+    if (_closing) return;
+    /* The group as it was DRAWN, not as the data reads now. Somebody
+       pressing this has just read a count beside the job name, and the
+       plots they close must be the plots that count was of. */
+    const g = _closeGroups.get(btn.dataset.closeSect);
+    if (!g || !g.items.length) return;
+
+    const what = t('close_sect_confirm')
+      .replace('{n}', fmtNum(g.items.length))
+      .replace('{job}', g.job)
+      .replace('{row}', g.row);
+
+    _closing = true;
+    try {
+      await _closePlots(g.items, what);
+    } finally { _closing = false; }
+  });
 
   /* Folding a work type. Same delegated-listener reasoning as below. */
   document.addEventListener('click', e => {
@@ -2513,7 +2998,11 @@ function loadAuditTodo(){
          to be visible whether it happens to be due today, in the past
          (overdue), or two days from now. The other modules run on the
          auditor's own calendar and are date-scoped as before. */
-      (showingToday && (o.mod === 'maint' ||
+      /* A special request rides on today's view for the same reason a
+         maintenance row does: it was raised BY somebody, for now, and
+         waiting for its deadline day to come round before showing it
+         would answer a question nobody asked. */
+      (showingToday && (o.mod === 'maint' || o._special ||
                         occStatus(o, o.fromY ?? viewY, o.fromM ?? viewM) === 'overdue')) ||
       (o.fromY === undefined && selDay >= o.start && selDay <= o.end));
     if (active.size)     list = list.filter(o =>
@@ -2601,12 +3090,19 @@ function loadAuditTodo(){
             <div class="tl-ico"><svg viewBox="0 0 24 24" style="stroke:${c.tone}">${ICONS[o.mod]}</svg></div>
             <div class="tl-body">
               <div class="tl-ttl">${
+                o._special ? `<span class="tl-special">${t('special_audit')}</span> ` : ''
+              }${
                 o.round ? `<span class="tl-round" data-round="${o.round}">R<i>•</i>${o.round}</span> ` : ''
               }${t(o.title)}${
-                o.fromY !== undefined
+                o._special ? ` <span class="tl-from">${
+                  NURSERY_LABELS[o._special.nursery] || o._special.nursery}</span>` : ''
+              }${
+                o.fromY !== undefined && !o._special
                   ? ` <span class="tl-from">${MONTHS[om]} ${o.fromY}</span>` : ''}</div>
               <div class="tl-meta">
-                <span class="tl-badge" style="background:${st.bg};color:${st.fg}">${stLbl(k)}</span>
+                <span class="tl-badge" style="background:${st.bg};color:${st.fg}">${stLbl(k)}</span>${
+                o._special && o._special.note
+                  ? ` <span class="tl-note">${esc(o._special.note)}</span>` : ''}
               </div>
             </div>
             <div class="tl-due${due.late ? ' late' : due.soon ? ' soon' : ''}">
@@ -2669,7 +3165,13 @@ function loadAuditTodo(){
     /* Anything still owed from earlier months rides along with the current
        month, and only there — paging back to July should show July, not
        July plus a copy of June. */
-    const occ = thisMonth ? carriedOverdue().concat(monthOcc) : monthOcc;
+    /* Special requests are gathered straight from the open list rather
+       than through occurrences(), which is keyed on a day of the month:
+       a one-off has an absolute date and must not be duplicated by the
+       carried-over sweep. Today's view only, same as the backlog. */
+    const occ = thisMonth
+      ? carriedOverdue().concat(monthOcc).concat(specialOccurrences())
+      : monthOcc;
 
     const outstanding = occ.filter(o =>
       occStatus(o, o.fromY ?? viewY, o.fromM ?? viewM) !== 'done').length;
@@ -2700,6 +3202,10 @@ function loadAuditTodo(){
        answer, which is the same fallback the rows themselves use: a
        number too small is worse than a number of the old kind. */
     function plotsOwed(o, y, m){
+      if (o._special) {
+        const l = _specialOwed(o, o._special.nursery);
+        return l ? l.length : 0;
+      }
       if (o.mod === 'maint')
         return o._maintPlots
           ? SCOPE_NURSERIES.reduce((n, nur) =>
@@ -2717,6 +3223,11 @@ function loadAuditTodo(){
        Maintenance has no such figure: an audited task leaves the ledger
        entirely, so its pending count IS its total. */
     function plotsTotal(o){
+      if (o._special) {
+        if (!o._special.allPlots) return o._special.plots.length;
+        return (window.MJMAuditPending && MJMAuditPending.covers(o.mod, o._special.nursery))
+          ? MJMAuditPending.plotsAll(o.mod, o._special.nursery).length : 0;
+      }
       if (o.mod === 'maint') return 0;
       if (!window.MJMAuditPending) return 0;
       return SCOPE_NURSERIES.reduce((n, nur) =>
@@ -2879,6 +3390,7 @@ function loadAuditTodo(){
   renderAll();                                   // draw at once, from the schedule
   loadCompletions().then(renderAll);             // then again, minus what is done
   loadMaintTimeline().then(renderAll);           // add maintenance deadlines when they arrive
+  loadSpecialAudits().then(renderAll);           // and any one-off round somebody raised
   /* Settings last: the rounds and the maintenance windows both come from
      them, so when they land the board is rebuilt and the maintenance walk
      is redone with the real day counts. */
@@ -3094,7 +3606,60 @@ function renderHistory(){
     const d = new Date(r.date + 'T00:00:00');
     const dstr = d.toLocaleDateString(lang, { day:'numeric', month:'short' });
     const nur  = (typeof NURSERY_LABELS !== 'undefined' && NURSERY_LABELS[r.nursery]) || r.nursery;
-    const meta = [nur, r.auditor].filter(Boolean).join(' · ');
+    /* WHICH ROUND THIS RECORD ANSWERED, where it answered one late. A
+       record dated 1 October is September round 3 done a day late --
+       the round open on the 1st, because an overdue round is cleared by
+       the work and not by the calendar. The history is where somebody
+       goes to see what was done and when it was owed, so it is the one
+       place that most has to say both. Nothing is said on a record
+       filed inside its own window: the date already says it. */
+    let lateTxt = '';
+    try {
+      if (window.MJMAuditSettings && MJMAuditSettings.roundOf && r.mod !== 'maint') {
+        const rd = MJMAuditSettings.roundOf(r.nursery === 'PN' ? 'PN' : 'MN', r.mod, r.date);
+        if (rd && rd.late) {
+          const due = new Date(rd.dueISO + 'T00:00:00')
+            .toLocaleDateString(lang, { day:'numeric', month:'short' });
+          lateTxt = (typeof t === 'function' ? t('late_for_round') : 'late for the {d} round')
+            .replace('{d}', due);
+        }
+      }
+    } catch (e) {}
+    /* ── A CLOSURE IS NOT AN AUDIT, AND THE HISTORY HAS TO SAY SO ──
+       An admin closing a cold maintenance plot writes an ordinary row
+       here, which is the point of it -- a name and a date against the
+       decision. But a row in this month's list with nothing on it to
+       say otherwise reads as work that was DONE. So the row names the
+       job it closed and says who closed it, and it is the one thing on
+       the line that is coloured. A whole section closed at once is a
+       run of these, all on the same day. */
+    let closedTxt = '';
+    if (r.mod === 'maint' && r.raw && r.raw.result === MAINT_CLOSED_RESULT) {
+      closedTxt = '<span class="hist-closed">' +
+        (typeof t === 'function' ? t('hist_closed_by_admin') : 'Closed by admin') +
+        (r.raw.task_type ? ' \u00b7 ' + r.raw.task_type : '') + '</span>';
+      /* ── WHAT IT OWED, NOT WHEN IT WAS CLOSED ──
+         The date on the right of the row is the day somebody pressed the
+         button, so a run of closures all reads as this month and the
+         whole point of them -- that they were old and nobody was ever
+         going to walk them -- is nowhere on screen. The office said it
+         plainly: "it feels like closing that month case but not the old
+         and unaudited case." So the line says what the task was DUE and
+         how far past it had gone. */
+      const info = MAINT_DUE[String(r.raw.task_id)];
+      if (info && info.due) {
+        const dd = new Date(info.due + 'T00:00:00')
+          .toLocaleDateString(lang, { day:'numeric', month:'short', year:'numeric' });
+        const late = _overdueBy(info.due, r.date);
+        closedTxt += ' <span class="hist-overdue">' +
+          (typeof t === 'function' ? t('hist_was_due') : 'was due {d}').replace('{d}', dd) +
+          (late > 0 ? ' \u00b7 ' +
+            (typeof t === 'function' ? t('hist_days_overdue') : '{n} days overdue')
+              .replace('{n}', late) : '') +
+          '</span>';
+      }
+    }
+    const meta = [nur, r.auditor, closedTxt, lateTxt].filter(Boolean).join(' · ');
     /* A row opens its summary. data-hi indexes the month's rows, which
        is what the delegated listener below reads — the list is redrawn
        on every month change, so anything bound to a row would die with

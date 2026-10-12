@@ -202,13 +202,22 @@ function resultBadgeClass(r){
   if(r==='Not Done')return'badge-not_done';
   return'badge-pending';
 }
+/* An admin closing a long-overdue plot from the To-Do board writes an
+   ordinary record here with this result. It is not pending and it is not
+   a finding -- it is the office saying nobody is going to audit this one
+   -- so it gets its own grey rather than falling through to the amber
+   that means "waiting". Written by audit_home.html; the spelling is
+   MAINT_CLOSED_RESULT there and must not drift from this one. */
+const MAINT_CLOSED_RESULT = 'Closed by admin';
 function resultStatusClass(r){
+  if(r===MAINT_CLOSED_RESULT)return'status-not_done';
   if(r==='Satisfactory')return'status-satisfactory';
   if(r==='Unsatisfactory')return'status-unsatisfactory';
   if(r==='Not Done')return'status-not_done';
   return'status-pending';
 }
 function resultColor(r){
+  if(r===MAINT_CLOSED_RESULT)return{bg:'#f1f5f9',color:'#475569'};
   if(r==='Satisfactory')return{bg:'#ecfdf5',color:'#065f46'};
   if(r==='Unsatisfactory')return{bg:'#fff1f1',color:'#b91c1c'};
   if(r==='Not Done')return{bg:'#f1f5f9',color:'#475569'};

@@ -146,9 +146,6 @@ const TRANSLATIONS = {
     /* The date on the right of a history row is the day somebody pressed
        the button. On a closure that reads as a current case, so the line
        says what the task actually owed. */
-    /* A one-off audit round the office raised, as against the monthly
-       schedule. It is a deadline, not a window. */
-    special_audit:           'Special',
     hist_was_due:            'was due {d}',
     hist_days_overdue:       '{n} days overdue',
     /* A record dated 1 Oct is September round 3 done a day late, not an
@@ -577,7 +574,6 @@ const TRANSLATIONS = {
     close_plot_denied:       'Hanya admin audit boleh menutup plot.',
     close_plot_failed:       'Tidak dapat ditutup —',
     hist_closed_by_admin:    'Ditutup oleh admin',
-    special_audit:           'Khas',
     hist_was_due:            'sepatutnya {d}',
     hist_days_overdue:       'lewat {n} hari',
     late_for_round:          'lewat untuk pusingan {d}',

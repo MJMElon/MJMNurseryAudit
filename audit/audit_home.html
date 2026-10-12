@@ -771,13 +771,6 @@
     .tl-wt-head:hover{background:rgba(0,0,0,.035)}
     /* The header is itself a <button>, so the section close cannot be
        nested inside it -- it sits BESIDE it in a bar of its own. */
-    /* A one-off round raised by the office, so it reads differently
-       from the monthly schedule beside it. */
-    .tl-special{display:inline-block;padding:1px 7px;border-radius:999px;
-      background:#7c3aed;color:#fff;font-size:9.5px;font-weight:900;
-      letter-spacing:.08em;text-transform:uppercase;vertical-align:1.5px}
-    .tl-note{font-size:11px;font-weight:700;color:#6d28d9;
-      overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:60%}
     .tl-wt-bar{display:flex;align-items:center;gap:4px}
     .tl-wt-bar .tl-wt-head{min-width:0}
     /* Said quietly until it is hovered. It closes a dozen plots at once,
@@ -1117,7 +1110,7 @@
   </div>
 </div>
 
-<script src="audit_lang.js?v=20261012g"></script>
+<script src="audit_lang.js?v=20261012f"></script>
 <script src="audit_supabase.js?v=20261008a"></script>
 <script src="audit_ribbon.js?v=20260826a"></script>
 <!-- Works out which plots still owe work, for the circles under each
@@ -1125,7 +1118,7 @@
 <script src="audit_pending.js?v=20260829a"></script>
 <!-- Rounds, maintenance windows and the ages being audited. Defaults to
      what used to be hardcoded below, so this cannot break the board. -->
-<script src="audit_settings.js?v=5"></script>
+<script src="audit_settings.js?v=4"></script>
 <!-- The record summary shared with the module pages' Completed Records.
      On this page it only exports MJMAuditSummary — the completed-records
      section it also carries is the manage view's and does not mount
@@ -1641,102 +1634,6 @@ function loadAuditTodo(){
     }
   }
 
-  /* ── SPECIAL AUDITS ──────────────────────────────────────────────
-     A one-off round, raised from Settings to System Setting when
-     something happens and not expected again for months: "walk these
-     plots in BNN by the 20th".
-
-     It is a DEADLINE and never a window, which is the whole difference
-     from a scheduled round. It is owed the moment it is saved, it reads
-     due until its date has gone by and overdue after, and it stays on
-     the list until every plot it names has been audited -- no round rule
-     clears it and an audit from BEFORE it was raised cannot answer it,
-     because the request is a new question.
-
-     That last part is what `raised` is for: the range asked of
-     MJMAuditPending opens on the day it was raised rather than at the
-     beginning of time, so a plot walked last month does not silently
-     close a request made this morning. */
-  /* The note is free text an admin types, and it is dropped into a
-     template string that becomes innerHTML. Everything else on this
-     board is a plot code or a date; this is the first field on it that
-     a person writes, so it is the first that has to be escaped. */
-  const esc = (v) => String(v == null ? '' : v)
-    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;');
-
-  let SPECIAL_REQS = [];
-  async function loadSpecialAudits(){
-    try {
-      const rows = await sb.select('audit_special_audits',
-        'select=id,module,nursery,due_date,raised_on,all_plots,plots,note'
-        + '&cancelled_at=is.null');
-      SPECIAL_REQS = (rows || [])
-        .filter(r => r && r.module && r.nursery && r.due_date)
-        .map(r => ({
-          id:       r.id,
-          module:   r.module,
-          nursery:  r.nursery,
-          due:      String(r.due_date).slice(0, 10),
-          /* An older row with no raised_on falls back to its due date,
-             which is the conservative reading: it asks for work done on
-             or after that day rather than letting anything older count. */
-          raised:   String(r.raised_on || r.due_date).slice(0, 10),
-          allPlots: !!r.all_plots,
-          plots:    Array.isArray(r.plots) ? r.plots.map(String) : [],
-          note:     r.note || ''
-        }));
-    } catch (e) {
-      /* The table may simply not be installed yet. Nothing is owed that
-         was not owed before, so this is quiet. */
-      console.warn('[audit-home] special audits not read:', e && e.message);
-      SPECIAL_REQS = [];
-    }
-  }
-
-  /* The plots ONE special request still owes. The single place that
-     turns a request into a list of circles -- nurseryState, _plotsHtml
-     and plotsOwed all ask it, for exactly the reason winRange has one
-     copy: a row that clears while its circles remain is worse than the
-     bug it replaced.
-
-     null means "no basis to judge" -- the roster could not be read --
-     and every caller treats that as NOT done, so a refusal shows the
-     work rather than hiding it. */
-  function _specialOwed(o, nursery){
-    const r = o._special;
-    if (!r || r.nursery !== nursery) return [];
-    if (!window.MJMAuditPending || !MJMAuditPending.covers(o.mod, nursery)) return null;
-    let list = MJMAuditPending.plots(o.mod, nursery, r.raised, iso(year, month, day));
-    if (!r.allPlots) {
-      const want = new Set(r.plots);
-      list = list.filter(p => want.has(p));
-    }
-    return list;
-  }
-
-  /* One row per open request, placed in the month its DEADLINE falls in
-     so occStatus and dueInfo read it without knowing it is special. */
-  function specialOccurrences(){
-    const out = [];
-    SPECIAL_REQS.forEach(r => {
-      if (SCOPE_NURSERIES.indexOf(r.nursery) === -1) return;
-      const base = SET.find(sc => sc.mod === r.module);
-      if (!base) return;                      // module not run in this scope
-      const p = r.due.split('-').map(Number);
-      const dy = p[0], dm = p[1] - 1, dd = p[2];
-      if (!isFinite(dy) || !isFinite(dm) || !isFinite(dd)) return;
-      const o = { mod: base.mod, title: base.title, href: base.href,
-                  start: dd, end: dd, round: 0, _special: r };
-      /* Only stamped when the deadline is not in the month on screen --
-         the same marker a carried-over row uses, and for the same
-         reason: so nobody reads the date as this month. */
-      if (dy !== viewY || dm !== viewM) { o.fromY = dy; o.fromM = dm; }
-      out.push(o);
-    });
-    return out;
-  }
-
   /* ── MAINTENANCE TIMELINE ────────────────────────────────────────
      Pending maintenance tasks each have their own audit deadline —
      work_date + window(work_type):
@@ -2192,13 +2089,6 @@ function loadAuditTodo(){
      is a different shape: each occurrence carries a set of nurseries
      that STILL have pending tasks on that deadline, so we invert it. */
   function nurseryState(o, y, m, strict){
-    /* A special request names ONE nursery, so the other two are not
-       "done", they are not asked. Returning just the one keeps isDone's
-       every() honest instead of making two absent answers vote. */
-    if (o._special) {
-      const list = _specialOwed(o, o._special.nursery);
-      return [{ nursery: o._special.nursery, done: list !== null && list.length === 0 }];
-    }
     if (o.mod === 'maint' && o._maintNurseries) {
       return SCOPE_NURSERIES.map(n => ({
         nursery: n,
@@ -2329,16 +2219,6 @@ function loadAuditTodo(){
      the list; a closed window with nothing recorded is overdue, not passed. */
   function occStatus(o, y, m){
     if (isDone(o, y, m)) return 'done';
-    /* A special request is owed the moment it is saved -- it is a
-       deadline, not a window, so it never reads "soon" or "upcoming"
-       the way a round whose window has not opened does. Without this a
-       request raised today for the 20th would draw greyed out and
-       refuse to open, which is the opposite of asking for it. */
-    if (o._special) {
-      const t0 = new Date(year, month, day);
-      const e0 = new Date(y, m, o.end);
-      return t0 > e0 ? 'overdue' : 'due';
-    }
     const t0 = new Date(year, month, day);
     const s0 = new Date(y, m, o.start), e0 = new Date(y, m, o.end);
     if (t0 > e0) return 'overdue';
@@ -2580,9 +2460,7 @@ function loadAuditTodo(){
 
     const byNursery = pending.map(x => {
       let list = [];
-      if (o._special) {
-        list = _specialOwed(o, x.nursery) || [];
-      } else if (o.mod === 'maint') {
+      if (o.mod === 'maint') {
         /* Already worked out while the timeline was built. */
         const set = o._maintPlots && o._maintPlots.get(x.nursery);
         list = set ? [...set].sort() : [];
@@ -2998,11 +2876,7 @@ function loadAuditTodo(){
          to be visible whether it happens to be due today, in the past
          (overdue), or two days from now. The other modules run on the
          auditor's own calendar and are date-scoped as before. */
-      /* A special request rides on today's view for the same reason a
-         maintenance row does: it was raised BY somebody, for now, and
-         waiting for its deadline day to come round before showing it
-         would answer a question nobody asked. */
-      (showingToday && (o.mod === 'maint' || o._special ||
+      (showingToday && (o.mod === 'maint' ||
                         occStatus(o, o.fromY ?? viewY, o.fromM ?? viewM) === 'overdue')) ||
       (o.fromY === undefined && selDay >= o.start && selDay <= o.end));
     if (active.size)     list = list.filter(o =>
@@ -3090,19 +2964,12 @@ function loadAuditTodo(){
             <div class="tl-ico"><svg viewBox="0 0 24 24" style="stroke:${c.tone}">${ICONS[o.mod]}</svg></div>
             <div class="tl-body">
               <div class="tl-ttl">${
-                o._special ? `<span class="tl-special">${t('special_audit')}</span> ` : ''
-              }${
                 o.round ? `<span class="tl-round" data-round="${o.round}">R<i>•</i>${o.round}</span> ` : ''
               }${t(o.title)}${
-                o._special ? ` <span class="tl-from">${
-                  NURSERY_LABELS[o._special.nursery] || o._special.nursery}</span>` : ''
-              }${
-                o.fromY !== undefined && !o._special
+                o.fromY !== undefined
                   ? ` <span class="tl-from">${MONTHS[om]} ${o.fromY}</span>` : ''}</div>
               <div class="tl-meta">
-                <span class="tl-badge" style="background:${st.bg};color:${st.fg}">${stLbl(k)}</span>${
-                o._special && o._special.note
-                  ? ` <span class="tl-note">${esc(o._special.note)}</span>` : ''}
+                <span class="tl-badge" style="background:${st.bg};color:${st.fg}">${stLbl(k)}</span>
               </div>
             </div>
             <div class="tl-due${due.late ? ' late' : due.soon ? ' soon' : ''}">
@@ -3165,13 +3032,7 @@ function loadAuditTodo(){
     /* Anything still owed from earlier months rides along with the current
        month, and only there — paging back to July should show July, not
        July plus a copy of June. */
-    /* Special requests are gathered straight from the open list rather
-       than through occurrences(), which is keyed on a day of the month:
-       a one-off has an absolute date and must not be duplicated by the
-       carried-over sweep. Today's view only, same as the backlog. */
-    const occ = thisMonth
-      ? carriedOverdue().concat(monthOcc).concat(specialOccurrences())
-      : monthOcc;
+    const occ = thisMonth ? carriedOverdue().concat(monthOcc) : monthOcc;
 
     const outstanding = occ.filter(o =>
       occStatus(o, o.fromY ?? viewY, o.fromM ?? viewM) !== 'done').length;
@@ -3202,10 +3063,6 @@ function loadAuditTodo(){
        answer, which is the same fallback the rows themselves use: a
        number too small is worse than a number of the old kind. */
     function plotsOwed(o, y, m){
-      if (o._special) {
-        const l = _specialOwed(o, o._special.nursery);
-        return l ? l.length : 0;
-      }
       if (o.mod === 'maint')
         return o._maintPlots
           ? SCOPE_NURSERIES.reduce((n, nur) =>
@@ -3223,11 +3080,6 @@ function loadAuditTodo(){
        Maintenance has no such figure: an audited task leaves the ledger
        entirely, so its pending count IS its total. */
     function plotsTotal(o){
-      if (o._special) {
-        if (!o._special.allPlots) return o._special.plots.length;
-        return (window.MJMAuditPending && MJMAuditPending.covers(o.mod, o._special.nursery))
-          ? MJMAuditPending.plotsAll(o.mod, o._special.nursery).length : 0;
-      }
       if (o.mod === 'maint') return 0;
       if (!window.MJMAuditPending) return 0;
       return SCOPE_NURSERIES.reduce((n, nur) =>
@@ -3390,7 +3242,6 @@ function loadAuditTodo(){
   renderAll();                                   // draw at once, from the schedule
   loadCompletions().then(renderAll);             // then again, minus what is done
   loadMaintTimeline().then(renderAll);           // add maintenance deadlines when they arrive
-  loadSpecialAudits().then(renderAll);           // and any one-off round somebody raised
   /* Settings last: the rounds and the maintenance windows both come from
      them, so when they land the board is rebuilt and the maintenance walk
      is redone with the real day counts. */

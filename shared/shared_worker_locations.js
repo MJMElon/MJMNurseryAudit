@@ -32,10 +32,16 @@
     return String(name || '').replace(/\s+/g, '').toUpperCase();
   }
 
+  /* The Main Nursery takes BNN and UNN with or without a number after it,
+     so BNN, UNN1, UNN2 today and a BNN2 or a UNN3 the day somebody adds
+     one. It used to name BNN exactly, which was true for as long as there
+     was one Batu Niah — a second would have landed under "Not in a
+     location" on the Location card, with nothing saying why.
+     UNE is not caught by it: the estate is UNE, not UNN. */
   var LOCATIONS = [
     { key: 'pre',    name: 'Pre Nursery',  match: function (c) { return c === 'PN'; } },
     { key: 'main',   name: 'Main Nursery',
-      match: function (c) { return c === 'BNN' || /^UNN\d+$/.test(c); } },
+      match: function (c) { return /^(BNN|UNN)\d*$/.test(c); } },
     { key: 'estate', name: 'Estate',       match: function (c) { return c === 'UNE'; } }
   ];
 

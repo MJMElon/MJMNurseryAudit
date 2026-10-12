@@ -375,6 +375,15 @@
               white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
     .hist-date{font-size:11px;font-weight:800;color:var(--fc-ink3);white-space:nowrap;
                flex-shrink:0;letter-spacing:.3px;text-transform:uppercase}
+    /* A round the month owed and did not get. Amber rather than red:
+       it is a fact being recorded, not an alarm -- the work has since
+       been done, which is why it left the to-do list. */
+    .hist-missed-head{font-size:10.5px;font-weight:900;letter-spacing:.08em;
+      text-transform:uppercase;color:#92400e;padding:14px 4px 6px;
+      border-top:1px dashed #e8dcc8;margin-top:6px}
+    .hist-row.hist-missed{cursor:default;background:#fffbeb}
+    .hist-row.hist-missed:hover{background:#fffbeb}
+    .hist-row.hist-missed .hist-sub{color:#92400e;font-weight:700}
     .hist-empty{padding:26px 12px;text-align:center;font-size:12.5px;
                 font-weight:600;color:var(--fc-ink3)}
     /* ── AUDIT SCHEDULE BOARD ────────────────────────────────────────
@@ -1053,7 +1062,7 @@
   </div>
 </div>
 
-<script src="audit_lang.js?v=20260825b"></script>
+<script src="audit_lang.js?v=20261012a"></script>
 <script src="audit_supabase.js?v=20261008a"></script>
 <script src="audit_ribbon.js?v=20260826a"></script>
 <!-- Works out which plots still owe work, for the circles under each
@@ -1061,7 +1070,7 @@
 <script src="audit_pending.js?v=20260829a"></script>
 <!-- Rounds, maintenance windows and the ages being audited. Defaults to
      what used to be hardcoded below, so this cannot break the board. -->
-<script src="audit_settings.js?v=2"></script>
+<script src="audit_settings.js?v=3"></script>
 <!-- The record summary shared with the module pages' Completed Records.
      On this page it only exports MJMAuditSummary — the completed-records
      section it also carries is the manage view's and does not mount
@@ -1448,6 +1457,41 @@ function loadAuditTodo(){
   let done = null;
 
   const iso = (y,m,d) => y + '-' + String(m+1).padStart(2,'0') + '-' + String(d).padStart(2,'0');
+
+  /* ── AN OVERDUE WINDOW IS CLEARED BY THE WORK, NOT BY THE CALENDAR ──
+
+     A row asks one question: was this plot audited inside the window?
+     For a window still open that is right. For one that CLOSED it is
+     unanswerable for ever: "audit B01 between 1 and 5 August" cannot be
+     satisfied in October, so an auditor who walks B01 today has done the
+     work and the row stays, listing every plot, reading "lewat 68 hari",
+     and it will go on doing that until somebody deletes something.
+
+     Every overdue row on the board was in that state. So the upper bound
+     on a CLOSED window runs to today: the work counts whenever it was
+     done. The lower bound does not move -- an audit from before the
+     window opened belongs to the round before this one and must not
+     close two.
+
+     A round cleared late is not a round done on time, and it is not
+     thrown away either: strict() is the same test with the real window,
+     and missedRounds() below uses the two together to file it in Audit
+     History as a missed audit. "No meaningful to audit back" is the
+     office's own phrase for why the row goes.
+
+     THREE CALLERS, ONE RANGE. nurseryState (does the row stay),
+     _plotsHtml (which circles under it) and plotsOwed (the count and the
+     progress bar) each worked the two dates out for themselves. They
+     have to agree -- a row that clears while its circles remain, or a
+     count that disagrees with the list under it, is worse than the bug.
+     So they all come here. */
+  function winRange(o, y, m, strict){
+    const fromISO = iso(y, m, o.start);
+    const endISO  = iso(y, m, o.end);
+    if (strict) return { fromISO: fromISO, toISO: endISO };
+    const todayISO = iso(year, month, day);
+    return { fromISO: fromISO, toISO: endISO >= todayISO ? endISO : todayISO };
+  }
 
   async function loadCompletions(){
     let from = new Date(year, month - LOOKBACK_MONTHS, 1);
@@ -1896,14 +1940,15 @@ function loadAuditTodo(){
   /* Which nurseries have been audited inside this window. Maintenance
      is a different shape: each occurrence carries a set of nurseries
      that STILL have pending tasks on that deadline, so we invert it. */
-  function nurseryState(o, y, m){
+  function nurseryState(o, y, m, strict){
     if (o.mod === 'maint' && o._maintNurseries) {
       return SCOPE_NURSERIES.map(n => ({
         nursery: n,
         done: !o._maintNurseries.has(n)             // pending? then not done
       }));
     }
-    const fromISO = iso(y, m, o.start), toISO = iso(y, m, o.end);
+    const r = winRange(o, y, m, strict);
+    const fromISO = r.fromISO, toISO = r.toISO;
     return SCOPE_NURSERIES.map(n => {
       /* A window is finished when no plot in it is still owed.
 
@@ -1923,10 +1968,20 @@ function loadAuditTodo(){
         return { nursery: n,
                  done: MJMAuditPending.plots(o.mod, n, fromISO, toISO).length === 0 };
 
+      /* The fallback reads the same extended range. Leaving it on the
+         window alone would mean a device that cannot read the batch
+         roster -- offline, or an RLS refusal -- shows a backlog that
+         nothing it can do will ever clear, which is the whole bug over
+         again on the one screen least able to explain itself. */
       let ok = false;
-      if (done && done[o.mod])
-        for (let d = o.start; d <= o.end && !ok; d++)
-          if (done[o.mod].has(n + '|' + iso(y, m, d))) ok = true;
+      if (done && done[o.mod]) {
+        const pre = n + '|';
+        done[o.mod].forEach(k => {
+          if (ok || k.indexOf(pre) !== 0) return;
+          const d = k.slice(pre.length);
+          if (d >= fromISO && d <= toISO) ok = true;
+        });
+      }
       return {nursery:n, done:ok};
     });
   }
@@ -1936,6 +1991,40 @@ function loadAuditTodo(){
   function isDone(o, y, m){
     return nurseryState(o, y, m).every(x => x.done);
   }
+
+  /* ── A ROUND CLEARED LATE IS STILL A ROUND THAT WAS MISSED ──
+     The row goes, because auditing August back is not a thing anybody
+     can do and a list of impossible work is a list nobody reads. What
+     must not go with it is the FACT: August asked for a round and did
+     not get one in its window.
+
+     So the two tests above are run side by side -- strict, which is
+     the real window, and the extended one that clears the row -- and
+     a nursery that passes only the second is a missed round. It is
+     filed in Audit History under the month that OWED it, never under
+     the month the late work happened: a missed August round is a fact
+     about August.
+
+     Maintenance is left out. Its rows exist because a deadline has
+     pending work on it, so there is no window to be outside of.
+
+     Read from outside this closure by the Audit History section, which
+     is a top-level function and cannot see any of this. */
+  function missedRounds(y, m){
+    const out = [];
+    occurrences(y, m).forEach(o => {
+      if (o.mod === 'maint') return;
+      const onTime = nurseryState(o, y, m, true);
+      const cleared = nurseryState(o, y, m, false);
+      cleared.forEach((x, i) => {
+        if (x.done && onTime[i] && !onTime[i].done)
+          out.push({ mod: o.mod, title: o.title, round: o.round || 0,
+                     nursery: x.nursery, endISO: iso(y, m, o.end) });
+      });
+    });
+    return out;
+  }
+  window.MJMAuditMissed = { rounds: missedRounds, lookback: LOOKBACK_MONTHS };
 
   const daysIn = (y,m) => new Date(y, m+1, 0).getDate();
 
@@ -2218,8 +2307,8 @@ function loadAuditTodo(){
     [o.mod, oy, om, o.start, o.end, o.round || 0].join('|');
   function _plotsHtml(o, oy, om, pending){
     if (!pending.length) return '';
-    const fromISO = iso(oy, om, o.start);
-    const toISO   = iso(oy, om, o.end);
+    const _r = winRange(o, oy, om);
+    const fromISO = _r.fromISO, toISO = _r.toISO;
 
     const byNursery = pending.map(x => {
       let list = [];
@@ -2617,7 +2706,8 @@ function loadAuditTodo(){
               n + ((o._maintPlots.get(nur) || {size: 0}).size), 0)
           : 0;
       if (!window.MJMAuditPending) return 0;
-      const fromISO = iso(y, m, o.start), toISO = iso(y, m, o.end);
+      const r = winRange(o, y, m);
+      const fromISO = r.fromISO, toISO = r.toISO;
       return SCOPE_NURSERIES.reduce((n, nur) =>
         MJMAuditPending.covers(o.mod, nur)
           ? n + MJMAuditPending.plots(o.mod, nur, fromISO, toISO).length
@@ -2802,7 +2892,13 @@ function loadAuditTodo(){
      circles appear under rows that are already on screen, rather than
      holding the whole board back for them. A failure here leaves the
      rows exactly as they were before circles existed. */
-  MJMAuditPending.load(SCOPE_NURSERIES).then(renderAll).catch(e => {
+  /* The missed-round block in Audit History is derived from the same
+     roster, so it cannot be drawn until this lands. renderHistory is a
+     no-op until its own records arrive, and is called again by them. */
+  MJMAuditPending.load(SCOPE_NURSERIES).then(() => {
+    renderAll();
+    if (typeof renderHistory === 'function') renderHistory();
+  }).catch(e => {
     console.warn('[audit-home] pending plots unavailable:', e);
   });
 }
@@ -2917,9 +3013,34 @@ async function loadHistory(){
   }
 }
 
+/* Missed rounds for one 'YYYY-MM', or [] until the to-do board has
+   worked out what it owes. Guarded at every step: the history section
+   must never be the thing that breaks the page, and a board that failed
+   to load is a board with nothing to say about missed rounds -- which
+   is not the same as saying none were missed, so it says nothing. */
+function histMissed(ym){
+  try {
+    if (!window.MJMAuditMissed || !MJMAuditMissed.rounds) return [];
+    const p = String(ym).split('-');
+    return MJMAuditMissed.rounds(Number(p[0]), Number(p[1]) - 1) || [];
+  } catch (e) { return []; }
+}
+
+/* A month can earn its place in the arrows two ways now: records filed
+   in it, or a round it owed and did not get. The second has no record
+   by definition -- that is what makes it missed -- so without this the
+   arrows would skip straight past the month somebody most needs to see.
+   Scanned over the same lookback the board carries its backlog for. */
 function histMonthsWithData(){
   const set = new Set();
   HIST_ALL.forEach(r => set.add(r.date.slice(0,7)));
+  const back = (window.MJMAuditMissed && MJMAuditMissed.lookback) || 3;
+  const now  = new Date();
+  for (let i = 0; i <= back; i++) {
+    const d  = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    const ym = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
+    if (histMissed(ym).length) set.add(ym);
+  }
   return [...set].sort();      // ascending
 }
 
@@ -2954,8 +3075,9 @@ function renderHistory(){
   if (prevBtn) prevBtn.disabled = !months.some(mo => mo < HIST_MONTH);
   if (nextBtn) nextBtn.disabled = !months.some(mo => mo > HIST_MONTH);
 
-  const rows = HIST_ALL.filter(r => r.date.slice(0,7) === HIST_MONTH);
-  if (!rows.length) {
+  const rows   = HIST_ALL.filter(r => r.date.slice(0,7) === HIST_MONTH);
+  const missed = histMissed(HIST_MONTH);
+  if (!rows.length && !missed.length) {
     /* Never actually reached at the moment — the arrows can only land
        on months with records — but the empty state matters if the
        initial default month is a fresh one with nothing filed yet. */
@@ -2989,6 +3111,43 @@ function renderHistory(){
       '<div class="hist-date">' + dstr + '</div>' +
     '</div>';
   }).join('');
+
+  /* ── WHAT THIS MONTH OWED AND DID NOT GET ──
+     Under the records, because the records are what somebody came here
+     for. These rows carry no data-hi and no role=button: there is no
+     record behind them to open -- that is the whole point of them. */
+  if (missed.length) {
+    const seen = new Set();
+    const html = missed.map(x => {
+      const mod = HIST_MODS[x.mod];
+      if (!mod) return '';
+      const k = x.mod + '|' + x.round + '|' + x.nursery;
+      if (seen.has(k)) return '';
+      seen.add(k);
+      const nur = (typeof NURSERY_LABELS !== 'undefined' && NURSERY_LABELS[x.nursery]) || x.nursery;
+      const rnd = x.round ? ' R\u2022' + x.round : '';
+      const due = new Date(x.endISO + 'T00:00:00')
+        .toLocaleDateString(lang, { day:'numeric', month:'short' });
+      return '<div class="hist-row hist-missed">' +
+        '<div class="hist-ico" style="background:#fef3c7">' +
+          '<svg viewBox="0 0 24 24" style="stroke:#92400e">' + mod.icon + '</svg>' +
+        '</div>' +
+        '<div class="hist-body">' +
+          '<div class="hist-ttl">' + mod.label + rnd + '</div>' +
+          '<div class="hist-sub">' + nur + ' \u00b7 ' +
+            (typeof t === 'function' ? t('home_history_missed') : 'Missed audit') +
+          '</div>' +
+        '</div>' +
+        '<div class="hist-date">' + due + '</div>' +
+      '</div>';
+    }).join('');
+    if (html) {
+      list.innerHTML +=
+        '<div class="hist-missed-head">' +
+          (typeof t === 'function' ? t('home_history_missed_head') : 'Missed this month') +
+        '</div>' + html;
+    }
+  }
 
   /* Remembered so the listener can find the record behind a row without
      re-filtering, and so a month change cannot hand back a stale one. */

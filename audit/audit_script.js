@@ -46,6 +46,19 @@ function fmtDate(iso){
   const s=iso.split('T')[0].split('-');
   return s[2]+' '+['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][+s[1]-1]+' '+s[0];
 }
+/* Today in the nursery, not in UTC. todayISO() goes through
+   toISOString(), which is the day before in Malaysia for the whole of
+   the early morning -- harmless where it is used to stamp a save, and
+   an off-by-one round on the day a window opens. */
+function _localISO(d){
+  const t = d || new Date();
+  return t.getFullYear() + '-' + String(t.getMonth()+1).padStart(2,'0')
+       + '-' + String(t.getDate()).padStart(2,'0');
+}
+/* "Round 3" where the module has rounds, "This round" where it has one. */
+function _roundLabel(w){
+  return (w && w.round) ? 'Round ' + w.round : 'This round';
+}
 function fmtDT(iso){
   if(!iso)return'—';
   return new Date(iso).toLocaleString('en-MY',{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit',hour12:true});
@@ -307,12 +320,39 @@ function byPlot(){ return activeTab === 'PN'; }
 function plotHasWork(p){
   return batchesOnPlot(p).some(b => !isBatchNotRequired(p, b.batch));
 }
+
+/* ── THE ROUND THE GRID IS COUNTING ───────────────────────────────────
+   isBatchAudited / isPlotAudited used to ask "has this ever been
+   audited", so a plot walked once was green for ever: the badge, the
+   "N / M audited" count and the plot cell all said done while the to-do
+   list went on asking for it. They ask about the round that is
+   currently owed now -- the same range the board asks on, from
+   MJMAuditSettings.currentWindow.
+
+   No settings module, or a module with no rounds, falls back to the old
+   question. Showing too much is the safe direction to be wrong in. */
+function _roundNow(){
+  try {
+    if (!(window.MJMAuditSettings && MJMAuditSettings.currentWindow)) return null;
+    return MJMAuditSettings.currentWindow(activeTab === 'PN' ? 'PN' : 'MN', 'plot', _localISO());
+  } catch (e) { return null; }
+}
+function _inRound(r, w){
+  if (!w) return true;
+  const d = String(r && r.date || '').slice(0, 10);
+  return d >= w.fromISO && d <= w.toISO;
+}
 function isPlotAudited(p){
-  return records.some(r => r.nursery === activeTab && r.plot === p);
+  const w = _roundNow();
+  return records.some(r => r.nursery === activeTab && r.plot === p && _inRound(r, w));
 }
 function openPlotAudit(plot){
   window._lastOpenedPlot = plot;
-  const rec = records.find(r => r.nursery === activeTab && r.plot === plot);
+  /* The record for THIS round, if there is one -- opening last
+     round's would be editing an answer to a question already
+     answered. */
+  const _w = _roundNow();
+  const rec = records.find(r => r.nursery === activeTab && r.plot === plot && _inRound(r, _w));
   if (rec) { openDetail(rec.uid); return; }
   _openFormForPlot(plot, null);
   /* Fill the read-only batches chips inside the form so the auditor
@@ -400,10 +440,29 @@ function batchesOnPlot(plot){
    + batch as strings — mirrors how the form saves them. */
 function isBatchAudited(plot, batch){
   const wanted = String(batch || '').trim();
+  const w = _roundNow();
   return records.some(r =>
-    r.nursery === activeTab && r.plot === plot && String(r.batch || '').trim() === wanted);
+    r.nursery === activeTab && r.plot === plot &&
+    String(r.batch || '').trim() === wanted && _inRound(r, w));
 }
 
+
+/* WHICH ROUND THE COUNT IS COUNTING.
+   "0 / 7 audited" with every batch card underneath showing an audit
+   from the 1st reads as "the work has vanished". It has not: those
+   audits closed the round they fell in, and a NEW round has opened
+   since. The count is per round -- it always was, now that a batch
+   stops being done the moment the next round opens -- and the only
+   thing missing was it saying so. The deadline rides with it, because
+   "Round 1" alone does not tell anybody whether they are late. */
+function _roundSuffix(){
+  const w = _roundNow();
+  if (!w) return '';
+  const d = w.dueISO ? fmtDate(w.dueISO) : '';
+  const name = w.round ? ((typeof t === 'function' ? t('round_word') : 'Round') + ' ' + w.round)
+                       : (typeof t === 'function' ? t('this_round') : 'This round');
+  return ' \u00b7 ' + name + (d ? ' \u00b7 ' + (typeof t === 'function' ? t('due_by') : 'due') + ' ' + d : '');
+}
 function renderList(){
   const recs=records.filter(r=>r.nursery===activeTab);
   const plots=NURSERY_PLOTS[activeTab]||[];
@@ -425,7 +484,7 @@ function renderList(){
     totalAudited  += required.filter(b => isBatchAudited(p, b.batch)).length;
   });
   document.getElementById('list-count').textContent =
-    fmtNum(totalAudited) + ' / ' + fmtNum(totalRequired) + ' ' + t('audited');
+    fmtNum(totalAudited) + ' / ' + fmtNum(totalRequired) + ' ' + t('audited') + _roundSuffix();
   document.getElementById('list-heading').textContent =
     t('plot_title') + ' — ' + NURSERY_LABELS[activeTab];
   document.querySelectorAll('.tab-item').forEach(t=>{
@@ -555,13 +614,39 @@ function openPlotDetail(plot){
   // admin may delete). Pending batches keep a text 'Audit Now' button
   // because there's no record to edit or delete yet.
   const canDelete = typeof isAuditAdmin === 'function' && isAuditAdmin();
+  /* WHICH ROUND IS BEING ASKED FOR. This card used to read `done =
+     !!audit` -- any audit, ever -- so a batch audited once in round 2
+     stayed green in round 3 and in every round after it. The auditor
+     opened the plot, saw green, and the to-do list went on asking for
+     that plot with nothing here to say which batch it meant. The to-do
+     list was right. See MJMAuditSettings.currentWindow for the range,
+     which is the same one the board asks on.
+
+     No settings module, or a module with no rounds, falls back to the
+     old question. Showing too much is the safe direction: an auditor
+     re-walking a done batch loses an hour, a batch silently marked done
+     loses a month. */
+  const _round = _roundNow();
   const editSvg = '<svg viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>';
   const delSvg  = '<svg viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/><path d="M10 11v6M14 11v6M9 6V4a1 1 0 011-1h4a1 1 0 011 1v2"/></svg>';
 
   listEl.innerHTML = bs.map(b => {
-    const audit = records.find(r => r.nursery === activeTab && r.plot === plot &&
-                              String(r.batch || '').trim() === b.batch);
-    const done = !!audit;
+    /* Every audit this batch has, newest first -- the card shows the
+       LATEST rather than whichever the table happened to return. */
+    const mine = records
+      .filter(r => r.nursery === activeTab && r.plot === plot &&
+                   String(r.batch || '').trim() === b.batch)
+      .sort((x, y) => String(y.date || '').localeCompare(String(x.date || '')));
+    const audit = mine[0] || null;
+    const everDone = !!audit;
+    const done = _round
+      ? mine.some(r => _inRound(r, _round))
+      : everDone;
+    /* Audited before, and this round still wants one. The record is NOT
+       hidden -- it is the auditor's work and the thing they would want
+       to look at before walking out again -- it simply stops being an
+       answer to the question the round is asking. */
+    const lapsed = everDone && !done;
     // The operation ledger's Plot·Batch Balance says nothing is standing
     // here — culled, sold or moved on. No audit needed. Skip Not-
     // Required if an audit ALREADY exists on this batch (don't hide
@@ -572,14 +657,25 @@ function openPlotDetail(plot){
       : notReq
         ? 'border-left:4px solid #cbd5e1;opacity:.72'
         : 'border-left:4px solid #f4c94a';
-    const thumbHtml = done && audit.photo
+    const thumbHtml = everDone && audit.photo
       ? `<img class="record-thumb" src="${audit.photo}" alt="Batch ${b.batch}" onclick="event.stopPropagation();openLightbox('${audit.photo}')"/>`
       : `<div class="record-thumb-placeholder"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="12" cy="12" r="3"/></svg></div>`;
     const breedHtml = b.breed
       ? ` <span style="font-size:11px;color:var(--text3);font-weight:500">· ${b.breed}</span>`
       : '';
+    /* The DATE the audit is for, not the moment the row was inserted.
+       The card used to print created_at alone, which is why a batch
+       audited for the 22nd and saved at 11pm read as "22 Sep 11:22 pm"
+       while every list that decides anything was reading `date`. Two
+       screens quoting different days about the same record is how an
+       auditor comes to trust the wrong one. */
+    const auditDay = audit ? String(audit.date || '').slice(0, 10) : '';
+    const dayTxt = auditDay ? fmtDate(auditDay) : '';
     const metaHtml = done
-      ? `${audit.id || ''}${audit.createdAt ? ' · ' + fmtDT(audit.createdAt) : ''}`
+      ? `${audit.id || ''}${dayTxt ? ' · ' + dayTxt : ''}`
+      : lapsed
+        ? `<span style="color:#9a6b00;font-weight:700">⟳ ${_roundLabel(_round)} due</span>`
+          + `${dayTxt ? ' · last audited ' + dayTxt : ''}`
       : notReq
         ? '<span style="color:#94a3b8;font-weight:600">✕ Not Required</span> · balance ≤ 0 in operation ledger'
         : 'Pending';
@@ -587,7 +683,7 @@ function openPlotDetail(plot){
     // four measurement chips — the four fields carry the sentinel
     // string, not real measurements, so rendering them as chips would
     // be misleading. Shows who declined for accountability.
-    const chipsHtml = done
+    const chipsHtml = everDone
       ? (isNoAuditRequired(audit)
           ? `<div class="record-chips">
                <span class="mini-chip" style="background:#e0f2e0;color:#0f5527;border:1px solid #a7d5b0;padding:3px 10px">
@@ -604,7 +700,7 @@ function openPlotDetail(plot){
     // Actions on the right:
     //   audited → edit + (admin) delete icon buttons
     //   pending → nothing on the right; the row itself is the tap target
-    const actionsHtml = done
+    const actionsHtml = everDone
       ? `<div class="record-actions" onclick="event.stopPropagation()">`
           + `<button class="icon-btn edit-btn" title="Edit audit" aria-label="Edit audit" onclick="openEdit('${audit.uid}')">${editSvg}</button>`
           + (canDelete ? `<button class="icon-btn del-btn" title="Delete audit" aria-label="Delete audit" onclick="confirmDelete('${audit.uid}')">${delSvg}</button>` : '')
@@ -615,6 +711,10 @@ function openPlotDetail(plot){
     // targets — no action, no keyboard activation — so a tap doesn't
     // trigger an audit that wasn't asked for. The auditor can still
     // manually add one via the FAB if they want.
+    /* A lapsed row opens a NEW audit, not the old one. Editing the
+       September record would not answer October, and the auditor
+       standing in the plot wants the form. The old record is still one
+       tap away on the edit button. */
     const rowClick = done
       ? `openEdit('${audit.uid}')`
       : notReq
@@ -622,6 +722,8 @@ function openPlotDetail(plot){
         : `_openFormForPlot('${plot}','${b.batch}')`;
     const rowLabel = done
       ? 'Edit audit for batch ' + b.batch
+      : lapsed
+        ? 'Audit batch ' + b.batch + ' again — ' + _roundLabel(_round) + ' is due'
       : notReq
         ? 'Batch ' + b.batch + ' — audit not required (operation ledger balance ≤ 0)'
         : 'Audit batch ' + b.batch;
@@ -1234,6 +1336,20 @@ function init(){
        audit_login_guard.js. */
     const fromMgmt = qs.get('from') === 'manage';
     if (!hasPlot && !isAdm && !fromMgmt) { location.replace('audit_home.html'); return; }
+  } catch (e) {}
+
+  /* The real rounds, if the office has set any. The defaults are the
+     old hardcoded schedule, so the cards draw correctly from the first
+     frame and are redrawn if the live ones say something else. Never
+     awaited: a settings read that fails must not hold up a plot grid an
+     auditor is standing in front of. */
+  try {
+    if (window.MJMAuditSettings && MJMAuditSettings.load) {
+      MJMAuditSettings.load().then(() => {
+        if (activeView === 'plot' && window._lastOpenedPlot)
+          openPlotDetail(window._lastOpenedPlot);
+      }).catch(() => {});
+    }
   } catch (e) {}
 
   const d=document.getElementById('nav-today');if(d)d.textContent=fmtDate(todayISO());

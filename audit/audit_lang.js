@@ -45,6 +45,11 @@ const TRANSLATIONS = {
     home_history_title:      'Audit History',
     home_history_loading:    'Loading history…',
     home_history_empty:      'No audits filed this month.',
+    /* A round this month owed and did not get inside its window. The
+       work has since been done -- that is why it left the to-do list --
+       and this is what keeps the fact that it was late. */
+    home_history_missed:     'Missed audit',
+    home_history_missed_head:'Missed this month',
     /* === NURSERY CHOOSER + SCHEDULE BOARD === */
     ask_nursery:      'Which nursery are you auditing today?',
     pre_nursery:      'Pre Nursery',
@@ -112,6 +117,12 @@ const TRANSLATIONS = {
        list-count header on the Plot Condition audit. Kept short so
        "0 / 6 audited" reads at a glance in either language. */
     audited:                 'audited',
+    /* Named on the grid count so "0 / 7 audited" cannot be read as
+       "nothing was ever done here" -- the count is per ROUND, and the
+       deadline says whether that round is late. */
+    round_word:              'Round',
+    this_round:              'This round',
+    due_by:                  'due',
     no_batches:              'no batches',
     batch_one:               'batch',
     batches_many:            'batches',
@@ -451,6 +462,8 @@ const TRANSLATIONS = {
     home_history_title:      'Sejarah Audit',
     home_history_loading:    'Memuatkan sejarah…',
     home_history_empty:      'Tiada audit direkodkan bulan ini.',
+    home_history_missed:     'Audit tertunggak',
+    home_history_missed_head:'Tertunggak bulan ini',
     /* === PEMILIHAN NURSERI + PAPAN JADUAL === */
     ask_nursery:      'Nurseri mana anda audit hari ini?',
     pre_nursery:      'Tapak Semaian Kecil',
@@ -516,6 +529,9 @@ const TRANSLATIONS = {
     /* Ratio-label words (Malay) for the plot-icon subtitle and the
        list-count header on the Plot Condition audit. */
     audited:                 'Diaudit',
+    round_word:              'Pusingan',
+    this_round:              'Pusingan ini',
+    due_by:                  'tarikh akhir',
     no_batches:              'tiada lot',
     batch_one:               'lot',
     batches_many:            'lot',

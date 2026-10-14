@@ -221,6 +221,12 @@ const TRANSLATIONS = {
     /* === PAPAN AUDIT === */
     papan_title:         'Papan Tanda Audit',
     papan_checks:        'Papan Tanda Checks',
+    /* The plots to audit are grouped by the month the batch went onto
+       the plot, and the window is last month and this. The month NAMES
+       are not translated: they are the spelling on the physical sign. */
+    papan_month_undated: 'No date on the record',
+    papan_none_two_months:      'No new plots in the last two months',
+    papan_none_two_months_desc: 'No {ev} events recorded on {nursery} last month or this month. Newly-placed batches appear here automatically, or add one manually in Batch Info.',
     presence_cond:       'Presence & Condition',
     correct_info:        'Correct Information',
     height_150:          'Height of Papan Tanda (150cm)',
@@ -641,6 +647,9 @@ const TRANSLATIONS = {
     /* === PAPAN AUDIT === */
     papan_title:         'Audit Papan Tanda',
     papan_checks:        'Semakan Papan Tanda',
+    papan_month_undated: 'Tiada tarikh pada rekod',
+    papan_none_two_months:      'Tiada plot baharu dalam dua bulan ini',
+    papan_none_two_months_desc: 'Tiada acara {ev} direkodkan di {nursery} bulan lepas atau bulan ini. Batch yang baharu dipindah akan muncul di sini secara automatik, atau tambah satu secara manual di Batch Info.',
     presence_cond:       'Kehadiran & Keadaan',
     correct_info:        'Maklumat Betul',
     height_150:          'Ketinggian Papan Tanda (150sm)',

@@ -65,13 +65,55 @@ function _fmtMonthYear(iso){
   const names=['January','February','March','April','May','June','July','August','September','October','November','December'];
   return names[+s[1]-1]+' '+s[0];
 }
-/* First day of this calendar month as YYYY-MM-01 — the window for
-   auto-detecting new transplant/planted events from the operation
-   ledger. Papan tanda gets checked on newly-placed plants, so
-   "this month" is the natural window. */
-function _startOfThisMonthISO(){
+/* Today in the nursery, not in UTC. todayISO() goes through
+   toISOString(), which is the day before in Malaysia for the whole of
+   the early morning -- harmless where it is used to stamp a save, and
+   an off-by-one round on the day a window opens. Third copy, with
+   audit_script.js and audit_height_script.js. */
+function _localISO(d){
+  const t = d || new Date();
+  return t.getFullYear() + '-' + String(t.getMonth()+1).padStart(2,'0')
+       + '-' + String(t.getDate()).padStart(2,'0');
+}
+
+/* ── PAPAN'S WINDOW IS TWO MONTHS: LAST MONTH AND THIS ──
+   First day of the PREVIOUS calendar month, as YYYY-MM-01 — the window
+   for auto-detecting new transplant/planted events from the operation
+   ledger.
+
+   SHARED RULE — the same window is `_papanWindowStartISO()` in
+   audit_pending.js, which is what the home board's to-do row and its
+   plot chips are built from. Change one, change the other: a plot
+   inside one window and outside the other is a to-do row with no card
+   to open, or a card nothing ever asked for.
+
+   It was the current month alone to begin with, on the argument that
+   papan tanda gets checked on newly-placed plants. One month is too
+   narrow for the walking: a plot transplanted on the 28th gets its
+   sign nailed up days later, and on the 1st it dropped off the list
+   whether or not anybody had looked at it. The office asked for both
+   months at once — "so i can see sep transplanting plot and oct
+   transplanting plot" — so the auditor works one list and the plots
+   are grouped under the month they went out in. */
+function _papanWindowStartISO(){
   const d = new Date();
-  return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-01';
+  const s = new Date(d.getFullYear(), d.getMonth() - 1, 1);   // -1 normalises to December
+  return s.getFullYear() + '-' + String(s.getMonth()+1).padStart(2,'0') + '-01';
+}
+
+/* The month a card belongs to: the event that put the batch on the plot.
+   MN cards are a transplant, PN cards a planting, and a card with
+   neither is grouped under '' and shown last — see _papanMonthLabel. */
+function _papanMonthKey(b){
+  const d = (b && (b.dateTransplant || b.datePlanted)) || '';
+  return d ? d.slice(0,7) : '';
+}
+function _papanMonthLabel(key){
+  /* _fmtMonthYear is the one month-name list on this page, and it is the
+     spelling the physical sign carries. A second copy here is a second
+     list to get wrong, and one of them had March missing within a minute
+     of being typed. */
+  return key ? _fmtMonthYear(key + '-01') : t('papan_month_undated');
 }
 
 /* Add N calendar months to a YYYY-MM-DD string. Local time to match how
@@ -136,9 +178,78 @@ function getLatestBatchPerPlot(){
   return Object.values(map);
 }
 
-/* Find audit for a batch */
+/* ── THE AUDIT THAT ANSWERS THE ROUND NOW OWED ──
+   THIRD COPY of the rule in audit_script.js and audit_height_script.js
+   (`_roundNow` / `_inRound`). Change one, change all three.
+
+   This page used to ask "has this batch EVER been audited", which the
+   other two modules were taken off a month ago for the reason written
+   up under "A batch is not audited for ever because it was audited
+   once". Papan was deliberately left out, and the note said why: it
+   audited the batch most recently placed on a plot THIS MONTH, so its
+   roster was already round-shaped and the two questions could not
+   disagree.
+
+   The window is two months now, so that reasoning is gone. A plot
+   transplanted and audited in September rides into October's roster,
+   and "ever audited" would draw it green while the home board — which
+   asks about the round's own dates — went on listing it as owed. Two
+   screens disagreeing about one plot is how a round stays open for
+   months, which is exactly what the office reported on the other two.
+
+   `currentWindow` keeps a closed window open until somebody does the
+   work, so a September audit still answers September's round while
+   that round is the one owed. It stops answering the moment October's
+   opens, which is the point.
+
+   The SCOPE comes off the batch rather than off the open tab: the
+   badge counts span every nursery, and PN and MN can be scheduled
+   differently. No settings module, or a module with no rounds, falls
+   back to the old question — showing too much is the safe direction. */
+function _papanRoundFor(nursery){
+  try {
+    if (!(window.MJMAuditSettings && MJMAuditSettings.currentWindow)) return null;
+    return MJMAuditSettings.currentWindow(nursery === 'PN' ? 'PN' : 'MN', 'papan', _localISO());
+  } catch (e) { return null; }
+}
+function _papanInRound(a, w){
+  if (!w) return true;
+  const d = String(a && a.date || '').slice(0, 10);
+  return d >= w.fromISO && d <= w.toISO;
+}
+/* "· Round 1 · due 20 Oct 2026" on the count pill. THIRD COPY of
+   `_roundSuffix` in audit_script.js and audit_height_script.js; change
+   one, change all three.
+
+   The office asked for this on the other two in one line: a bare
+   "0 / 7 audited" over seven cards each carrying an audit reads as the
+   work having vanished, when both screens are right and a new round has
+   simply opened. "Round 1" alone does not say whether anybody is late,
+   so the deadline is on it too. */
+function _papanRoundSuffix(){
+  const w = _papanRoundFor(activeNursery);
+  if (!w) return '';
+  const d = w.dueISO ? fmtDate(w.dueISO) : '';
+  const name = w.round ? (t('round_word') + ' ' + w.round) : t('this_round');
+  return ' \u00b7 ' + name + (d ? ' \u00b7 ' + t('due_by') + ' ' + d : '');
+}
+
+/* The answer to "is this batch done" — the audit inside the round now
+   owed, or null. */
 function getAuditForBatch(batchUid){
-  return audits.find(a=>String(a.batchUid)===String(batchUid))||null;
+  const b = batches.find(x => String(x.uid) === String(batchUid));
+  const w = _papanRoundFor(b ? b.nursery : activeNursery);
+  const mine = audits.filter(a => String(a.batchUid) === String(batchUid));
+  return mine.find(a => _papanInRound(a, w)) || null;
+}
+/* The most recent audit of this batch, whenever it was done. The CARD
+   shows this one: the last reading is what an auditor wants in front of
+   them before they take the next, and hiding it would be hiding their
+   own work. It is never the done test. */
+function getLastAuditForBatch(batchUid){
+  return audits
+    .filter(a => String(a.batchUid) === String(batchUid))
+    .sort((x, y) => String(y.date||'').localeCompare(String(x.date||'')))[0] || null;
 }
 
 /* Status logic */
@@ -367,7 +478,7 @@ async function loadAll(){
 }
 
 async function _loadAllLive(){
-    const monthStart = _startOfThisMonthISO();
+    const monthStart = _papanWindowStartISO();
     // Filter logs server-side to this month + the four life-stage events
     // that put a new batch onto a plot. transaction_date is the real
     // event date when set; the created_at fallback keeps rows written
@@ -640,12 +751,16 @@ function renderAuditList(){
     const evName = activeNursery === 'PN' ? 'Planted' : 'Transplanted';
     listEl.innerHTML=`<div class="empty-state">
       <div class="empty-state-icon"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 9h6M9 12h6M9 15h4"/></svg></div>
-      <h3>No new plots this month</h3>
-      <p>No ${evName} events recorded on ${NURSERY_LABELS[activeNursery]} this month. Newly-placed batches appear here automatically, or add one manually in <strong>Batch Info</strong>.</p>
+      <h3>${t('papan_none_two_months')}</h3>
+      <p>${t('papan_none_two_months_desc')
+            .replace('{ev}', evName)
+            .replace('{nursery}', NURSERY_LABELS[activeNursery])
+            .replace('Batch Info', '<strong>Batch Info</strong>')}</p>
     </div>`;
     // Reset the header pill so a previous nursery's "N / M audited"
     // doesn't sit above the empty-state message.
-    document.getElementById('audit-count').textContent = '0 / 0 ' + t('audited');
+    document.getElementById('audit-count').textContent =
+      '0 / 0 ' + t('audited') + _papanRoundSuffix();
     if(compSection)compSection.style.display='none';
     return;
   }
@@ -660,7 +775,8 @@ function renderAuditList(){
   // Translates on the BM flip because t('audited') is used the same way
   // the other audits use it.
   document.getElementById('audit-count').textContent =
-    fmtNum(audited.length) + ' / ' + fmtNum(latest.length) + ' ' + t('audited');
+    fmtNum(audited.length) + ' / ' + fmtNum(latest.length) + ' ' + t('audited')
+    + _papanRoundSuffix();
 
   /* opts.canView  — may open the read-only detail of a finished audit
      opts.canAudit — may start or redo an audit
@@ -732,26 +848,71 @@ function renderAuditList(){
      per plot, so this holds even when several batches were sown on
      the same plot in one month. */
   if(pending.length){
-    listEl.innerHTML =
-      '<div class="plot-chip-list" style="display:flex;flex-wrap:wrap;gap:10px;padding:14px 12px">' +
-      pending.sort((a,b)=>(a.plot).localeCompare(b.plot)).map(b => {
-        const plotLabel = String(b.plot||'').replace(/[^A-Za-z0-9]/g,'') || '—';
-        return '<button type="button" class="plot-chip" '
-          + 'onclick="openAuditForm(\''+b.uid+'\',false,null)" '
-          + 'aria-label="Audit plot '+plotLabel+' — batch '+(b.batch||'')+'" '
-          + 'title="'+plotLabel+' · Batch '+(b.batch||'')+'" '
-          + 'style="min-width:58px;height:58px;padding:0 14px;border-radius:999px;'
-          + 'background:#fff;border:2px solid #e65100;color:#c2410c;'
-          + 'font-family:inherit;font-size:14px;font-weight:800;letter-spacing:.3px;'
-          + 'cursor:pointer;display:inline-flex;align-items:center;justify-content:center;'
-          + 'transition:transform .12s,background .12s,color .12s;'
-          + '-webkit-tap-highlight-color:transparent" '
-          + 'onmouseover="this.style.background=\'#e65100\';this.style.color=\'#fff\'" '
-          + 'onmouseout="this.style.background=\'#fff\';this.style.color=\'#c2410c\'">'
-          + plotLabel
-          + '</button>';
-      }).join('') +
-      '</div>';
+    /* ── GROUPED BY THE MONTH THE BATCH WENT ONTO THE PLOT ──
+       The window is two months now (see _papanWindowStartISO), and a
+       bare row of plot codes cannot say which of them a plot belongs
+       to. That is the whole of what the office asked for: "so i can
+       see sep transplanting plot and oct transplanting plot". So the
+       chips sit under a month heading, newest month first, with the
+       count beside it — an auditor planning a round wants to know how
+       many of last month are still outstanding before they set off.
+
+       A record with no date is grouped last under its own heading
+       rather than dropped: a plot nobody dated is the thing somebody
+       needs to see, and it is still auditable. */
+    const byMonth = new Map();
+    pending.forEach(b => {
+      const k = _papanMonthKey(b);
+      if(!byMonth.has(k)) byMonth.set(k, []);
+      byMonth.get(k).push(b);
+    });
+    /* Newest month first; the undated group ('') sorts last on purpose
+       rather than first, which is where a plain descending sort of ''
+       would put it. */
+    const keys = [...byMonth.keys()].sort((a,b) => {
+      if(!a) return 1;
+      if(!b) return -1;
+      return b.localeCompare(a);
+    });
+    const chip = b => {
+      const plotLabel = String(b.plot||'').replace(/[^A-Za-z0-9]/g,'') || '—';
+      /* A plot owed because a NEW round opened, not because nobody has
+         ever been, says so. Without it the chip is identical to one
+         nobody has ever walked, and an auditor who checked that sign
+         three weeks ago is given no way to tell. The full record is in
+         Completed Records; this is the hint on the way past. */
+      const last = getLastAuditForBatch(b.uid);
+      const lastBit = last && last.date ? ' · last audited ' + fmtDate(last.date) : '';
+      return '<button type="button" class="plot-chip" '
+        + 'onclick="openAuditForm(\''+b.uid+'\',false,null)" '
+        + 'aria-label="Audit plot '+plotLabel+' — batch '+(b.batch||'')+lastBit+'" '
+        + 'title="'+plotLabel+' · Batch '+(b.batch||'')+lastBit+'" '
+        + 'style="min-width:58px;height:58px;padding:0 14px;border-radius:999px;'
+        + 'background:#fff;border:2px solid #e65100;color:#c2410c;'
+        + 'font-family:inherit;font-size:14px;font-weight:800;letter-spacing:.3px;'
+        + 'cursor:pointer;display:inline-flex;align-items:center;justify-content:center;'
+        + 'transition:transform .12s,background .12s,color .12s;'
+        + '-webkit-tap-highlight-color:transparent" '
+        + 'onmouseover="this.style.background=\'#e65100\';this.style.color=\'#fff\'" '
+        + 'onmouseout="this.style.background=\'#fff\';this.style.color=\'#c2410c\'">'
+        + plotLabel
+        + '</button>';
+    };
+    listEl.innerHTML = keys.map(k => {
+      const rows = byMonth.get(k).sort((a,b)=>(a.plot).localeCompare(b.plot));
+      return '<div class="papan-month-group" data-month="'+k+'">'
+        + '<div class="papan-month-head" style="display:flex;align-items:baseline;gap:8px;'
+        + 'padding:14px 14px 0;font-family:inherit">'
+        +   '<span style="font-size:13px;font-weight:800;letter-spacing:.4px;'
+        +   'text-transform:uppercase;color:var(--text3,#5b7280)">'+_papanMonthLabel(k)+'</span>'
+        +   '<span style="font-size:12px;font-weight:700;color:var(--text4,#8b9bab)">'
+        +   fmtNum(rows.length)+'</span>'
+        + '</div>'
+        + '<div class="plot-chip-list" style="display:flex;flex-wrap:wrap;gap:10px;padding:10px 12px 4px">'
+        + rows.map(chip).join('')
+        + '</div>'
+        + '</div>';
+    }).join('');
   } else {
     listEl.innerHTML=`<div style="text-align:center;padding:20px;color:var(--text4);font-size:13px">🎉 All plots audited!</div>`;
   }
@@ -792,7 +953,12 @@ function renderBatchTable(){
   const latestUids=new Set(getLatestBatchPerPlot().map(b=>b.uid));
   const sorted=[...batches].sort((a,b)=>(b.dateTransplant||'').localeCompare(a.dateTransplant||''));
   tbody.innerHTML='<div class="record-list">'+sorted.map(b=>{
-    const audit=getAuditForBatch(b.uid);
+    /* Batch Info is a register of what is on file, not a to-do list, so
+       this one asks the EVER question: a batch audited last round has
+       been audited, and a row here reading Pending because a new round
+       opened would be saying the record is missing when it is not.
+       Whether the work is owed is renderAuditList's question. */
+    const audit=getLastAuditForBatch(b.uid);
     const status=overallStatus(audit);
     const isLatest=latestUids.has(b.uid);
     return `<div class="audit-item status-${status}" data-plot="${_canonicalPlot(b.plot||'')}">

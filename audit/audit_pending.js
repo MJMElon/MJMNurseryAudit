@@ -298,29 +298,39 @@
     });
   }
 
-  /* First of the current calendar month — papan audits track new
-     signage that went up this month, matching the module page's
-     transaction_date >= monthStart filter. Without this, the roster
-     carried every Planted/Transplanted event ever recorded and the
-     home to-do chips listed every plot in the nursery, not just the
-     ones with fresh signage due. */
-  function _startOfThisMonthISO(){
+  /* ── PAPAN'S WINDOW IS TWO MONTHS: LAST MONTH AND THIS ──
+     SHARED RULE — the same window is `_papanWindowStartISO()` in
+     audit_papan_script.js, which is what the module page queries the
+     ledger with. Change one, change the other: a plot inside one
+     window and outside the other is a to-do row with no card to open,
+     or a card nothing ever asked for.
+
+     It began as the current calendar month alone, which keeps the
+     roster to plots with fresh signage rather than every
+     Planted/Transplanted event ever recorded. One month is too narrow
+     for the work: a plot transplanted on the 28th gets its sign nailed
+     up days later, and on the 1st it fell out of the list entirely,
+     audited or not. The office asked for both months on screen so the
+     auditor can walk last month's plots and this month's off one list.
+
+     A batch with no date is still dropped rather than counted; if the
+     office has not dated it we cannot say which month it belongs in. */
+  function _papanWindowStartISO(){
     const d = new Date();
-    return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-01';
+    const y = d.getFullYear(), m = d.getMonth() - 1;   // Date normalises m = -1 to December
+    const s = new Date(y, m, 1);
+    return s.getFullYear() + '-' + String(s.getMonth() + 1).padStart(2, '0') + '-01';
   }
 
   /* Latest batch per plot, for one nursery — papan's unit of work.
-     Restricted to batches placed on the plot inside the current
-     month (see comment on _startOfThisMonthISO above). A batch with
-     no date is dropped rather than counted; if the office hasn't
-     dated it we can't say whether it belongs in this month's
-     window. */
+     ONE row per plot still: the sign says what is standing there now,
+     so a plot transplanted in both months is its newer batch. */
   function latestPapanPerPlot(nursery){
-    const monthStart = _startOfThisMonthISO();
+    const winStart = _papanWindowStartISO();
     const best = {};
     papanBat.forEach(b => {
       if (b.nursery !== nursery) return;
-      if (!b.date || b.date < monthStart) return;
+      if (!b.date || b.date < winStart) return;
       const cur = best[b.plot];
       if (!cur || b.date >= (cur.date || '')) best[b.plot] = b;
     });
@@ -372,6 +382,25 @@
     return _plots(mod, nursery, fromISO, toISO, false);
   }
 
+  /* ── WHEN THE BATCH ON THIS PAPAN PLOT WENT OUT ──
+     plots() answers in plot codes and nothing else, which is right for
+     every module but one: papan's window is two months, so its strip
+     carries last month's plots and this month's side by side with
+     nothing to tell them apart. The office asked to see both — "so i
+     can see sep transplanting plot and oct transplanting plot" — and a
+     row of identical circles does not.
+
+     An accessor of its own rather than a date on plots(): the other
+     three callers want a list of codes, and widening the one function
+     they share to carry a field only papan reads is how a shared
+     function becomes four. Returns '' when the plot is not in the
+     roster, which the caller groups under its own heading rather than
+     guessing a month for. */
+  function papanPlacedOn(nursery, plot){
+    const hit = latestPapanPerPlot(nursery).find(b => b.plot === plot);
+    return (hit && hit.date) || '';
+  }
+
   /* Every plot with work, audited or not — one task per plot, which is
      how the portal counts a day's workload. */
   function plotsAll(mod, nursery){
@@ -398,6 +427,7 @@
   global.MJMAuditPending = {
     load: load,
     plots: plots,
+    papanPlacedOn: papanPlacedOn,
     plotsAll: plotsAll,
     covers: covers,
     ready: () => loaded,

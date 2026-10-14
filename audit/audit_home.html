@@ -684,6 +684,15 @@
              transition:background .14s,color .14s,transform .14s}
     .tl-plot:hover{background:var(--tone,#2d7a2d);color:#fff}
     .tl-plot:active{transform:scale(.94)}
+    /* The month a run of papan plots went out in. Papan is the one
+       module whose strip carries two months at once, so the tag marks
+       where one ends and the next begins. flex-basis:100% puts every
+       month on a line of its own, which is what makes the two runs
+       readable at a glance rather than a tag buried mid-row. */
+    .tl-plot-mon{flex:0 0 100%;display:block;margin:2px 0 -2px;
+                 font-size:10px;font-weight:800;letter-spacing:.6px;
+                 color:var(--text4,#8b9bab)}
+    .tl-plot-mon:first-child{margin-top:0}
     /* Overdue MAINTENANCE chips read red — an overdue maintenance plot is
        the one thing on the To Do list that should catch the eye first,
        because worker maintenance is scheduled by someone else and the
@@ -1110,12 +1119,12 @@
   </div>
 </div>
 
-<script src="audit_lang.js?v=20261012f"></script>
+<script src="audit_lang.js?v=20261014a"></script>
 <script src="audit_supabase.js?v=20261008a"></script>
 <script src="audit_ribbon.js?v=20260826a"></script>
 <!-- Works out which plots still owe work, for the circles under each
      to-do row. Needs sb.select from audit_supabase.js above it. -->
-<script src="audit_pending.js?v=20260829a"></script>
+<script src="audit_pending.js?v=20261014a"></script>
 <!-- Rounds, maintenance windows and the ages being audited. Defaults to
      what used to be hardcoded below, so this cannot break the board. -->
 <script src="audit_settings.js?v=4"></script>
@@ -2472,22 +2481,66 @@ function loadAuditTodo(){
 
     /* pending is in SCOPE_NURSERIES order, so flattening it groups the
        strip by nursery without any further sorting. */
-    const shown = byNursery.flat();
+    let shown = byNursery.flat();
     if (!shown.length) return '';
     const label = t(o.title);
+
+    /* ── PAPAN CARRIES TWO MONTHS, SO THE STRIP SAYS WHICH ──
+       Papan's roster is last month and this month (see
+       _papanWindowStartISO in audit_pending.js); every other module's
+       is one window. A strip of identical circles cannot say which of
+       the two a plot belongs to, and that is exactly what the office
+       asked to be able to see: "so i can see sep transplanting plot
+       and oct transplanting plot".
+
+       So papan plots are ordered newest month first and a small month
+       tag is drawn wherever the month changes. The tag is part of the
+       same flat strip rather than a set of sub-strips, so the
+       show-more toggle and its count go on counting PLOTS and nothing
+       else. A plot the roster cannot date is grouped last under its
+       own tag rather than dropped or quietly filed under a month
+       nobody checked. */
+    const isPapan = (o.mod === 'papan' && window.MJMAuditPending
+                     && MJMAuditPending.papanPlacedOn);
+    if (isPapan){
+      shown = shown.map(e => {
+        let on = '';
+        try { on = MJMAuditPending.papanPlacedOn(e.nursery, e.plot) || ''; } catch (_) {}
+        return Object.assign({}, e, { on: on, mon: on ? on.slice(0, 7) : '' });
+      }).sort((a, b) => {
+        if (a.mon !== b.mon){
+          if (!a.mon) return 1;            // undated rides at the end
+          if (!b.mon) return -1;
+          return b.mon.localeCompare(a.mon);
+        }
+        return a.plot.localeCompare(b.plot);
+      });
+    }
+    const MON3 = ['JAN','FEB','MAR','APR','MAY','JUN',
+                  'JUL','AUG','SEP','OCT','NOV','DEC'];
+    const monTag = (m) => m
+      ? MON3[Number(m.slice(5, 7)) - 1] + ' ' + m.slice(2, 4)
+      : t('papan_month_undated');
 
     const key    = _plotKey(o, oy, om);
     const open   = expandedPlots.has(key);
     const visible = open ? shown : shown.slice(0, PLOT_PREVIEW);
     const hidden  = shown.length - visible.length;
 
+    let lastMon = null;
     const circles = visible.map(e => {
       const nur = NURSERY_LABELS[e.nursery] || e.nursery;
-      return `<a class="tl-plot"
+      let tag = '';
+      if (isPapan && e.mon !== lastMon){
+        lastMon = e.mon;
+        tag = `<span class="tl-plot-mon" data-month="${e.mon || ''}">${monTag(e.mon)}</span>`;
+      }
+      const when = isPapan && e.on ? ' · ' + monTag(e.mon) : '';
+      return tag + `<a class="tl-plot"
                  href="${o.href}?nursery=${encodeURIComponent(e.nursery)}` +
              `&plot=${encodeURIComponent(e.plot)}&from=home"
-                 title="${nur} ${e.plot}"
-                 aria-label="${label} — ${nur} ${e.plot}">${e.plot}</a>`;
+                 title="${nur} ${e.plot}${when}"
+                 aria-label="${label} — ${nur} ${e.plot}${when}">${e.plot}</a>`;
     }).join('');
 
     /* Chevrons out to open, in to close — the count rides on the closed
@@ -2874,9 +2927,23 @@ function loadAuditTodo(){
          somebody else's work — a task the field files this morning is
          pending the moment it lands, and the row that carries it needs
          to be visible whether it happens to be due today, in the past
-         (overdue), or two days from now. The other modules run on the
-         auditor's own calendar and are date-scoped as before. */
+         (overdue), or two days from now.
+
+         ON TODAY, EVERY ROW OF THIS MONTH SHOWS, not only the ones whose
+         window covers today. Today is selected on load, so the day scope
+         was the default view, and a Plot Condition or Papan Tanda or
+         Seedling Height round starting on the 20th simply was not in the
+         list on the 14th: the only way to see it was to tap today's chip
+         a second time to clear the selection, which nothing says. A
+         to-do list that hides what is coming is a diary, and the auditor
+         opening it wants to know what is owed and what is next.
+
+         They arrive greyed and do not navigate, which is the treatment a
+         window that has not opened already had — the audit form would
+         have nothing yet to record. Picking any OTHER day still scopes
+         to that day, which is what picking a day is for. */
       (showingToday && (o.mod === 'maint' ||
+                        o.fromY === undefined ||
                         occStatus(o, o.fromY ?? viewY, o.fromM ?? viewM) === 'overdue')) ||
       (o.fromY === undefined && selDay >= o.start && selDay <= o.end));
     if (active.size)     list = list.filter(o =>

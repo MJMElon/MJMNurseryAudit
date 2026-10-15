@@ -188,6 +188,27 @@ select.cf-native-hidden{display:none!important;}
         // inline instead only touches the elements THIS function creates,
         // so a page's own pre-existing cf-* widget keeps its own sizing.
         wrap.style.width = '100%';
+        // The wrap steps into the select's own slot in whatever row it was
+        // in, so it has to carry the select's OWN flex sizing — a select
+        // written as `class="input-style flex-1"` (every select in this
+        // system) has flex-basis:0% from flex-1, which is what makes
+        // width:100% on the real <select> harmless (flex-basis wins over
+        // width once it isn't auto). The wrap has no such class, so its
+        // flex-basis defaults to auto, which THEN falls back to its own
+        // width:100% — i.e. 100% of the whole ROW, not of its own slot —
+        // and a flex row shrinks that down against its siblings, taking
+        // the shrink almost entirely out of THIS item since its claimed
+        // basis so outweighs theirs. A select sized flex-1 (or any other
+        // way) next to a flex-1 input showed as roughly a 95/5 split
+        // instead of even — this is why. Reading the select's computed
+        // flex-grow/shrink/basis before it is reparented and copying them
+        // onto wrap reproduces exactly the sizing the select itself would
+        // have had, whatever Tailwind width/flex classes a given page put
+        // on it, so no page has to know this skin exists to get it right.
+        const selFlex = getComputedStyle(select);
+        wrap.style.flexGrow = selFlex.flexGrow;
+        wrap.style.flexShrink = selFlex.flexShrink;
+        wrap.style.flexBasis = selFlex.flexBasis;
         const btn = document.createElement('button');
         btn.type = 'button';
         btn.className = 'cf-btn';

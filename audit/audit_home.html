@@ -1124,7 +1124,7 @@
 <script src="audit_ribbon.js?v=20260826a"></script>
 <!-- Works out which plots still owe work, for the circles under each
      to-do row. Needs sb.select from audit_supabase.js above it. -->
-<script src="audit_pending.js?v=20261014a"></script>
+<script src="audit_pending.js?v=20261015a"></script>
 <!-- Rounds, maintenance windows and the ages being audited. Defaults to
      what used to be hardcoded below, so this cannot break the board. -->
 <script src="audit_settings.js?v=4"></script>
@@ -1609,6 +1609,13 @@ function loadAuditTodo(){
      have to agree -- a row that clears while its circles remain, or a
      count that disagrees with the list under it, is worse than the bug.
      So they all come here. */
+  /* The month a row is about, as a date the roster can read. Three
+     callers -- nurseryState, _plotsHtml and plotsOwed -- and they must
+     agree, for the same reason they already share winRange: a row that
+     clears while its circles remain, or a count that disagrees with the
+     list under it, is worse than the bug was. */
+  const _asOfMonthISO = (y, m) => y + '-' + String(m + 1).padStart(2, '0') + '-01';
+
   function winRange(o, y, m, strict){
     const fromISO = iso(y, m, o.start);
     const endISO  = iso(y, m, o.end);
@@ -2121,9 +2128,17 @@ function loadAuditTodo(){
          If it did not — offline, or the tables refused — fall back to
          the old date rule rather than reading "no plots known" as "no
          work left". */
+      /* The month the ROW is about, for the one roster that moves with
+         the calendar. Papan carries two months of placements, and
+         anchoring them on today made every carried-over row list the
+         same plots: an AUG 2026 row showing six plots transplanted in
+         SEPTEMBER, which August could not possibly have owed a sign
+         for and which nothing an auditor did would ever clear. See
+         _papanWindowStartISO in audit_pending.js. */
+      const asOf = _asOfMonthISO(y, m);
       if (window.MJMAuditPending && MJMAuditPending.covers(o.mod, n))
         return { nursery: n,
-                 done: MJMAuditPending.plots(o.mod, n, fromISO, toISO).length === 0 };
+                 done: MJMAuditPending.plots(o.mod, n, fromISO, toISO, asOf).length === 0 };
 
       /* The fallback reads the same extended range. Leaving it on the
          window alone would mean a device that cannot read the batch
@@ -2247,6 +2262,25 @@ function loadAuditTodo(){
       const y = d.getFullYear(), m = d.getMonth();
       if (beforeStart(y, m)) continue;
       occurrences(y, m).forEach(o => {
+        /* ── PAPAN IS NOT CARRIED, AND THAT FALLS OUT OF ITS WINDOW ──
+           Every other module's round asks about one window, so a round
+           nobody walked has to be carried or the work disappears.
+           Papan's roster is TWO MONTHS WIDE by itself: October's row
+           already asks about every plot transplanted in September. So
+           carrying September's row puts the same plots on the board
+           twice, and August's a third time where the windows overlap
+           -- the office saw B03, B06, N08 and U04 under an AUG 2026 row
+           and again under a SEP 2026 one, and said of both: "this 2
+           already passed, no need to show."
+
+           The two-month window IS the catching up, which is what it was
+           asked for. What it costs is written down beside this: a plot
+           placed TWO months back or more, never audited, is on no row
+           -- it is outside the current window, so there is nothing on
+           the board that could ask for it. A round done LATE is still
+           filed in Audit History as a missed one, because missedRounds
+           walks the months itself and does not read this list. */
+        if (o.mod === 'papan') return;
         if (occStatus(o, y, m) === 'overdue')
           out.push(Object.assign({}, o, {fromY:y, fromM:m}));
       });
@@ -2474,7 +2508,8 @@ function loadAuditTodo(){
         const set = o._maintPlots && o._maintPlots.get(x.nursery);
         list = set ? [...set].sort() : [];
       } else if (window.MJMAuditPending) {
-        list = MJMAuditPending.plots(o.mod, x.nursery, fromISO, toISO);
+        list = MJMAuditPending.plots(o.mod, x.nursery, fromISO, toISO,
+                                     _asOfMonthISO(oy, om));
       }
       return list.map(pl => ({ nursery: x.nursery, plot: pl }));
     });
@@ -2505,7 +2540,10 @@ function loadAuditTodo(){
     if (isPapan){
       shown = shown.map(e => {
         let on = '';
-        try { on = MJMAuditPending.papanPlacedOn(e.nursery, e.plot) || ''; } catch (_) {}
+        try {
+          on = MJMAuditPending.papanPlacedOn(e.nursery, e.plot,
+                                             _asOfMonthISO(oy, om)) || '';
+        } catch (_) {}
         return Object.assign({}, e, { on: on, mon: on ? on.slice(0, 7) : '' });
       }).sort((a, b) => {
         if (a.mon !== b.mon){
@@ -3138,9 +3176,10 @@ function loadAuditTodo(){
       if (!window.MJMAuditPending) return 0;
       const r = winRange(o, y, m);
       const fromISO = r.fromISO, toISO = r.toISO;
+      const asOf = _asOfMonthISO(y, m);
       return SCOPE_NURSERIES.reduce((n, nur) =>
         MJMAuditPending.covers(o.mod, nur)
-          ? n + MJMAuditPending.plots(o.mod, nur, fromISO, toISO).length
+          ? n + MJMAuditPending.plots(o.mod, nur, fromISO, toISO, asOf).length
           : n, 0);
     }
     /* The whole job, audited or not — what the progress bar divides by.

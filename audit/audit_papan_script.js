@@ -87,6 +87,13 @@ function _localISO(d){
    inside one window and outside the other is a to-do row with no card
    to open, or a card nothing ever asked for.
 
+   That copy takes an `asOfISO` and this one does not, and the
+   difference is not drift. The board carries a round forward from an
+   earlier month, so it has to ask the roster about THAT month -- an
+   August row listing plots transplanted in September is a row nothing
+   can ever satisfy. This page only ever shows now, so now is all it
+   asks for. Asked about today, the two windows are the same window.
+
    It was the current month alone to begin with, on the argument that
    papan tanda gets checked on newly-placed plants. One month is too
    narrow for the walking: a plot transplanted on the 28th gets its

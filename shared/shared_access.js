@@ -570,6 +570,12 @@
       case 'worker':  return false;
       case 'workers': return canDo('npayroll', 'workers', 'view');
       case 'setting': return canManageUsers();
+      // Admin Portal and Audit Portal moved onto scan_admin.html from the
+      // hub, where each had its own module-level card (data-module="mobile"
+      // / "audit"). Falling back to that same check is what "nobody's
+      // access changed the day they moved" means here.
+      case 'admin_portal': return canAccess('mobile');
+      case 'audit_portal': return canAccess('audit');
       default:        return false;
     }
   }

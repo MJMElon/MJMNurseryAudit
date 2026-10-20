@@ -87,14 +87,43 @@
         return new Date() >= autoLockDateFor(year, month);
     }
 
+    /* A YEAR THAT CANNOT BE RIGHT IS A TYPO, AND A TYPO MUST NOT LOCK THE
+       ROW THAT WOULD FIX IT.
+
+       A date box takes four digits for the year and somebody keyed two, so
+       a 3rd Culling came out dated 21/02/**0026**. Every month of year 26 is
+       two thousand years past its auto-lock date, so the row locked itself
+       solid — and the lock disables the very box the wrong year is in. The
+       Month Lock Calendar could not be used to let it go either: it lists
+       real years, and nobody is going to find year 26 on it.
+
+       The calendar exists to stop somebody changing a month that has been
+       settled and paid. Year 26 was never settled and never paid; locking it
+       protects nothing and strands a keying error on the screen for good. So
+       a date outside the range this nursery can possibly mean is treated as
+       what it is — not a date — and the row stays open to be corrected.
+
+       It is deliberately WIDE. This is not a validity check and must not
+       start refusing dates somebody meant; it is only the band outside which
+       a year is certainly a slip of the keyboard. */
+    const YEAR_MIN = 2000, YEAR_MAX = 2100;
+    function isKeyedWrong(dateStr) {
+        if (!dateStr) return false;
+        const d = new Date(dateStr);
+        if (isNaN(d)) return false;
+        const y = d.getFullYear();
+        return y < YEAR_MIN || y > YEAR_MAX;
+    }
+
     // The one function DO/AL/Batch Record actually call: is the record
     // dated `dateStr` (any parseable date/timestamp string) locked right
     // now? No date at all is never locked — there's nothing to place on
-    // the calendar.
+    // the calendar. Nor is a year nobody could have meant — see above.
     function isDateLocked(dateStr) {
         if (!dateStr) return false;
         const d = new Date(dateStr);
         if (isNaN(d)) return false;
+        if (isKeyedWrong(dateStr)) return false;
         return isMonthLocked(d.getFullYear(), d.getMonth() + 1);
     }
 
@@ -158,7 +187,8 @@
     }
 
     global.MJMMonthLock = {
-        load, isMonthLocked, isDateLocked, rowFor, autoLockDateFor, defaultAutoLockDate,
+        load, isMonthLocked, isDateLocked, isKeyedWrong, YEAR_MIN, YEAR_MAX,
+        rowFor, autoLockDateFor, defaultAutoLockDate,
         autoLockDayFor, currentLockDay, setManualOverride, setManualOverrideForYear,
         clearManualOverrideForYear, setLockDay
     };

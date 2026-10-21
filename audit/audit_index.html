@@ -530,14 +530,20 @@
     }catch(e){}
   }
 
+  /* SIGNING IN TO THE AUDITOR PORTAL LANDS ON THE AUDITOR PORTAL, whoever
+     you are. An admin used to be sent to audit_admin.html instead — the
+     manage page — which was the right answer while that page was the only
+     desk-shaped half of this module and had no door of its own.
+     It has one now: "Nursery Audit System" on the hub, gated on the same
+     `audit` module. So manage is reached from the hub and the portal is
+     reached from here, and neither pretends to be the other. An admin who
+     wants manage from this page uses the back arrow on the to-do list,
+     which goes to the hub. applyLandingScope still runs for everybody —
+     it is about WHICH NURSERY, not which page. */
   function auditLanding(){
     try{
       const u = JSON.parse(localStorage.getItem('mjm_user') || '{}');
       applyLandingScope(u);
-      const mod = u.permissions && u.permissions.modules && u.permissions.modules.audit;
-      const role = (u.audit_role || u.role || '').toLowerCase();
-      if (mod === 'admin' || role === 'admin' || role === 'administrator')
-        return 'audit_admin.html';
     }catch(e){}
     return 'audit_home.html';
   }

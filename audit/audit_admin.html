@@ -138,26 +138,14 @@
     .section-head{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;
                   color:var(--ink3);margin-bottom:10px;padding-left:2px}
 
-    /* ── ENTER THE PORTAL ──
-       Sits under the name, the way the store button does on the portal:
-       a solid block, icon in front, arrow marking that it leads away. */
-    /* The way through to the auditor view. Same shape as the FC Manage
-       page's own portal button — full width, 18px radius, the gradient
-       and the icon-label-arrow row — so the two manage pages read as
-       one family. Only the hue differs: green is the auditor portal's,
-       violet is the FC portal's. */
-    .portal-btn{display:flex;align-items:center;justify-content:center;gap:10px;width:100%;
-                padding:18px 22px;border-radius:18px;text-decoration:none;
-                background:linear-gradient(135deg,#2f9c4f,#1b6b32);color:#fff;
-                font-weight:900;font-size:14px;letter-spacing:.1em;text-transform:uppercase;
-                box-shadow:0 10px 26px -6px rgba(27,107,50,.5);transition:all .15s}
-    .portal-btn:hover{transform:translateY(-1px);box-shadow:0 14px 30px -6px rgba(27,107,50,.55)}
-    .portal-btn:active{transform:translateY(1px)}
-    /* Sized here, not only by a class: same reason the FC page pins its own. */
-    .portal-btn svg{fill:none;stroke:currentColor;stroke-width:2.2;
-                    stroke-linecap:round;stroke-linejoin:round}
-    .portal-btn .pb-home{width:20px;height:20px;flex-shrink:0}
-    .portal-btn .pb-out{width:15px;height:15px;opacity:.85;flex-shrink:0}
+    /* The "Visit 555 Auditor Portal" block that stood under the name is
+       gone, and its rules went with it — .portal-btn, .pb-home and .pb-out
+       are not worn by anything on this page any more. The button belonged
+       to a time when this page was the back door OF the auditor portal;
+       the two are separate doors now and the office asked for it to go.
+       Left here as a note rather than as dead CSS: a style nothing wears
+       is a style the next person spends five minutes looking for a use
+       of. The FC Manage page keeps its own copy of the same shape. */
 
     /* ── ADMIN CARDS ──
        Scaled up to match the module cards on the other dashboards: room to
@@ -383,15 +371,14 @@
 
   <div class="content">
 
-    <!-- Way through to the auditor view. Opens the to-do list directly
-         — the nursery chooser was cancelled, and the auditor view
-         defaults to whichever nursery was last chosen (or PN on a fresh
-         session), with a Switch pill on the ribbon to flip PN ↔ MN. -->
-    <a class="portal-btn" href="audit_home.html" style="margin-bottom:24px">
-      <svg class="pb-home" viewBox="0 0 24 24"><path d="M3 10.5L12 3l9 7.5"/><path d="M5 9.5V20a1 1 0 001 1h12a1 1 0 001-1V9.5"/></svg>
-      <span>Visit 555 Auditor Portal</span>
-      <svg class="pb-out" viewBox="0 0 24 24"><path d="M7 17L17 7"/><path d="M9 7h8v8"/></svg>
-    </a>
+    <!-- "Visit 555 Auditor Portal" stood here, and it went with the split.
+         It was the way across while this page was the back DOOR of the
+         auditor portal and an admin landed on it by signing in; the portal
+         is a door of its own now — 555 MJM Team, and the auditor sign-in —
+         so a button pointing at it from the back office is the one thing
+         that still said the two were one place. The office asked for it to
+         go. The ribbon's Portal link still reaches the hub, which is where
+         both doors are. -->
 
 
     <!-- ── WHAT NEEDS ATTENTION ──
@@ -554,8 +541,11 @@
 
     </div>
 
+    <!-- "…and can open the auditor portal" went with the button it was
+         describing. The sentence has to say what is true of THIS page, and
+         the portal is reached from its own doors now. -->
     <div class="note admin-only">The alerts, the monthly report and Settings are shown to audit admins only.
-         Every signed-in auditor sees the module cards above and can open the auditor portal.</div>
+         Every signed-in auditor sees the module cards above.</div>
   </div>
 </div>
 

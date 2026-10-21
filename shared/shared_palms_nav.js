@@ -85,8 +85,10 @@
     '#palms-nav .pn-tab.is-on{background:#0f766e;color:#fff;}' +
     '#palms-nav .pn-tab.is-on:hover{background:#115e59;}' +
     /* Desktop: a real column that stays put while a long board scrolls
-       past it. 84px clears the ribbon, which is sticky. */
-    '@media(min-width:768px){#palms-nav{position:sticky;top:84px;align-self:start;}}' +
+       past it. 76px clears the compact bar (~65px tall), which is sticky.
+       Same offset as #sm-nav in plot_maintenance_styles.css — the two bars
+       are the same bar and must not drift. */
+    '@media(min-width:768px){#palms-nav{position:sticky;top:76px;align-self:start;}}' +
     /* Phone: the column becomes a row above the content — a 212px column
        beside a table on a 412px screen leaves neither of them usable.
        The four scroll sideways if they have to, and the way out stays on

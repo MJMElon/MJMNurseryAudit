@@ -1090,6 +1090,10 @@ async function saveBatch(){
 
 /* --- AUDIT FORM --- */
 function openAuditForm(batchUid, isEdit, existingAuditUid){
+  /* Asked BEFORE the work, and isEdit says which tick it needs — see
+     canAuditAction in audit_supabase.js. */
+  if(isEdit&&existingAuditUid){ if(!requireAuditAction('edit',()=>showToast(t('err_no_edit'))))return; }
+  else                        { if(!requireAuditAction('record',()=>showToast(t('err_no_record'))))return; }
   auditFormBatchUid=batchUid;
   const b=batches.find(x=>x.uid===batchUid);if(!b)return;
 
@@ -1236,6 +1240,10 @@ function clearPhoto(e){
 }
 
 async function saveAudit(){
+  /* Asked again: a form opened before a permission changed is still on
+     the screen. */
+  if(editMode){ if(!requireAuditAction('edit',()=>showToast(t('err_no_edit'))))return; }
+  else        { if(!requireAuditAction('record',()=>showToast(t('err_no_record'))))return; }
   if(!formState.presence){showToast(t('err_kehadiran'));return;}
   if(!formState.infoCorrect){showToast(t('err_maklumat'));return;}
   if(!formState.condition){showToast(t('err_keadaan'));return;}
@@ -1320,10 +1328,15 @@ function deleteFromDetail(){if(detailId)confirmDelete(detailId);}
 
 /* --- DELETE --- */
 function confirmDelete(uid){
+  /* BESIDE the admin test, never instead of it. */
+  if(!requireAuditAction('delete',()=>showToast(t('err_no_delete'))))return;
   if(!isAuditAdmin()){showToast(t('err_delete_admin_only'));return;}
   deleteTarget=uid;deleteType='audit';document.getElementById('modal-overlay').classList.add('show');
 }
 function confirmDeleteBatch(uid){
+  /* A batch takes its linked AUDIT with it (see doDelete), so deleting
+     one is deleting a past audit whatever the button is called. */
+  if(!requireAuditAction('delete',()=>showToast(t('err_no_delete'))))return;
   if(!isAuditAdmin()){showToast(t('err_delete_admin_only'));return;}
   deleteTarget=uid;deleteType='batch';document.getElementById('modal-overlay').classList.add('show');
 }
@@ -1331,10 +1344,10 @@ function cancelDelete(){deleteTarget=null;document.getElementById('modal-overlay
 async function doDelete(){
   if(!deleteTarget)return;
   /* Checked again here: the modal's Delete button is reachable on its own. */
-  if(!isAuditAdmin()){
+  if(!isAuditAdmin() || !canAuditAction('delete')){
     deleteTarget=null;
     document.getElementById('modal-overlay').classList.remove('show');
-    showToast(t('err_delete_admin_only'));return;
+    showToast(t(canAuditAction('delete')?'err_delete_admin_only':'err_no_delete'));return;
   }
   document.getElementById('modal-overlay').classList.remove('show');
   setLoading(true);

@@ -951,6 +951,10 @@ function _resetDeclineUI(){
 
 /* --- FORM --- */
 function openAddForm(){
+  /* Asked BEFORE the work, not at the save: a refusal at the end of an
+     audit somebody has walked a plot to fill in is a refusal that costs
+     the audit. See canAuditAction in audit_supabase.js. */
+  if(!requireAuditAction('record',()=>showToast(t('err_no_record'))))return;
   bq=null;      // a fresh single-record form abandons any batch queue in progress
   editMode=false;editId=null;
   formState={nursery:activeTab,ulat:null,tikus:null,bintik:null,warna:null,photo1:null,photo2:null};
@@ -961,6 +965,7 @@ function openAddForm(){
   _bqRenderHeader();
 }
 function openEdit(uid){
+  if(!requireAuditAction('edit',()=>showToast(t('err_no_edit'))))return;
   const r=records.find(x=>x.uid===uid);if(!r)return;
   bq=null;      // editing a saved record is never part of a batch queue
   editMode=true;editId=uid;
@@ -1189,6 +1194,10 @@ function undoDeclineAudit(){
 window.undoDeclineAudit = undoDeclineAudit;
 
 async function saveRecord(){
+  /* Asked again: a form opened before a permission changed is still on
+     the screen, and editMode decides WHICH tick this save needs. */
+  if(editMode){ if(!requireAuditAction('edit',()=>showToast(t('err_no_edit'))))return; }
+  else        { if(!requireAuditAction('record',()=>showToast(t('err_no_record'))))return; }
   const plot=document.getElementById('f-plot').value;
   const batch=document.getElementById('f-batch').value.trim();
   if(!plot)           {showToast(t('err_select_plot'));return;}
@@ -1323,6 +1332,10 @@ function closeLightbox(){document.getElementById('lightbox').classList.remove('o
 
 /* --- DELETE --- */
 function confirmDelete(uid){
+  /* BESIDE the admin test, never instead of it: deleting is its own
+     tick now, and an admin the office has taken it from cannot
+     delete either. */
+  if(!requireAuditAction('delete',()=>showToast(t('err_no_delete'))))return;
   if(!isAuditAdmin()){showToast(t('err_delete_admin_only'));return;}
   deleteTarget=uid;document.getElementById('modal-overlay').classList.add('show');
 }
@@ -1330,10 +1343,10 @@ function cancelDelete(){deleteTarget=null;document.getElementById('modal-overlay
 async function doDelete(){
   if(!deleteTarget)return;
   /* Checked again here: the modal's Delete button is reachable on its own. */
-  if(!isAuditAdmin()){
+  if(!isAuditAdmin() || !canAuditAction('delete')){
     deleteTarget=null;
     document.getElementById('modal-overlay').classList.remove('show');
-    showToast(t('err_delete_admin_only'));return;
+    showToast(t(canAuditAction('delete')?'err_delete_admin_only':'err_no_delete'));return;
   }
   document.getElementById('modal-overlay').classList.remove('show');
   setLoading(true);

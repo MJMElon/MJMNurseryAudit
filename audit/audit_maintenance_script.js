@@ -803,7 +803,17 @@ function makeTaskCard(t, audit){
 }
 
 /* --- FORM --- */
+/* openForm and saveAudit both declare `const t = tasks.find(...)`, which
+   SHADOWS the translation function t() for the whole of their scope — so
+   a t('...') before that line is a ReferenceError and not a message.
+   Said from out here, where t means what it means everywhere else. */
+function _mtSay(key){ showToast(t(key)); }
+
 function openForm(taskId, isEdit, existingAuditUid){
+  /* Asked BEFORE the work, and isEdit says which tick it needs — see
+     canAuditAction in audit_supabase.js. */
+  if(isEdit&&existingAuditUid){ if(!requireAuditAction('edit',()=>_mtSay('err_no_edit')))return; }
+  else                        { if(!requireAuditAction('record',()=>_mtSay('err_no_record')))return; }
   formTaskId=taskId;
   const t=tasks.find(x=>x.id===taskId);if(!t)return;
   if(isEdit&&existingAuditUid){
@@ -886,6 +896,10 @@ function cancelForm(){setView('list');}
    optionally leaves a remark. The photo requirement is the same
    either way, so nothing branches on the result. */
 async function saveAudit(){
+  /* Asked again: a form opened before a permission changed is still on
+     the screen. */
+  if(editMode){ if(!requireAuditAction('edit',()=>_mtSay('err_no_edit')))return; }
+  else        { if(!requireAuditAction('record',()=>_mtSay('err_no_record')))return; }
   if(!formState.result){showToast('⚠ Please pick Satisfied or Unsatisfied');return;}
   if (!formState.photo){
     showToast('⚠ A photo is required for every audit');
@@ -994,6 +1008,8 @@ function closeLightbox(){document.getElementById('lightbox').classList.remove('o
 
 /* --- DELETE --- */
 function confirmDelete(uid){
+  /* BESIDE the admin test, never instead of it. */
+  if(!requireAuditAction('delete',()=>showToast(t('err_no_delete'))))return;
   if(!isAuditAdmin()){showToast(t('err_delete_admin_only'));return;}
   deleteTarget=uid;document.getElementById('modal-overlay').classList.add('show');
 }
@@ -1001,10 +1017,10 @@ function cancelDelete(){deleteTarget=null;document.getElementById('modal-overlay
 async function doDelete(){
   if(!deleteTarget)return;
   /* Checked again here: the modal's Delete button is reachable on its own. */
-  if(!isAuditAdmin()){
+  if(!isAuditAdmin() || !canAuditAction('delete')){
     deleteTarget=null;
     document.getElementById('modal-overlay').classList.remove('show');
-    showToast(t('err_delete_admin_only'));return;
+    showToast(t(canAuditAction('delete')?'err_delete_admin_only':'err_no_delete'));return;
   }
   document.getElementById('modal-overlay').classList.remove('show');
   setLoading(true);

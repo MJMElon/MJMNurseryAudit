@@ -8,7 +8,7 @@
    - Supabase API: network only (never cache)
    - On activate: delete old caches, claim all clients
 ================================================================ */
-const VER = 'mjm-1801100012';
+const VER = 'mjm-26102202';
 
 const ALL_FILES = [
   './audit_index.html',

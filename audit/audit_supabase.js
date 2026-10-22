@@ -1,4 +1,4 @@
-/* BUILD: 2026-10-08a */
+/* BUILD: 2026-10-22b */
 /* ================================================================
    MJM NURSERY — SUPABASE SHARED CONFIG
    supabase.js
@@ -125,6 +125,80 @@ function canOpenAuditPage(page) {
     // that set, and using it here would lock out the whole team at once.
     return true;
   } catch (e) { return true; }
+}
+
+/* ================================================================
+   WHAT THEY MAY DO INSIDE A PAGE
+
+   User Access has listed "Record a new audit" and "Edit & delete past
+   audits" against each of the four modules since that screen was
+   written, and NOTHING HAS EVER READ THEM. Unticking Edit for an
+   auditor saved cleanly, showed as set on both screens that offer it,
+   and that auditor went on editing and deleting — which is the exact
+   fault the `view` half of this file was written to correct, one level
+   down. Putting the same two ticks on a second screen (555 MJM Team ->
+   User Access -> Auditor Portal) is what made it worth closing.
+
+   Three things about the shape, and the first is the whole reason this
+   is not simply a check at the save:
+
+   IT IS ASKED BEFORE THE WORK, NOT AFTER IT. A permission tested when
+   the Save button is pressed is tested at the end of an audit somebody
+   has already walked a plot to fill in — the same mistake as the save
+   that was the only thing asking whether a login could save at all.
+   So the FORM refuses to open, and the save asks again because a
+   button drawn before a permission changed is still on the screen.
+
+   DELETE IS ITS OWN TICK, and it used to be half of Edit. Correcting
+   a figure somebody keyed and removing the morning it was recorded for
+   are different acts with different consequences, and the office asked
+   for them apart. It is asked BESIDE the admin test rather than
+   instead of it — an admin the office has unticked cannot delete
+   either, and a non-admin never could.
+
+   A ROW SAVED BEFORE THE SPLIT ANSWERED THE OLD TICK. It carries
+   `edit` and no `delete`, so ACTION_FALLBACK reads the old answer
+   rather than inventing one: an auditor the office had closed editing
+   for stays closed for deleting too, and one they had opened keeps
+   both until somebody saves that row again. Reading the absent key as
+   off would take away access nobody removed; reading it as on would
+   hand back a deletion the office had deliberately closed. The same
+   line is in shared_module_access.js and in scan_user_access.html, the
+   two screens that WRITE it — all three have to agree or a screen
+   draws one answer and the app obeys another.
+
+   AND IT FAILS OPEN, like everything else here. No entry for the page
+   is nobody having been asked; an action key that is absent is the
+   same. Only an explicit false is a no. A revoked page closes every
+   action inside it, because there is nothing left to do on it.
+================================================================ */
+/* An action split out of an older one, and the key to read when a saved
+   row predates the split. */
+const ACTION_FALLBACK = { delete: 'edit' };
+
+function canAuditAction(action, page) {
+  const key = page || currentAuditPageKey();
+  if (!key) return true;                      // a page this map does not cover
+  if (!canOpenAuditPage(key)) return false;
+  try {
+    const u = JSON.parse(localStorage.getItem('mjm_user') || '{}');
+    const acts = (u.permissions || {}).audit_actions;
+    const entry = acts && acts[key];
+    if (!entry || typeof entry !== 'object') return true;
+    const asked = (!(action in entry) && ACTION_FALLBACK[action]) || action;
+    return entry[asked] !== false;
+  } catch (e) { return true; }
+}
+
+/* The click-time guard. Says WHY and where it is set, because a button
+   that does nothing is read as a broken app and reported as one. The
+   toast is the module's own, so it speaks whichever language the
+   auditor has chosen; `say` is passed in rather than looked up here
+   because this file knows nothing of the language table. */
+function requireAuditAction(action, say) {
+  if (canAuditAction(action)) return true;
+  try { if (typeof say === 'function') say(); } catch (e) {}
+  return false;
 }
 
 /* Pull the current permissions down so a revoked page stops working on the

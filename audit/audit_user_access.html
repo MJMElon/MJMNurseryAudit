@@ -14,7 +14,7 @@
 <script src="../shared/shared_access.js"></script>
 <script src="audit_settings.js?v=4"></script>
 <script src="audit_system_setting.js?v=3"></script>
-<script src="../shared/shared_module_access.js?v=3"></script>
+<script src="../shared/shared_module_access.js?v=4"></script>
 <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;700;900&display=swap" rel="stylesheet">
 </head>
 <body>
@@ -64,22 +64,26 @@ MJMModuleAccess.init({
     { key:'plot_audit', label:'Plot Condition Audit', desc:'Pest, animal and disease infestation, and leaf condition',
       actions:[
         { key:'record', label:'Record a new audit',        desc:'Walk a plot and submit its condition audit' },
-        { key:'edit',   label:'Edit & delete past audits', desc:'Change or remove an audit already submitted' }
+        { key:'edit',   label:'Edit past audits',   desc:'Change an audit already submitted' },
+        { key:'delete', label:'Delete past audits', desc:'Remove an audit from the books altogether', fallbackTo:'edit' }
       ]},
     { key:'height', label:'Seedling Height Audit', desc:'Three sampled heights per plot, with photo evidence',
       actions:[
         { key:'record', label:'Record a new audit',        desc:'Measure and submit heights for a plot' },
-        { key:'edit',   label:'Edit & delete past audits', desc:'Change or remove a height audit already submitted' }
+        { key:'edit',   label:'Edit past audits',   desc:'Change a height audit already submitted' },
+        { key:'delete', label:'Delete past audits', desc:'Remove a height audit from the books altogether', fallbackTo:'edit' }
       ]},
     { key:'papan', label:'Papan Tanda Audit', desc:'Height, accuracy and visibility of every papan tanda',
       actions:[
         { key:'record', label:'Record a new audit',        desc:'Audit the papan tanda on a plot' },
-        { key:'edit',   label:'Edit & delete past audits', desc:'Change or remove a papan tanda audit' }
+        { key:'edit',   label:'Edit past audits',   desc:'Change a papan tanda audit already submitted' },
+        { key:'delete', label:'Delete past audits', desc:'Remove a papan tanda audit, and the batch record it hangs off', fallbackTo:'edit' }
       ]},
     { key:'maintenance', label:'Maintenance Audit', desc:'Verify completed manuring, weeding, racun and interrow work',
       actions:[
         { key:'record', label:'Record a new audit',        desc:'Check work on site and submit the audit' },
-        { key:'edit',   label:'Edit & delete past audits', desc:'Change or remove a maintenance audit' },
+        { key:'edit',   label:'Edit past audits',   desc:'Change a maintenance audit already submitted' },
+        { key:'delete', label:'Delete past audits', desc:'Remove a maintenance audit from the books altogether', fallbackTo:'edit' },
         { key:'verify', label:'Verify audit results',      desc:'Sign off another auditor\u2019s findings',
           adminOnly:true, highlight:true, chip:'Verify Audits' }
       ]},

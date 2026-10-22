@@ -136,7 +136,17 @@
       const saved = perms[ACT_KEY] && perms[ACT_KEY][d.key];
       if (saved && typeof saved === 'object' && !Array.isArray(saved)) {
         const out = { view: !!saved.view };
-        (d.actions || []).forEach(a => { out[a.key] = out.view && !!saved[a.key]; });
+        /* `fallbackTo` is for an action SPLIT OUT of another one. A row saved
+           before the split carries the old combined key and not the new one,
+           and reading the new one as absent-means-off would draw a tick the
+           office never set — while reading it as absent-means-on would hand
+           back access they had deliberately closed. Neither is what they
+           answered: they answered the OLD tick, so that is what is read until
+           somebody saves this row again. */
+        (d.actions || []).forEach(a => {
+          const key = (a.fallbackTo && !(a.key in saved)) ? a.fallbackTo : a.key;
+          out[a.key] = out.view && !!saved[key];
+        });
         return out;
       }
       const lvl = (perms.modules && perms.modules[MODULE]) || 'none';

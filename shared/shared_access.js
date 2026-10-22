@@ -36,8 +36,8 @@
        "operation_actions": {
          "batch":       { "view":true, "add_new":true, "fill_report":true,
                           "verify":false, "review":false, "delete":false },
-         "orders":      { "view":true, "manage":true },
-         "stock":       { "view":true, "manage":true },
+         "orders":      { "view":true, "manage":true, "ba_manage":true, "al_manage":true },
+         "stock":       { "view":true, "manage":true, "customer":true, "map":true },
          "reports":     { "view":false },
          "audit_trail": { "view":false, "clear_logs":false },
          "settings":    { "view":true, "manage":true }
@@ -451,6 +451,22 @@
   //                 page itself is open (the legacy "normal" behaviour)
   const MODULE_STORED_PAGES = new Set(['reports', 'audit_trail']);
 
+  /* An action tick ADDED to a page that already had its own saved row
+     reads as allowed, not denied, when that row has no opinion on it —
+     the function it gates had no gate at all before the tick existed, so
+     missing must not mean "nobody said yes" the way an ordinary unticked
+     box does. 'ba_manage' and 'al_manage' joined 'orders' the same day
+     Borang Akuan and Approval Letter stopped being ungated pages of their
+     own; 'customer' and 'map' joined 'stock' the same day Customer
+     Monitoring and Inventory Map stopped being panes nobody could lock
+     separately from it. A row saved before that day, or in the hour
+     between, has 'view'/'manage' and nothing else — this is what keeps
+     it reading the way it always did. */
+  const OPERATION_NEW_ACTION_DEFAULT = {
+    orders: ['ba_manage', 'al_manage'],
+    stock:  ['customer', 'map'],
+  };
+
   function canDoOperation(page, action) {
     const p = permissions();
     const acts = p.operation_actions && p.operation_actions[page];
@@ -461,6 +477,7 @@
       if (!MODULE_STORED_PAGES.has(page) && !canAccess('operation')) return false;
       if (!acts.view) return false;      // page closed → every function closed
       if (action === 'view') return true;
+      if (acts[action] === undefined && (OPERATION_NEW_ACTION_DEFAULT[page] || []).includes(action)) return true;
       return !!acts[action];
     }
     // Legacy fallback.

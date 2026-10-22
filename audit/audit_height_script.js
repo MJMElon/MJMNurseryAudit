@@ -710,6 +710,9 @@ _resetPlotForm();
 function _mfGet(_batch){ return plotFormState; }
 
 function openMultiBatchForm(plot){
+  /* This module's second door: a whole plot at once. Recording, so it
+     asks the record tick; an EDIT reaches the form through openEdit. */
+  if(!requireAuditAction('record',()=>showToast(t('err_no_record'))))return;
   window._lastOpenedPlot=plot;
   multiPlot=plot;
   _resetPlotForm();
@@ -939,6 +942,10 @@ function _renderPlotSlot(n, src){
    for context but is not part of the write.
    ══════════════════════════════════════════════════════════════════ */
 async function savePlotAudit(){
+  /* _plotEditId is what makes this an UPDATE rather than an insert, so
+     it is also what decides which tick the save needs. */
+  if(window._plotEditId){ if(!requireAuditAction('edit',()=>showToast(t('err_no_edit'))))return; }
+  else                  { if(!requireAuditAction('record',()=>showToast(t('err_no_record'))))return; }
   if(!multiPlot){ showToast('No plot selected'); return; }
   const declined=!!plotFormState.declined;
   if(!declined){
@@ -1223,6 +1230,7 @@ function _mfRenderPhotoSlot(batch, n, src){
    skipped; Not Required cards are written with nulls + the sentinel
    photo url, same shape the single-batch form uses. */
 async function saveAllBatches(){
+  if(!requireAuditAction('record',()=>showToast(t('err_no_record'))))return;
   if(!multiPlot){ showToast('No plot selected'); return; }
   const plot=multiPlot;
   const authorName=(JSON.parse(localStorage.getItem('mjm_user')||'{}').name||'');
@@ -1492,6 +1500,8 @@ window.noAuditReason=noAuditReason;
 
 /* --- FORM --- */
 function openAddForm(){
+  /* Asked BEFORE the work — see canAuditAction in audit_supabase.js. */
+  if(!requireAuditAction('record',()=>showToast(t('err_no_record'))))return;
   bq=null;      // a fresh single-record form abandons any batch queue in progress
   editMode=false;editId=null;
   formState={nursery:activeTab,s1:'',s2:'',s3:'',p1:null,p2:null,p3:null};
@@ -1502,6 +1512,7 @@ function openAddForm(){
   _bqRenderHeader();
 }
 function openEdit(uid){
+  if(!requireAuditAction('edit',()=>showToast(t('err_no_edit'))))return;
   const r=records.find(x=>x.uid===uid);if(!r)return;
   bq=null;      // editing a saved record is never part of a batch queue
   editMode=true;editId=uid;
@@ -1700,6 +1711,10 @@ function cancelForm(){
 
 /* --- SAVE --- */
 async function saveRecord(){
+  /* Asked again: a form opened before a permission changed is still on
+     the screen, and editMode decides WHICH tick this save needs. */
+  if(editMode){ if(!requireAuditAction('edit',()=>showToast(t('err_no_edit'))))return; }
+  else        { if(!requireAuditAction('record',()=>showToast(t('err_no_record'))))return; }
   const plot=document.getElementById('f-plot').value;
   const batch=document.getElementById('f-batch').value.trim();
   if(!plot){showToast(t('err_select_plot'));return;}
@@ -1833,6 +1848,9 @@ function closeLightbox(){document.getElementById('lightbox').classList.remove('o
 
 /* --- DELETE --- */
 function confirmDelete(uid){
+  /* BESIDE the admin test, never instead of it — the tick reads
+     "Edit & delete past audits". */
+  if(!requireAuditAction('delete',()=>showToast(t('err_no_delete'))))return;
   if(!isAuditAdmin()){showToast(t('err_delete_admin_only'));return;}
   deleteTarget=uid;document.getElementById('modal-overlay').classList.add('show');
 }
@@ -1840,10 +1858,10 @@ function cancelDelete(){deleteTarget=null;document.getElementById('modal-overlay
 async function doDelete(){
   if(!deleteTarget)return;
   /* Checked again here: the modal's Delete button is reachable on its own. */
-  if(!isAuditAdmin()){
+  if(!isAuditAdmin() || !canAuditAction('delete')){
     deleteTarget=null;
     document.getElementById('modal-overlay').classList.remove('show');
-    showToast(t('err_delete_admin_only'));return;
+    showToast(t(canAuditAction('delete')?'err_delete_admin_only':'err_no_delete'));return;
   }
   document.getElementById('modal-overlay').classList.remove('show');
   setLoading(true);

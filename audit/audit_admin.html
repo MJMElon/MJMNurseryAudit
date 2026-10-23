@@ -644,11 +644,37 @@ function currentMonthRange(){
   };
 }
 
-function latestPerPlot(rows){
+/* ── WHAT COUNTS AS ONE READING ────────────────────────────────────
+   Only the LATEST reading of a thing is its current state, so earlier
+   ones are dropped. The trap is what "a thing" means, and it is not the
+   same for both tables:
+
+     PAPAN TANDA   one sign per PLOT. The plot is the thing.
+
+     PLOT CONDITION  one row per plot per BATCH in the main nursery --
+                     audit_script.js says it in its own words, "a plot
+                     holds several, each with its own age and its own
+                     audit". Pre Nursery is the exception and is audited
+                     plot by plot, which is why its alerts were the ones
+                     that still worked.
+
+   Collapsing plot condition on the PLOT alone threw away every batch
+   but one before any filter ran, so a rat found on batch 253 in B01
+   vanished the moment batch 268 was saved a second later and came back
+   clean. The main nursery's alerts had effectively stopped, and the
+   board showed nothing but papan tanda. Worse, the rows of one plot go
+   up in ONE insert -- the batch queue holds them until the last batch --
+   so which of them survived was not even the latest reading, it was
+   whichever `created_at` happened to sort highest.
+
+   `keyOf` is passed rather than guessed, so the next table to use this
+   has to say what its unit is. */
+function latestPerPlot(rows, keyOf){
+  const key  = keyOf || (r => r.nursery + '_' + r.plot);
   const seen = {};
   rows.forEach(r => {
-    const key = r.nursery + '_' + r.plot;
-    if (!seen[key] || r.created_at > seen[key].created_at) seen[key] = r;
+    const k = key(r);
+    if (!seen[k] || r.created_at > seen[k].created_at) seen[k] = r;
   });
   return Object.values(seen);
 }
@@ -791,7 +817,7 @@ async function loadAlerts(){
 
     const [plotRows, papanRows] = await Promise.all([
       sb.select('audit_plot_audits',
-        'select=plot,nursery,pest,tikus,warna_daun,date,created_at&' + within),
+        'select=plot,batch,nursery,pest,tikus,disease,warna_daun,date,created_at&' + within),
       sb.select('audit_papan_audits',
         'select=plot,nursery,presence,info_correct,condition,date,created_at&' + within)
     ]);
@@ -799,7 +825,11 @@ async function loadAlerts(){
     const monthEl = document.getElementById('alert-month');
     if (monthEl) monthEl.textContent = label;
 
-    const plots = latestPerPlot(plotRows || []);
+    /* The batch is part of the key for plot condition and not for papan
+       -- see latestPerPlot. A main-nursery plot holds several batches and
+       each is its own audit; a plot has one sign. */
+    const plots = latestPerPlot(plotRows || [],
+      r => r.nursery + '_' + r.plot + '_' + (r.batch || ''));
     const papan = latestPerPlot(papanRows || []);
 
     const kinds = [
@@ -809,6 +839,27 @@ async function loadAlerts(){
       { emoji:'🐛', title:'Pest Infestation', note:'Banyak only',
         bg:'#fff7ed', fg:'#c2410c',
         match: plots.filter(r => r.pest === 'Banyak') },
+      /* DISEASE WAS ASKED ON THE FORM AND TESTED BY NOTHING. The module
+         card above this one has always promised "pest, animal damage,
+         disease and leaf colour", and the board read three of the four --
+         the column was not even in the select. So 76 readings of Banyak
+         bintik and 40 of Sedikit, 116 of 142 ever taken, were walked to,
+         tapped in, and never shown to anybody. It is the whole reason
+         Plot Condition had never raised a card: rats and pests really are
+         Tidak Ada everywhere and leaf colour never reaches 4, so disease
+         was the only thing the auditors were finding.
+
+         BANYAK ONLY, the same threshold as its sibling pest, and for the
+         reason the count gives: Sedikit as well is 116 plots on the
+         board, which is the whole nursery and so is a board nobody reads.
+         Sedikit is one string away if the office asks for it.
+
+         The exact equality is also what keeps the NO_AUDIT_SENTINEL off
+         it -- a declined audit stores "No Audit Required — Culling Plot"
+         in this column, which is not a reading of anything. */
+      { emoji:'🦠', title:'Disease', note:'Banyak only',
+        bg:'#fdf2f8', fg:'#9d174d',
+        match: plots.filter(r => r.disease === 'Banyak') },
       { emoji:'🍂', title:'Yellow Leaves', note:'Warna Daun 5',
         bg:'#fefce8', fg:'#854d0e',
         match: plots.filter(r => r.warna_daun === '5') },
@@ -825,7 +876,8 @@ async function loadAlerts(){
     /* Tell the admin when something new appears, but only on a change —
        a notification on every page load is one nobody reads. */
     const fingerprint = JSON.stringify(
-      kinds.map(k => k.match.map(r => r.nursery + '/' + r.plot).sort()));
+      kinds.map(k => k.match.map(r =>
+        r.nursery + '/' + r.plot + (r.batch ? '/' + r.batch : '')).sort()));
     const previous = localStorage.getItem(ALERT_KEY);
     if (previous && previous !== fingerprint && total > 0) notifyAlerts(kinds);
     localStorage.setItem(ALERT_KEY, fingerprint);
@@ -856,12 +908,17 @@ async function loadAlerts(){
       const cards = kinds.map(k => {
         const hits = k.match.filter(r => r.nursery === n);
         if (!hits.length) return '';
+        /* "2 plots affected" counts PLOTS, because that is what somebody
+           walks to; the pills below name the BATCH, because that is what
+           the reading was taken of and a plot can be flagged on one batch
+           and clean on the next. */
+        const nPlots = new Set(hits.map(r => r.plot)).size;
         return '<div class="alert-card" onclick="toggleAlert(this)">' +
           '<div class="alert-head">' +
             '<span class="alert-emoji">' + k.emoji + '</span>' +
             '<div class="alert-body">' +
               '<div class="alert-ttl">' + k.title + '</div>' +
-              '<div class="alert-sub">' + hits.length + ' plot' + (hits.length > 1 ? 's' : '') +
+              '<div class="alert-sub">' + nPlots + ' plot' + (nPlots > 1 ? 's' : '') +
               ' affected · ' + k.note + '</div>' +
             '</div>' +
             '<span class="alert-count" style="background:' + k.bg + ';color:' + k.fg + '">' +
@@ -869,7 +926,8 @@ async function loadAlerts(){
             '<svg class="alert-chev" viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"/></svg>' +
           '</div>' +
           '<div class="alert-plots">' +
-            hits.map(r => '<span class="plot-pill">' + r.plot + '</span>').join('') +
+            hits.map(r => '<span class="plot-pill">' + r.plot +
+              (r.batch ? ' · ' + r.batch : '') + '</span>').join('') +
           '</div></div>';
       }).join('');
       const count = kinds.reduce((t,k) => t + k.match.filter(r => r.nursery === n).length, 0);

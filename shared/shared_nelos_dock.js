@@ -1067,9 +1067,27 @@
         '<div class="nd-form" hidden>' +
           '<div class="nd-err" hidden></div>' +
           '<div class="nd-today"></div>' +
+          /* WORK FIRST, because the destination follows from it. The list
+             is the titles the RAISING system has on Case Routing, and the
+             rule the office set against the chosen one fills in the two
+             boxes below — "solved by Admin Portal, Admin 2". Asked the
+             other way round, as it was, the form offered the destination's
+             titles and an FC Portal title could not be raised from the FC
+             Portal at all. */
+          '<div class="nd-fld">' +
+            '<label class="nd-lbl" for="nd-f-work">Work</label>' +
+            '<select class="nd-in" id="nd-f-work" hidden>' +
+              '<option value="">— choose the work —</option></select>' +
+            '<input class="nd-in" id="nd-f-title" maxlength="300" autocomplete="off" ' +
+                   'placeholder="Choose a system first" disabled>' +
+          '</div>' +
           /* Who it goes to, on one row: the system, then the person in it.
-             They are one decision asked in two parts, and the PIC list is
-             filled from whatever the system beside it says. */
+             They are one decision asked in two parts, the PIC list is
+             filled from whatever the system beside it says, and BOTH are
+             filled in by the routing rule when a work is chosen. Changing
+             either afterwards overrides the rule for this one case, which
+             is the whole reason they are still here and not a line of
+             text. */
           '<div class="nd-fld nd-2">' +
             '<div>' +
               '<label class="nd-lbl" for="nd-f-to">Assign to</label>' +
@@ -1081,13 +1099,6 @@
               '<select class="nd-in" id="nd-f-pic" disabled>' +
                 '<option value="">Anyone</option></select>' +
             '</div>' +
-          '</div>' +
-          '<div class="nd-fld">' +
-            '<label class="nd-lbl" for="nd-f-work">Work</label>' +
-            '<select class="nd-in" id="nd-f-work" hidden>' +
-              '<option value="">— choose the work —</option></select>' +
-            '<input class="nd-in" id="nd-f-title" maxlength="300" autocomplete="off" ' +
-                   'placeholder="Choose a system first" disabled>' +
           '</div>' +
           '<div class="nd-fld nd-2">' +
             '<div>' +
@@ -1574,6 +1585,36 @@
   var _mods = null;          // [{key, label}]
   var _people = null;        // [{user_id, full_name, email, primary_module}]
   var _cats = null;          // [{name, module_key, default_priority, default_days}]
+  var _routes = null;        // [{source_module, category, to_module, to_user_id, …}]
+
+  /* THE RULES THE OFFICE SET ON CASE ROUTING. Read here so the dock obeys
+     them: this form writes assigned_module itself, and nelos_route_case()
+     returns early on a case that already names its queue — so without this
+     every rule on that screen was dead for anything raised from the dock,
+     which is nearly everything. Fails soft like the three beside it: a
+     database without the table answers empty and the destination simply
+     stays wherever the person left it. */
+  async function loadRoutes() {
+    if (_routes) return _routes;
+    var token = await accessToken();
+    if (!token) return (_routes = []);
+    try {
+      var res = await fetch(CFG.url + '/rest/v1/nelos_routes' +
+                            '?select=source_module,category,to_module,to_seat_no,to_user_id,to_user_name',
+                            { headers: authHeaders(token) });
+      if (!res.ok) return (_routes = []);
+      var rows = await res.json();
+      return (_routes = Array.isArray(rows) ? rows : []);
+    } catch (_) { return (_routes = []); }
+  }
+
+  /* The rule for one piece of work, asked exactly the way nelos_route_case()
+     asks it: the category's own rule first, then the section default. */
+  function routeFor(source, work) {
+    var list = (_routes || []).filter(function (r) { return r.source_module === source; });
+    return list.filter(function (r) { return r.category === work; })[0] ||
+           list.filter(function (r) { return !r.category; })[0] || null;
+  }
 
   async function loadCategories() {
     if (_cats) return _cats;
@@ -1641,6 +1682,29 @@
     return (_cats || []).filter(function (c) { return c.module_key === moduleKey; });
   }
 
+  /* WHICH LIST THE WORK DROPDOWN IS FILLED FROM, and it is the system
+     RAISING the case, not the one it is being sent to.
+
+     It was the destination, and that is what the office walked into: on the
+     FC Portal, choosing "give this to Admin" offered ADMIN's titles, so
+     "Request Transplanting Signboard" — an FC Portal title, set up under FC
+     Portal on Case Routing, with a rule saying Admin Portal solves it —
+     could not be chosen from the FC Portal at all. The screen that lists
+     the titles under the system that raises them and the form that asked
+     the question the other way round were two answers to one question.
+
+     The destination falls OUT of the work now, from the rule the office
+     set, which is what that screen is for.
+
+     A system with no titles of its own still falls back to the
+     destination's, so raising a case from the hub — where the source is
+     Nelos itself — goes on working exactly as it did. */
+  function workList() {
+    var mine = worksFor(sourceModule());
+    if (mine.length) return mine;
+    return worksFor(formEl.querySelector('#nd-f-to').value);
+  }
+
   /* Sorted by name inside the system: the pin decides who is in the list,
      the name decides the order. */
   function picsFor(moduleKey) {
@@ -1658,9 +1722,8 @@
      pre-filled from there anyway. No default_priority, or no set titles
      for that system at all, means normal. */
   function priority() {
-    var key  = formEl.querySelector('#nd-f-to').value;
     var name = formEl.querySelector('#nd-f-work').value;
-    var c = worksFor(key).filter(function (x) { return x.name === name; })[0];
+    var c = workList().filter(function (x) { return x.name === name; })[0];
     return (c && c.default_priority) || 'normal';
   }
 
@@ -2267,11 +2330,12 @@
         Object.keys(NURSERY_PLOTS).map(function (n) { return opt(n, NURSERY_LABEL[n]); }).join('');
     }
 
-    /* Three reads, each failing on its own terms: no modules leaves the
+    /* Four reads, each failing on its own terms: no modules leaves the
        five as they stand, no case titles turns Work into a typed line, no
-       people leaves the case with the system rather than a person. None of
+       people leaves the case with the system rather than a person, and no
+       routing rules leave the destination where the person put it. None of
        them is allowed to block the form. */
-    var all = await Promise.all([loadModules(), loadCategories(), loadPeople()]);
+    var all = await Promise.all([loadModules(), loadCategories(), loadPeople(), loadRoutes()]);
     var to = formEl.querySelector('#nd-f-to');
     if (to.options.length <= 1) {
       to.innerHTML = opt('', '— choose —') +
@@ -2307,13 +2371,26 @@
       formEl.querySelector('#nd-f-desc').value = editing.description || '';
       return;
     }
-    setTimeout(function () { to.focus(); }, 60);
+    /* The work list is the raising system's, so it can be drawn before
+       anybody chooses anything — and on a system with titles of its own,
+       WORK is the first question now, because the destination follows from
+       it. */
+    onAssignTo();
+    setTimeout(function () {
+      var first = worksFor(sourceModule()).length
+        ? formEl.querySelector('#nd-f-work') : to;
+      if (first && !first.hidden) first.focus(); else to.focus();
+    }, 60);
   }
 
-  /* Changing the system invalidates the two answers that hang off it. */
+  /* Changing the system invalidates the two answers that hang off it.
+     The WORK list is one of them only where this system has no titles of
+     its own — see workList(). Where it has, the list is the same whatever
+     the destination says, and rebuilding it here is harmless. */
   function onAssignTo() {
     var key = formEl.querySelector('#nd-f-to').value;
-    var works = worksFor(key), pics = picsFor(key);
+    var works = workList(), pics = picsFor(key);
+    var keep = formEl.querySelector('#nd-f-work').value;
 
     var sel = formEl.querySelector('#nd-f-work');
     var typed = formEl.querySelector('#nd-f-title');
@@ -2323,6 +2400,9 @@
       sel.hidden = false;
       typed.hidden = true;
       typed.value = '';
+      /* The list can be rebuilt by a change of destination, and a chosen
+         work that is still on it has not stopped being chosen. */
+      if (keep && works.some(function (c) { return c.name === keep; })) sel.value = keep;
     } else {
       // Either nothing chosen yet, or that system has no titles set up.
       // Both are answered by saying so rather than by an empty dropdown
@@ -2331,8 +2411,9 @@
       sel.value = '';
       typed.hidden = false;
       typed.disabled = !key;
-      typed.placeholder = key ? 'No set titles for this system — type one'
-                              : 'Choose a system first';
+      typed.placeholder = (key || worksFor(sourceModule()).length)
+        ? 'No set titles for this system — type one'
+        : 'Choose a system first';
     }
 
     var pic = formEl.querySelector('#nd-f-pic');
@@ -2340,6 +2421,35 @@
     pic.innerHTML = opt('', key && !pics.length ? 'Nobody pinned yet'
                                                 : 'Anyone') +
       pics.map(function (p) { return opt(p.id, p.name); }).join('');
+  }
+
+  /* CHOOSING THE WORK SAYS WHERE IT GOES, because that is what the office
+     set on Case Routing — "Request Transplanting Signboard · solved by
+     Admin Portal · Admin 2". The rule is applied on every change of work
+     rather than only on the first: picking the work is the later act, so
+     it wins, and picking a different one moves the destination again.
+     Changing the destination afterwards still overrides it, which is the
+     whole reason that select is still here.
+
+     No rule, or no nelos_routes to read, leaves both exactly as they are. */
+  function onWork() {
+    var work = formEl.querySelector('#nd-f-work').value;
+    if (!work) return;
+    var rule = routeFor(sourceModule(), work);
+    if (!rule || !rule.to_module) return;
+
+    var to = formEl.querySelector('#nd-f-to');
+    if (to.value !== rule.to_module) {
+      to.value = rule.to_module;
+      onAssignTo();                       // the PIC list belongs to the system
+    }
+    /* The PIC the rule names, where it names one and the person has not
+       already chosen somebody themselves. */
+    var pic = formEl.querySelector('#nd-f-pic');
+    if (rule.to_user_id && !pic.value &&
+        Array.prototype.some.call(pic.options, function (o) { return o.value === rule.to_user_id; })) {
+      pic.value = rule.to_user_id;
+    }
   }
 
   function onNursery() {
@@ -2360,9 +2470,8 @@
      default_days means no due date, which is honest — a case nobody set a
      deadline for does not get an invented one. */
   function dueFromWork() {
-    var key = formEl.querySelector('#nd-f-to').value;
     var name = formEl.querySelector('#nd-f-work').value;
-    var c = worksFor(key).filter(function (x) { return x.name === name; })[0];
+    var c = workList().filter(function (x) { return x.name === name; })[0];
     if (!c || c.default_days == null) return null;
     var d = new Date();
     d.setDate(d.getDate() + Number(c.default_days));
@@ -2628,6 +2737,7 @@ async function uploadPhoto(token) {
 
     formEl.querySelector('#nd-f-work').addEventListener('change', function () {
       if (this.value) formError('');
+      onWork();                    // the rule says where this one goes
     });
 
     var photo = formEl.querySelector('#nd-f-photo');

@@ -43,13 +43,37 @@
         return m ? m[1].trim() : '';
     }
 
+    /* THE SAME STRING Life of Seedlings and the batch page test for. An
+       unapproved calibration counts for nothing, here as everywhere. */
+    const APPROVED = /\[APPROVED by ([^\]]+) on ([^\]]+)\]/i;
+
+    /* A DELIVERY ORDER CARRIES UP TO FIVE LINES, and flattening it is one
+       rule and not one per caller. Cancelled orders are the only ones left
+       out — the same test Life of Seedlings applies, which is a status of
+       'Cancelled' with the capital or [CANCELLED] in the remark. */
+    function salesLinesOf(doRows) {
+        const out = [];
+        (doRows || []).forEach(d => {
+            if (!d) return;
+            if (d.status === 'Cancelled' || (d.remark && String(d.remark).includes('[CANCELLED]'))) return;
+            for (let i = 1; i <= 5; i++) {
+                const qty = Number(d['qty_' + i] || 0);
+                if (!qty) continue;
+                out.push({ batch: d['batch_' + i], plot: d['plot_' + i], qty: Math.abs(qty) });
+            }
+        });
+        return out;
+    }
+
     /**
-     * compute({ trays, planted, transplanted, cull1 })
+     * compute({ trays, planted, transplanted, cull1, calibrations, sales })
      *
      *   trays         operation_trays rows        (tray_name, nursery_name, total_vacant)
      *   planted       Planted logs                (plot_name IS the tray, batch_name, quantity_change)
      *   transplanted  Transplanted / _Premium / _DoubleTone logs, WITH remark
      *   cull1         1st_Culling logs            (plot_name IS the tray)
+     *   calibrations  Stock_Calibration logs      (plot_name, quantity_change, remark)
+     *   sales         salesLinesOf(shared_do_records rows)
      *
      * → { capacity, occupied, vacant, usage, byBatch, rows }
      */
@@ -58,6 +82,8 @@
         const planted      = (input && input.planted)      || [];
         const transplanted = (input && input.transplanted) || [];
         const cull1        = (input && input.cull1)        || [];
+        const calibrations = (input && input.calibrations) || [];
+        const sales        = (input && input.sales)        || [];
 
         const trayNames = new Set(trays.map(t => t.tray_name));
 
@@ -68,6 +94,7 @@
            are standing. The two are kept apart on purpose — see below. */
         const insByBatch = {};          // batch → total that entered a tray
         const outsByBatch = {};         // batch → total that left pre-nursery
+        const adjByBatch = {};          // batch → approved pre-nursery calibration, signed
         const netByTrayBatch = {};      // tray → batch → in − out, trays we know
 
         const addBatch = (map, batch, qty) => { if (batch) map[batch] = (map[batch] || 0) + qty; };
@@ -107,6 +134,51 @@
             }
         });
 
+        /* ── A TRAY LOSES SEEDLINGS EVERY WAY THEY LEAVE ─────────────────
+
+           This knew two: the 1st culling and the transplant. Life of
+           Seedlings has known four since it was written —
+
+               preBalance = planted − cull1 − trans − salesPre + calibrationPre
+
+           — and the two missing ones are not rare. A batch SOLD out of the
+           tray, and a batch whose pre-nursery count was corrected by an
+           approved calibration, both went on standing in a tray here. The
+           batch's own arithmetic was then too big, so the trim below took
+           nothing off, and the phantom was parked on whichever tray
+           happened to survive it.
+
+           That is what P3 was showing: 230 (81) over a batch with nothing
+           in P3. Batch 230 carries an approved −1,000 against tray P30
+           ("Sold out 1,000 Pre nursery seedlings (DO: 01605)"), so its
+           standing read a thousand too high and the remainder had to land
+           somewhere. Two readers of one question, one of them two terms
+           short — the shape of nearly every fault in this system.
+
+           The tray the row NAMES is moved too, not only the batch total, so
+           the right tray gives its holes back instead of the trim guessing
+           which one should. */
+        // Approved pre-nursery calibrations. Signed: a minus takes seedlings
+        // out of the tray, a plus puts them back.
+        calibrations.forEach(l => {
+            if (!APPROVED.test(String(l.remark || ''))) return;
+            if (!trayNames.has(l.plot_name)) return;   // a field plot is not this tray's business
+            const signed = Number(l.quantity_change || 0);
+            if (!signed) return;
+            addBatch(adjByBatch, l.batch_name, signed);
+            addTray(l.plot_name, l.batch_name, signed);
+        });
+
+        // Sold straight out of the tray — small polybag sales that never
+        // reach the field. The same split Life of Seedlings calls salesPre.
+        sales.forEach(s => {
+            if (!trayNames.has(s.plot)) return;
+            const qty = Math.abs(Number(s.qty) || 0);
+            if (!qty) return;
+            addBatch(outsByBatch, s.batch, qty);
+            addTray(s.plot, s.batch, -qty);
+        });
+
         /* ── A TRAY HOLDS NO MORE THAN THE BATCH STILL HAS ───────────────
            Transplant 2,727 out of P6 and P6 gives back 2,727 the moment
            the record is saved. It did not, and trays P4–P7 sat occupied on
@@ -127,9 +199,13 @@
            the nursery's free holes are right even when one tray's share of
            them is a guess. */
         const held = {};   // tray → batch → seedlings actually standing there
-        const batches = new Set(Object.keys(insByBatch).concat(Object.keys(outsByBatch)));
+        const batches = new Set(Object.keys(insByBatch)
+            .concat(Object.keys(outsByBatch))
+            .concat(Object.keys(adjByBatch)));
         batches.forEach(batch => {
-            const standing = Math.max(0, (insByBatch[batch] || 0) - (outsByBatch[batch] || 0));
+            const standing = Math.max(0, (insByBatch[batch] || 0)
+                                       - (outsByBatch[batch] || 0)
+                                       + (adjByBatch[batch] || 0));
             const mine = [];
             Object.keys(netByTrayBatch).forEach(tray => {
                 const n = netByTrayBatch[tray][batch] || 0;
@@ -192,5 +268,5 @@
         return { capacity, occupied, vacant, usage, byBatch, rows };
     }
 
-    global.MJMTrayStock = { DEFAULT_CAPACITY, capacityOf, sourceTrayOf, compute };
+    global.MJMTrayStock = { DEFAULT_CAPACITY, APPROVED, capacityOf, sourceTrayOf, salesLinesOf, compute };
 })(typeof window !== 'undefined' ? window : globalThis);

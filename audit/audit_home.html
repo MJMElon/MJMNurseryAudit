@@ -2262,25 +2262,40 @@ function loadAuditTodo(){
       const y = d.getFullYear(), m = d.getMonth();
       if (beforeStart(y, m)) continue;
       occurrences(y, m).forEach(o => {
-        /* ── PAPAN IS NOT CARRIED, AND THAT FALLS OUT OF ITS WINDOW ──
-           Every other module's round asks about one window, so a round
-           nobody walked has to be carried or the work disappears.
-           Papan's roster is TWO MONTHS WIDE by itself: October's row
-           already asks about every plot transplanted in September. So
-           carrying September's row puts the same plots on the board
-           twice, and August's a third time where the windows overlap
-           -- the office saw B03, B06, N08 and U04 under an AUG 2026 row
-           and again under a SEP 2026 one, and said of both: "this 2
-           already passed, no need to show."
+        /* ── ONLY MAINTENANCE IS CARRIED, AND THE REASONS DIFFER ──
+           A ROUND that has passed is not carried any more. The office
+           asked for it in one line -- "remove all aug and sep audit to
+           do" -- looking at a board where N15 had never been walked and
+           so had accrued AUG R-1, AUG R-2 and SEP R-1, three rows one
+           above the other, every one asking the same question.
 
-           The two-month window IS the catching up, which is what it was
-           asked for. What it costs is written down beside this: a plot
-           placed TWO months back or more, never audited, is on no row
-           -- it is outside the current window, so there is nothing on
-           the board that could ask for it. A round done LATE is still
-           filed in Audit History as a missed one, because missedRounds
-           walks the months itself and does not read this list. */
-        if (o.mod === 'papan') return;
+           Papan already worked this way and its reason was its own: the
+           roster is TWO MONTHS WIDE, so October's row already asks about
+           every plot transplanted in September, and carrying September's
+           put the same plots on the board twice. The office said of its
+           AUG and SEP rows then, in the same words as now: "this 2
+           already passed, no need to show." Plot Condition and Seedling
+           Height now follow, on the plain judgement rather than on the
+           window.
+
+           WHAT IT COSTS, and the office chose it with this in front of
+           them: a round nobody walks shows only while its window is
+           actually OPEN. A plot never audited at all -- N15 is the live
+           one -- is on no row between rounds, where before it stacked.
+           The FACT is not lost: missedRounds() walks the months itself
+           and does not read this list, so every missed round is still
+           filed in Audit History under the month that owed it. That is
+           now the only place a plot nobody walks accumulates.
+
+           MAINTENANCE IS NOT A ROUND and stays. Its row exists because a
+           deadline has pending work on it, so there is no window to be
+           outside of, and dropping one would hide a task the maintenance
+           module can still see. The ONE thing that retires it is an audit
+           against its task_id, or an admin closing it with the x -- which
+           writes a record carrying a name, a date and how overdue it was.
+           An automatic drop would take that record away, and the office
+           said so when asked: leave the x to do it. */
+        if (o.mod !== 'maint') return;
         if (occStatus(o, y, m) === 'overdue')
           out.push(Object.assign({}, o, {fromY:y, fromM:m}));
       });

@@ -79,6 +79,10 @@
     }
     out.manage_users = !!perms.manage_users;
     out.can_verify_operation = !!perms.can_verify_operation;
+    // The one who decides who may manage users. Set only by SQL
+    // (shared/RUN_ME_access_in_the_database.sql names them); the database
+    // guard refuses anybody else touching manage_users or super_admin.
+    out.super_admin = !!perms.super_admin;
     // Per-page and per-function access INSIDE a module, managed from that
     // module's own User Access page. Any `<module>_pages` / `<module>_actions`
     // key is carried through, so adding a module needs no change here.
@@ -426,6 +430,7 @@
   function canAccess(name)  { return moduleLevel(name) !== 'none'; }
   function isAdminOf(name)  { return moduleLevel(name) === 'admin'; }
   function canManageUsers() { return !!permissions().manage_users; }
+  function isSuperAdmin()   { return !!permissions().super_admin; }
 
   // Per-page access inside the operation module (see operation_pages above).
   // Page keys mirror the dashboard cards: batch, orders, stock, settings.
@@ -466,6 +471,14 @@
     orders: ['ba_manage', 'al_manage'],
     stock:  ['customer', 'map'],
   };
+  /* Ticks that replaced the Master PIN written into the AL, BA and DO
+     pages (anybody could read it with Inspect). On a row saved before they
+     existed they answer as the old rule for a guarded action does: an
+     Operation admin, yes; anybody else, no.
+     Database twin: public.mjm_can() — change one, change the other. */
+  const OPERATION_NEW_ACTION_ADMIN = {
+    orders: ['al_verify', 'al_cancel', 'delete'],
+  };
 
   function canDoOperation(page, action) {
     const p = permissions();
@@ -478,6 +491,7 @@
       if (!acts.view) return false;      // page closed → every function closed
       if (action === 'view') return true;
       if (acts[action] === undefined && (OPERATION_NEW_ACTION_DEFAULT[page] || []).includes(action)) return true;
+      if (acts[action] === undefined && (OPERATION_NEW_ACTION_ADMIN[page] || []).includes(action)) return isAdminOf('operation');
       return !!acts[action];
     }
     // Legacy fallback.
@@ -489,7 +503,9 @@
     switch (action) {
       case 'verify':     return !!p.can_verify_operation || isAdminOf('operation');
       case 'review':     return isAdminOf('operation');
-      case 'delete':     return isAdminOf('operation');
+      case 'delete':
+      case 'al_verify':
+      case 'al_cancel':  return isAdminOf('operation');
       case 'clear_logs': return isAdminOf('audit_trail');
       default:           return true; // add_new, fill_report, manage…
     }
@@ -646,6 +662,7 @@
     operationPageLevel,
     canOpenOperationPage,
     canDoOperation,
+    isSuperAdmin,
     requireOperationAction,
     canDo,
     canOpenPage,

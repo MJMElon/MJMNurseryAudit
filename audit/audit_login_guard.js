@@ -1,4 +1,4 @@
-/* BUILD: 2026-08-24a */
+/* BUILD: 2026-10-27a */
 /* ================================================================
    MJM NURSERY — WHERE THE AUDIT MODULE SENDS YOU TO SIGN IN
 
@@ -28,12 +28,56 @@
     return 'audit_index.html';
   }
 
-  /* Signed in at all? Sends them to sign in and reports false if not, so a
-     caller can stop rather than carry on against a half-built page. */
-  function requireSignIn() {
+  /* The refusal's "staff account" button comes back here, not to the hub:
+     this is the door an auditor uses. */
+  global.MJM_SIGN_IN_URL = global.MJM_SIGN_IN_URL || loginUrl();
+
+  /* ── A SALES WEB CUSTOMER IS NOT AN AUDITOR ──
+     The audit portal is staff only. Every audit page used to ask nothing
+     but "is there an mjm_user", and the sign-in wrote one for anybody the
+     password box accepted. The rule is MJMStaffGate.isCustomer
+     (shared/shared_staff_gate.js); the one-line fallback is for a phone
+     whose cache does not hold that file yet, so a customer is still turned
+     away offline. */
+  function isCustomerUser(u) {
+    if (!u) return false;
+    if (global.MJMStaffGate) return global.MJMStaffGate.isCustomer(u);
+    return String(u.user_type || '').trim().toLowerCase() === 'customer';
+  }
+
+  /* Forget them, end the session server-side too, and send them to the
+     sign-in page, which shows the refusal and nothing else. */
+  function refuseCustomer() {
+    revokeSession();
+    clearScope();
     try {
-      if (localStorage.getItem('mjm_user')) return true;
+      if (global.MJMStaffGate) {
+        global.MJMStaffGate.markRefused();
+        global.MJMStaffGate.forget();
+      } else {
+        sessionStorage.setItem('mjm_customer_refused', '1');
+        Object.keys(localStorage).forEach(function (k) {
+          if (k === 'mjm_user' || k.indexOf('sb-') === 0 || k.indexOf('mjm_perm_last__') === 0) localStorage.removeItem(k);
+        });
+      }
     } catch (e) {}
+    global.location.replace(loginUrl() + '#customer');
+  }
+
+  /* Signed in at all, and not as a customer? Sends them to sign in and
+     reports false if not, so a caller can stop rather than carry on
+     against a half-built page. Reads only what is on the phone, so an
+     auditor with no signal is never locked out here; the fresh read is
+     refreshAuditPermissions() in audit_supabase.js, which comes back
+     through refuseCustomer() when the database says customer. */
+  function requireSignIn() {
+    var u = null;
+    try {
+      var raw = localStorage.getItem('mjm_user');
+      if (raw) { try { u = JSON.parse(raw); } catch (e) { u = {}; } }
+    } catch (e) {}
+    if (u && isCustomerUser(u)) { refuseCustomer(); return false; }
+    if (u) return true;
     global.location.replace(loginUrl());
     return false;
   }
@@ -227,6 +271,8 @@
   global.MJMAuditLogin = {
     url: loginUrl,
     requireSignIn: requireSignIn,
+    isCustomerUser: isCustomerUser,
+    refuseCustomer: refuseCustomer,
     requireAdmin: requireAdmin,
     isAdmin: isAdmin,
     signOut: signOut,

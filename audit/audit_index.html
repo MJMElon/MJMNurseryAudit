@@ -508,6 +508,8 @@
 <script src="audit_lang.js?v=20261022e"></script>
 <script src="audit_offline_vault.js?v=20260831a"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<!-- Customers cannot enter the staff system — the one rule, in one file. -->
+<script src="../shared/shared_staff_gate.js"></script>
 <script>
   const SUPA_URL = 'https://kibqjztozokohqmhqqqf.supabase.co';
   const SUPA_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtpYnFqenRvem9rb2hxbWhxcXFmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQyMzQzNjIsImV4cCI6MjA4OTgxMDM2Mn0.J7qJUZhWXYf5b9oey4wXJkjdi66jomEMw_NeV9NWF7M';
@@ -548,10 +550,30 @@
     return 'audit_home.html';
   }
 
-  // Already logged in — go straight in (works offline too)
-  if (localStorage.getItem('mjm_user')) {
-    window.location.href = auditLanding();
+  /* A SALES WEB CUSTOMER IS NOT AN AUDITOR. The rule is
+     MJMStaffGate.isCustomer (shared/shared_staff_gate.js); the fallback is
+     for a phone whose cache does not hold that file yet. */
+  function isCustomerUser(u){
+    if (!u) return false;
+    if (window.MJMStaffGate) return MJMStaffGate.isCustomer(u);
+    return String(u.user_type || '').trim().toLowerCase() === 'customer';
   }
+  /* Nothing is written for them, the session ends, and the page shows the
+     refusal and nothing else. */
+  async function refuseCustomerHere(){
+    if (window.MJMStaffGate) { await MJMStaffGate.refuseCustomer(_supa); return; }
+    try { await _supa.auth.signOut({ scope: 'local' }); } catch(e) {}
+    localStorage.removeItem('mjm_user');
+  }
+
+  // Already logged in — go straight in (works offline too). Not a customer:
+  // a phone that cached one before this rule is refused here instead.
+  (function(){
+    let u = null;
+    try { u = JSON.parse(localStorage.getItem('mjm_user') || 'null'); } catch(e) { u = null; }
+    if (u && isCustomerUser(u)) { refuseCustomerHere(); return; }
+    if (localStorage.getItem('mjm_user')) window.location.href = auditLanding();
+  })();
 
   /* Any phone that picks this build up sheds the plaintext credentials the
      vault replaced, signed in or not — see audit_offline_vault.js. */
@@ -613,6 +635,15 @@
         errEl.classList.add('show');
         return;
       }
+      /* A copy sealed for a customer before the rule existed opens nothing. */
+      if (isCustomerUser(saved.user)) {
+        btn.classList.remove('loading');
+        if (window.MJMStaffGate) { MJMStaffGate.markRefused(); MJMStaffGate.showRefused(); }
+        errEl.textContent = window.MJMStaffGate ? MJMStaffGate.CUSTOMER_MESSAGE
+          : 'This is the MJM Nursery staff system. Customer accounts cannot sign in here.';
+        errEl.classList.add('show');
+        return;
+      }
       localStorage.setItem('mjm_user', JSON.stringify(saved.user));
       /* The Supabase session too, where supabase-js keeps it — the OLD
          plaintext path never restored this, so records queued offline could
@@ -631,6 +662,34 @@
 
       const userId = data.user.id;
 
+      /* THE ONE RULE (shared/shared_staff_gate.js), asked before anything
+         is written. A customer is signed out and refused; mjm_user is never
+         written and nothing is sealed. A profile read that FAILED — a
+         returned {error} as much as a throw — stands on this phone's last
+         copy for this same account; with none the sign-in stops here,
+         session kept, and pressing Login again is the retry. It used to
+         carry on and sign anybody in as "Auditor". */
+      if (!window.MJMStaffGate) {
+        btn.classList.remove('loading');
+        errEl.textContent = 'We could not check your account just now. Please check your connection and try again.';
+        errEl.classList.add('show');
+        return;
+      }
+      const gate = await MJMStaffGate.check(_supa, userId, { columns: '*' });
+      if (gate.status === 'customer') {
+        await MJMStaffGate.refuseCustomer(_supa);
+        btn.classList.remove('loading');
+        errEl.textContent = MJMStaffGate.CUSTOMER_MESSAGE;
+        errEl.classList.add('show');
+        return;
+      }
+      if (gate.status === 'unknown') {
+        btn.classList.remove('loading');
+        errEl.textContent = MJMStaffGate.UNREACHABLE_MESSAGE;
+        errEl.classList.add('show');
+        return;
+      }
+
       // Fetch profile. The table is shared_profiles — `profiles` was renamed
       // by migration_rename_and_new_tables.sql and no longer exists, so this
       // lookup used to fail silently and everyone logged in as their email
@@ -640,11 +699,9 @@
       // over time and naming one that is missing fails the whole row, which is
       // the same silent fallback all over again. RLS limits this to the
       // caller's own row.
-      const { data: profile } = await _supa
-        .from('shared_profiles')
-        .select('*')
-        .eq('id', userId)
-        .maybeSingle();
+      // Read once, above, through the gate — the row it read, or this
+      // phone's last copy of it when the read failed.
+      const profile = gate.profile;
 
       const name = profile?.full_name || email.split('@')[0];
       const role = profile?.role || 'Auditor';

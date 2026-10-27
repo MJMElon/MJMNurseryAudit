@@ -249,12 +249,20 @@
 
   async function _fetchProfile(supa, uid) {
     if (_inflight[uid]) return _inflight[uid];
-    const p = supa
+    /* user_type and role ride along so a customer is recognised on every
+       page that loads this file (see shared_staff_gate.js). maybeSingle,
+       where the client has it: .single() answers a missing row with an
+       ERROR, and an error was read as "could not be read" — which skipped
+       the whole gate below for any login with no profile row at all. */
+    const q = supa
       .from('shared_profiles')
-      .select('full_name, email, permissions')
-      .eq('id', uid)
-      .single()
-      .then(function (r) { return r; })
+      .select('full_name, email, permissions, user_type, role')
+      .eq('id', uid);
+    const p = (typeof q.maybeSingle === 'function' ? q.maybeSingle() : q.single())
+      .then(function (r) {
+        if (r && r.error && r.error.code === 'PGRST116') return { data: null, error: null };
+        return r;
+      })
       .finally(function () { delete _inflight[uid]; });
     _inflight[uid] = p;
     return p;
@@ -305,6 +313,11 @@
       full_name: (u.user_metadata && u.user_metadata.full_name) || ''
     };
     let fetchOk = false;
+    /* What the staff test is asked of: the row as read, or the last one this
+       device was given for this account. Raw, not normalize()d — the hub
+       counts levels normalize() drops, and the two must agree. */
+    let rawProfile = null;
+    const G = global.MJMStaffGate || null;
     try {
       // Try the short-lived per-tab cache first — a repeat MJMAccess.load
       // inside the TTL is a no-op on the network, which cuts the dogpile
@@ -318,6 +331,13 @@
         if (!error && data) _writeProfileCache(u.id, data);
       }
       if (error) throw error;
+      rawProfile = data || null;
+      if (data && G && G.isCustomer(data)) {
+        /* A Sales Web customer. Signed out, nothing of this page shown. */
+        state.permissions = normalize(null);
+        await G.refuseCustomer(supa);
+        throw new Error('CUSTOMER_REFUSED');
+      }
       if (data) {
         if (data.full_name) state.user.full_name = data.full_name;
         state.permissions = normalize(data.permissions);
@@ -352,6 +372,7 @@
       }
       fetchOk = true;
     } catch (e) {
+      if (e && e.message === 'CUSTOMER_REFUSED') throw e;
       /* The read could not be made — almost always no signal. Fall back to
          the last answer this device was given rather than to none.
 
@@ -361,45 +382,77 @@
          entitled, holding a phone in a plot, and being shown an empty
          building. Their access did not change on the walk out there. */
       const last = _readLastKnown(u.id);
+      if (last && G && G.isCustomer(last)) {
+        state.permissions = normalize(null);
+        await G.refuseCustomer(supa);
+        throw new Error('CUSTOMER_REFUSED');
+      }
       if (last) {
         console.warn('[MJMAccess] permissions unreadable, using the last '
           + 'known copy for this account:', e);
         if (last.full_name) state.user.full_name = last.full_name;
         state.permissions = normalize(last.permissions);
         state.offline = true;
+        rawProfile = last;
+        /* The remembered answer is still an answer: the staff gate below
+           asks it, rather than being skipped because the read failed. */
+        fetchOk = true;
       } else {
         console.warn('[MJMAccess] failed to load permissions:', e);
         state.permissions = normalize(null);
+        /* NOTHING TO STAND ON: not read, nothing remembered for this
+           account. This used to skip the gate altogether and let the page
+           draw. Now the page says it could not check and offers Retry; the
+           session is kept, because a dropped line is not a reason to sign
+           anybody out. A page that does its own gating (the audit back
+           office) is left to it, with no permissions granted here. */
+        if (!global.__MJM_SKIP_ACCESS_GATE && G) {
+          G.showUnreachable();
+          throw new Error('PROFILE_UNREADABLE');
+        }
       }
     }
 
-    // Whole-system gate. The signed-in user MUST have at least one
-    // staff-grade entry on their permissions row — manage_users,
-    // can_verify_operation, or a non-'none' module level. Without that
-    // they have no business loading any ops page, so kick them back to
-    // the hub's index.html where the Pending Access screen explains
-    // they're awaiting admin approval.
+    /* Read fine, but the customer test could not be asked (a page cached
+       from before shared_staff_gate.js existed). Treat the customer as
+       having no ops access: the hub they are sent to does load the gate,
+       and refuses them there. */
+    const customerNoGate = !G && rawProfile &&
+      String(rawProfile.user_type || '').toLowerCase() === 'customer';
+
+    // Whole-system gate. The signed-in user MUST have staff access —
+    // MJMStaffGate.hasStaffAccess, the same test the hub asks. Without it
+    // they have no business loading any ops page, so kick them back to the
+    // hub's index.html where the Pending Access screen explains they're
+    // awaiting admin approval.
     //
-    // Fails OPEN on a profile-read error so a transient Supabase
-    // hiccup doesn't lock real ops admins out. Same policy as the hub
-    // gate. Allow opt-out via window.__MJM_SKIP_ACCESS_GATE for pages
-    // that already handle their own gating.
-    if (fetchOk && !global.__MJM_SKIP_ACCESS_GATE) {
+    // A failed read is answered by the last profile this device was given
+    // for this account (fetchOk is set for that too), and with none the
+    // page is held above — it no longer fails open. Allow opt-out via
+    // window.__MJM_SKIP_ACCESS_GATE for pages that already handle their own
+    // gating; a customer is refused whatever the page asked.
+    if (fetchOk && (!global.__MJM_SKIP_ACCESS_GATE || customerNoGate)) {
       const p = state.permissions || {};
-      let anyAccess = !!(p.manage_users || p.can_verify_operation);
-      if (!anyAccess && p.modules) {
-        for (const k in p.modules) {
-          if (p.modules[k] && p.modules[k] !== 'none') { anyAccess = true; break; }
-        }
-      }
-      if (!anyAccess) {
-        for (const key in p) {
-          if (!/_actions$/.test(key) || !p[key]) continue;
-          for (const page in p[key]) {
-            const acts = p[key][page];
-            if (acts && Object.keys(acts).some(a => acts[a])) { anyAccess = true; break; }
+      let anyAccess = false;
+      if (G) {
+        anyAccess = G.hasStaffAccess(rawProfile);
+      } else if (!customerNoGate) {
+        // A page without the gate file: the test this file always made.
+        anyAccess = !!(p.manage_users || p.can_verify_operation);
+        if (!anyAccess && p.modules) {
+          for (const k in p.modules) {
+            if (p.modules[k] && p.modules[k] !== 'none') { anyAccess = true; break; }
           }
-          if (anyAccess) break;
+        }
+        if (!anyAccess) {
+          for (const key in p) {
+            if (!/_actions$/.test(key) || !p[key]) continue;
+            for (const page in p[key]) {
+              const acts = p[key][page];
+              if (acts && Object.keys(acts).some(a => acts[a])) { anyAccess = true; break; }
+            }
+            if (anyAccess) break;
+          }
         }
       }
       if (!anyAccess) {

@@ -31,7 +31,7 @@
        any of it paints, so a non-admin never sees it flash. Which
        people may see which module card is coming as a setting on this
        page; until it exists every signed-in auditor sees all four. -->
-  <script src="audit_login_guard.js?v=20260827a"></script>
+  <script src="audit_login_guard.js?v=20261027a"></script>
   <script>
     MJMAuditLogin.requireSignIn();
     if (MJMAuditLogin.isAdmin())
@@ -549,7 +549,7 @@
   </div>
 </div>
 
-<script src="audit_supabase.js?v=20261022e"></script>
+<script src="audit_supabase.js?v=20261027a"></script>
 <!-- Which plots still owe work — the same helper the auditor to-do uses,
      so this page and that one count progress the same way. -->
 <script src="audit_pending.js?v=20261015a"></script>
@@ -573,6 +573,7 @@
 <script>window.__MJM_SKIP_ACCESS_GATE = true;</script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="../shared/shared_supabase.js"></script>
+<script src="../shared/shared_staff_gate.js"></script>
 <script src="../shared/shared_access.js"></script>
 <script src="../shared/shared_nelos.js"></script>
 

@@ -211,8 +211,17 @@ async function refreshAuditPermissions() {
     const rows = await sbFetch(
       `shared_profiles?select=permissions,role,user_type&id=eq.${encodeURIComponent(u.id)}`);
     if (!rows || !rows.length) return false;
+    /* A Sales Web customer is not an auditor, whatever the phone had cached
+       — refused here on the fresh answer, the same rule the sign-in and
+       requireSignIn() ask (shared/shared_staff_gate.js). */
+    if (window.MJMAuditLogin && MJMAuditLogin.isCustomerUser &&
+        MJMAuditLogin.isCustomerUser(rows[0])) {
+      MJMAuditLogin.refuseCustomer();
+      return false;
+    }
     u.permissions = rows[0].permissions || null;
     if (rows[0].role) u.role = rows[0].role;
+    u.user_type = rows[0].user_type || null;
     localStorage.setItem('mjm_user', JSON.stringify(u));
     return true;
   } catch (e) { return false; }

@@ -47,7 +47,11 @@
 .cf-btn-label{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .cf-chevron{width:12px;height:12px;color:#9c8f7a;transition:transform .15s;flex-shrink:0;}
 .cf-btn.open .cf-chevron{transform:rotate(180deg);}
-.cf-menu{position:absolute;left:0;top:calc(100% + 6px);min-width:100%;max-height:260px;overflow-y:auto;background:#fff;border:1px solid #e5e9f0;border-radius:14px;box-shadow:0 16px 32px -10px rgba(15,23,42,.18),0 4px 10px rgba(15,23,42,.06);padding:4px 0;z-index:2000;}
+/* The 260px is a FALLBACK only — placeMenu() writes a max-height off the
+   room there actually is, and opens the menu UPWARDS where there is more
+   room above. See placeMenu() for what that fixes. */
+.cf-menu{position:absolute;left:0;top:calc(100% + 6px);min-width:100%;max-height:260px;box-sizing:border-box;overflow-y:auto;background:#fff;border:1px solid #e5e9f0;border-radius:14px;box-shadow:0 16px 32px -10px rgba(15,23,42,.18),0 4px 10px rgba(15,23,42,.06);padding:4px 0;z-index:2000;}
+.cf-menu.cf-up{top:auto;bottom:calc(100% + 6px);}
 .cf-menu::-webkit-scrollbar{width:6px;}
 .cf-menu::-webkit-scrollbar-thumb{background:#cbd5e1;border-radius:3px;}
 .cf-opt{display:flex;align-items:center;justify-content:space-between;gap:12px;width:100%;text-align:left;font-size:13px;font-weight:600;color:#1a150d;background:#fff;border:none;border-bottom:1px solid #f4f1ea;padding:10px 14px;cursor:pointer;transition:background .12s,color .12s;font-family:inherit;white-space:nowrap;}
@@ -73,7 +77,86 @@ select.cf-native-hidden{display:none!important;}
         document.head.appendChild(style);
     }
 
+    /* ── WHERE THE MENU GOES, AND HOW TALL IT IS ──────────────────────────
+       The menu is position:absolute under the button, so EVERY scroller
+       above it can cut it off, and a fixed one cuts it off for good.
+
+       The office found it on the Transplanting form: the tray list opened
+       downwards out of a card near the foot of the window, and the page
+       scrolls inside `.modal-backdrop`, which is `position:fixed; inset:0`.
+       So the tail of the menu hung below the window and there was no way
+       to reach it — scrolling moves the BUTTON by the same amount, so the
+       menu never comes up the screen, and at the end of the document it
+       cannot move at all. With thirteen trays they could see four of them.
+       A flat `max-height:260px` cannot help: the cut is below the window,
+       not inside the menu.
+
+       So the height is the room there ACTUALLY is, measured on open:
+
+       - **The clip is every ancestor that clips, not just the window.** A
+         menu inside a scrolling panel is cut at the PANEL, and a height
+         measured off the window would hang out of it exactly as before.
+       - **It opens upwards where there is more room above**, which is the
+         only answer for a row at the very bottom — there is no amount of
+         height that fits under it.
+       - **It is re-measured while it is open.** The menu moves with the
+         button on a scroll, so a height worked out once goes stale the
+         moment anybody scrolls, and it would hang below the fold again.
+       - **The 260px in the stylesheet stays as a fallback**, for a menu
+         opened before this ever runs.                                    */
+    const MENU_GAP = 6;     // the 6px the stylesheet leaves under the button
+    const MENU_EDGE = 8;    // never flush against the edge it is cut at
+    const MENU_MIN = 140;   // under about three rows, look for room above
+
+    function clipBand(el) {
+        /* The band the menu has to stay inside: the window, narrowed by
+           every ancestor that clips its own overflow. BODY and HTML are
+           skipped — a page whose scroller is a fixed overlay leaves the
+           body at zero height, which would read as no room at all. */
+        let top = 0, bottom = window.innerHeight;
+        let n = el.parentElement;
+        while (n && n !== document.body && n !== document.documentElement) {
+            const cs = getComputedStyle(n);
+            if (cs.overflowY !== 'visible' || cs.overflowX !== 'visible') {
+                const r = n.getBoundingClientRect();
+                if (r.height > 0) {
+                    if (r.top > top) top = r.top;
+                    if (r.bottom < bottom) bottom = r.bottom;
+                }
+            }
+            n = n.parentElement;
+        }
+        return { top, bottom };
+    }
+
+    function placeMenu(wrap) {
+        if (!wrap || !wrap.isConnected) return;
+        const btn = wrap.querySelector('.cf-btn');
+        const menu = wrap.querySelector('.cf-menu');
+        if (!btn || !menu) return;
+        const r = btn.getBoundingClientRect();
+        const band = clipBand(wrap);
+        /* A MENU WHOSE BUTTON HAS SCROLLED OUT OF SIGHT IS CLOSED. It is
+           anchored to that button, so it goes on hanging where the button
+           now is -- off the screen, or floating over a part of the page
+           with nothing on it saying what it belongs to. */
+        if (r.bottom <= band.top || r.top >= band.bottom) {
+            menu.classList.add('hidden');
+            btn.classList.remove('open');
+            if (openWrap === wrap) openWrap = null;
+            return;
+        }
+        const below = band.bottom - r.bottom - MENU_GAP - MENU_EDGE;
+        const above = r.top - band.top - MENU_GAP - MENU_EDGE;
+        const up = below < MENU_MIN && above > below;
+        menu.classList.toggle('cf-up', up);
+        menu.style.maxHeight = Math.max(80, Math.floor(up ? above : below)) + 'px';
+    }
+
+    let openWrap = null;
+
     function closeAllMenus(exceptWrap) {
+        if (openWrap && openWrap !== exceptWrap) openWrap = null;
         document.querySelectorAll('.cf-wrap').forEach(wrap => {
             if (wrap === exceptWrap) return;
             wrap.querySelector('.cf-menu')?.classList.add('hidden');
@@ -226,6 +309,10 @@ select.cf-native-hidden{display:none!important;}
             closeAllMenus(wrap);
             menu.classList.toggle('hidden', !opening);
             btn.classList.toggle('open', opening);
+            /* Measured on OPEN, never once at build time: the room under a
+               row depends on where the page is scrolled to at that moment. */
+            if (opening) { openWrap = wrap; placeMenu(wrap); }
+            else openWrap = null;
         });
 
         select.parentNode.insertBefore(wrap, select);
@@ -262,6 +349,11 @@ select.cf-native-hidden{display:none!important;}
 
     function init() {
         skinAll(document);
+        /* The menu moves with its button, so a scroll ANYWHERE above it
+           invalidates the height worked out when it opened. Captured, so a
+           scroller inside the page counts and not only the window. */
+        window.addEventListener('scroll', () => { if (openWrap) placeMenu(openWrap); }, true);
+        window.addEventListener('resize', () => { if (openWrap) placeMenu(openWrap); });
         new MutationObserver((mutations) => {
             for (const m of mutations) {
                 m.addedNodes.forEach(node => {

@@ -960,11 +960,34 @@
        #mjm-ribbon that lived at the top and the audit-specific band that
        repeated similar navigation below it. The optional Back-End
        button that used to appear here for admin accounts is now reached
-       from the portal tile or the ribbon's back arrow. -->
+       from the portal tile on the hub. -->
   <nav class="fcr" role="navigation" aria-label="Auditor Portal">
-    <a class="fcr-back" href="https://ai.mjmnursery.com/index.html" aria-label="Back to portal" title="Back to portal">
-      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19 12H5"/><path d="m12 19-7-7 7-7"/></svg>
-    </a>
+    <!-- THE AUDITOR PORTAL IS A PAGE OF ITS OWN and has no way out but
+         Sign Out. The office asked for it in those words -- "remove the
+         back button in auditor portal. so the auditor portal will become
+         an individual webpage. It only link the data back to auditor
+         portal manage webpage" -- and the link that goes is the only
+         thing that was ever saying the portal and the back office are
+         one place. What joins them now is the DATA: every audit saved
+         here lands in audit_admin.html, its history, its alerts and its
+         monthly report. That is the whole of the connection and it is
+         the half that matters.
+
+         It is the mirror of the change that took "Visit 555 Auditor
+         Portal" off audit_admin.html, and it closes the loop: neither
+         page now carries a door into the other.
+
+         WHAT IT COSTS: an admin standing on the portal reaches the
+         manage page through the hub tile Nursery Audit System, not from
+         here. That is one door per page, which is the point.
+
+         The left cell stays, empty, as a SPACER -- the same thing
+         audit_admin.html puts there, and for the same reason it says in
+         its own words: the grid is 1fr auto 1fr, so the empty cell is
+         what balances the right-hand cluster and keeps the mark on the
+         bar's real centre line. Delete it and the brand slides into the
+         first column. display:none would collapse it and do the same. -->
+    <span class="fcr-spacer" aria-hidden="true"></span>
     <div class="fcr-brand">
       <div class="fcr-brand-name">555</div>
       <div class="fcr-brand-org">MJM Nursery</div>
@@ -1121,7 +1144,7 @@
 
 <script src="audit_lang.js?v=20261022e"></script>
 <script src="audit_supabase.js?v=20261027a"></script>
-<script src="audit_ribbon.js?v=20260826a"></script>
+<script src="audit_ribbon.js?v=20261028a"></script>
 <!-- Works out which plots still owe work, for the circles under each
      to-do row. Needs sb.select from audit_supabase.js above it. -->
 <script src="audit_pending.js?v=20261015a"></script>

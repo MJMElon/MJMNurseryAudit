@@ -37,12 +37,27 @@
      one. It used to name BNN exactly, which was true for as long as there
      was one Batu Niah — a second would have landed under "Not in a
      location" on the Location card, with nothing saying why.
-     UNE is not caught by it: the estate is UNE, not UNN. */
+     UNE is not caught by it: the estate is UNE, not UNN.
+
+     `maint` is WHETHER MAINTENANCE WORK IS DONE THERE, and it is a flag
+     rather than a list of exceptions. The payroll used to ask "is this
+     location not the estate", which is the shape of rule this system keeps
+     getting caught by: it was right for exactly as long as the estate was
+     the only place with no plots in it. Admin is the second, and a third
+     added next year must not quietly become a nursery to be sprayed. */
   var LOCATIONS = [
-    { key: 'pre',    name: 'Pre Nursery',  match: function (c) { return c === 'PN'; } },
-    { key: 'main',   name: 'Main Nursery',
+    { key: 'pre',    name: 'Pre Nursery',  maint: true,
+      match: function (c) { return c === 'PN'; } },
+    { key: 'main',   name: 'Main Nursery', maint: true,
       match: function (c) { return /^(BNN|UNN)\d*$/.test(c); } },
-    { key: 'estate', name: 'Estate',       match: function (c) { return c === 'UNE'; } }
+    { key: 'estate', name: 'Estate',       maint: false,
+      match: function (c) { return c === 'UNE'; } },
+    /* The office. Not a place with plots in it, so nobody filed here is on
+       a maintenance sheet or a piece-rate claim — same standing as the
+       estate, and for the same reason. It comes last because the board
+       reads left to right from the seedlings outwards. */
+    { key: 'admin',  name: 'Admin',        maint: false,
+      match: function (c) { return c === 'ADMIN'; } }
   ];
 
   /* The nursery sections the register has always used. operation_nurseries
@@ -53,6 +68,17 @@
     { code: 'BNN',  name: 'BNN — Batu Niah'   },
     { code: 'UNN1', name: 'UNN1 — Ulu Niah 1' },
     { code: 'UNN2', name: 'UNN2 — Ulu Niah 2' }
+  ];
+
+  /* The sections that are NOT nurseries, so operation_nurseries will never
+     hand them over and every screen has to add them itself. The Team Board
+     and the Location card each kept their own copy of that, which is to say
+     each kept the word UNE written down separately — and adding Admin to
+     one of them would have put a column on the board that the card reported
+     as "Not in a location". One list, read by both. */
+  var OFF_NURSERY = [
+    { code: 'UNE',   name: 'UNE'   },
+    { code: 'ADMIN', name: 'Admin' }
   ];
 
   function locationOf(c) {
@@ -78,11 +104,26 @@
     return { locations: out, unplaced: codes.filter(function (c) { return !used[c]; }) };
   }
 
+  /* Is maintenance work done in the section this code names?
+
+     A code in NO location answers NO, which is what the payroll has always
+     done with one and is deliberately kept: the claim offers a nursery to
+     be ticked and signed, and offering one this file cannot place is
+     offering a sheet nobody can reconcile. It shows on the Location card
+     under "Not in a location" instead, which is where somebody can see it
+     and say what it is. */
+  function isMaintSection(c) {
+    var loc = locationOf(c);
+    return !!loc && loc.maint !== false;
+  }
+
   global.MJMWorkerLocations = {
     code: code,
     locationOf: locationOf,
+    isMaintSection: isMaintSection,
     group: group,
     LOCATIONS: LOCATIONS,
-    KEEP_NURSERIES: KEEP_NURSERIES
+    KEEP_NURSERIES: KEEP_NURSERIES,
+    OFF_NURSERY: OFF_NURSERY
   };
 })(window);

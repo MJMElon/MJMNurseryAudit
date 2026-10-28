@@ -458,6 +458,13 @@
         supa.from('operation_nurseries').select('name, map_image_url').order('name'),
       ]);
       plots = Array.isArray(plotRes) ? plotRes : [];
+      /* A page that is not about replant plots can say so — PALMS does. Opt
+         in, because Life of Plot shares this map and a -R plot is real ground
+         with maintenance work on it there. The rule is MJMPalms's own, so the
+         map and the log cannot disagree about which plots are -R. */
+      if (lo.skipReplant && global.MJMPalms && MJMPalms.isReplantPlot) {
+        plots = plots.filter((p) => !MJMPalms.isReplantPlot(p.plot_name));
+      }
       /* B1, B2, … B10 — the way the nursery says them. The server orders by
          plot_name, which is text, so a plain sort gives B1, B10, B11, B2 and
          the office reads a list that jumps about. Sorted on the NUMBER, with

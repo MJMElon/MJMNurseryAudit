@@ -29,11 +29,21 @@
     var short = name.split(' ').slice(0, 2).join(' ');
     el.textContent = 'Welcome, ' + short;
   }
-  /* Where the ribbon's back arrow goes depends on who is looking. An
-     admin came in through the Auditor Portal Manage page and expects to
-     land back on it; everyone else came from the Nursery sector of the
-     MJM AI hub and expects that. Set at run time rather than in the
-     markup, because the same page serves both. */
+  /* NOTHING LIVE CARRIES A BACK ARROW ANY MORE, so this is a no-op on
+     every page that is actually served -- it returns on the first line
+     when there is no anchor to aim. audit_home.html gave its arrow up
+     when the office asked for the portal to be a page of its own, and
+     audit_admin.html never had one in that cell; the only markup left
+     is on audit_nursery_select.html, which redirects in its own head
+     and never renders. The function stays because that forwarder could
+     be un-cancelled, and because a rule is cheaper to keep than to work
+     out again.
+
+     What it does when there IS one: an admin came in through the
+     Auditor Portal Manage page and expects to land back on it;
+     everyone else came from the Nursery sector of the MJM AI hub and
+     expects that. Set at run time rather than in the markup, because
+     one page would serve both. */
   function aimBack(){
     var a = document.querySelector('.fcr-back');
     if (!a) return;

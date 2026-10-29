@@ -52,12 +52,20 @@
       match: function (c) { return /^(BNN|UNN)\d*$/.test(c); } },
     { key: 'estate', name: 'Estate',       maint: false,
       match: function (c) { return c === 'UNE'; } },
-    /* The office. Not a place with plots in it, so nobody filed here is on
-       a maintenance sheet or a piece-rate claim — same standing as the
-       estate, and for the same reason. It comes last because the board
-       reads left to right from the seedlings outwards. */
-    { key: 'admin',  name: 'Admin',        maint: false,
-      match: function (c) { return c === 'ADMIN'; } }
+    /* The office, and anybody else who works for the company rather than at
+       a nursery. Not a place with plots in it, so nobody filed here is on a
+       maintenance sheet or a piece-rate claim — same standing as the estate,
+       and for the same reason. It comes last because the board reads left to
+       right from the seedlings outwards.
+
+       IT IS CALLED OTHERS AND NOT ADMIN, because admin is a JOB. It was
+       ADMIN for a day, which put a place and a role under one word: the
+       Team Board now has an Admin ROW, and a column headed Admin beside it
+       would have been the same word answering two questions.
+       `shared/RUN_ME_worker_section_others.sql` moved the two people who
+       were filed under the old code. */
+    { key: 'others', name: 'Others',       maint: false,
+      match: function (c) { return c === 'OTHERS'; } }
   ];
 
   /* The nursery sections the register has always used. operation_nurseries
@@ -77,8 +85,8 @@
      one of them would have put a column on the board that the card reported
      as "Not in a location". One list, read by both. */
   var OFF_NURSERY = [
-    { code: 'UNE',   name: 'UNE'   },
-    { code: 'ADMIN', name: 'Admin' }
+    { code: 'UNE',    name: 'UNE'    },
+    { code: 'OTHERS', name: 'Others' }
   ];
 
   function locationOf(c) {

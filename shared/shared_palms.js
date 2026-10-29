@@ -45,7 +45,43 @@
 
   let FIRST_ACT = 1;    // Saringan Anak Bibit
   let LAST_ACT = 11;    // Pengambilan
-  const TARGET_DAYS = 15; // the speed incentive: Saringan → Transplanting
+  /* THE TARGET IS THE OFFICE'S, AND IT IS ONE NUMBER. The run it measures
+     — Saringan Anak Bibit to the end of Transplanting — is the same run the
+     Motion Study times and the same run Culling Monitoring pays for, and
+     this comment has said so since it was written. So it is kept HERE, in
+     the module that owns the timing, and everything reads it live rather
+     than taking a copy at load: a page that captured it would go on
+     drawing 15 beside a figure worked out against 12.
+
+     It is DATED in the table like the prices beside it, because a target
+     changed in October must not move what September came to. `loadTarget`
+     picks the one in force for a month; with no month it is today, which
+     is what "now" means on the Motion Study. */
+  let TARGET_DAYS = 15;
+  function setTargetDays(n) {
+    const v = Number(n);
+    if (Number.isFinite(v) && v > 0) TARGET_DAYS = v;
+    return TARGET_DAYS;
+  }
+  /* FAILS OPEN. No table, an RLS refusal, no signal — the target stays at
+     whatever it already was, and every plot is timed exactly as it was
+     timed before. A target that fell to nought because a read failed would
+     take every plot off the incentive at once. */
+  async function loadTarget(supa, ym) {
+    if (!supa) return TARGET_DAYS;
+    const month = ym || (() => { const d = new Date();
+      return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0'); })();
+    const res = await supa.from('nops_cull_monitoring_rate').select('kind, from_month, rm')
+      .then(r => r, e => ({ error: e }));
+    if (!res || res.error || !res.data) return TARGET_DAYS;
+    let best = null;
+    res.data.forEach(r => {
+      if (r.kind !== 'target' || String(r.from_month || '') > month) return;
+      if (!best || String(r.from_month || '') > String(best.from_month || '')) best = r;
+    });
+    if (best) setTargetDays(best.rm);
+    return TARGET_DAYS;
+  }
 
   const actByN = (n) => ACTIVITIES.find((a) => a.n === n) || null;
 
@@ -740,7 +776,11 @@
     ACTIVITIES: ACTIVITIES,
     FIRST_ACT: FIRST_ACT,
     LAST_ACT: LAST_ACT,
-    TARGET_DAYS: TARGET_DAYS,
+    /* A GETTER, not a value: the office can change it, and a caller that
+       took a copy at load would go on drawing the old number. */
+    get TARGET_DAYS() { return TARGET_DAYS; },
+    setTargetDays: setTargetDays,
+    loadTarget: loadTarget,
     actByN: actByN,
     addDays: addDays,
     diffDays: diffDays,

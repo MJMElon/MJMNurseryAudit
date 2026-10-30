@@ -287,12 +287,30 @@
     const cutoff = asOf == null ? Infinity : asOf;
 
     const per = {};
+    /* A 2ND CULLING THE CUT-OFF LEFT OUT, counted rather than dropped in
+       silence. The office looked at a P & D row and said the 2nd culling was
+       not being considered — and a figure that has had nothing taken off
+       reads exactly like a figure with no culling to take off. The two are
+       different facts and only one of them is a question.
+
+       This is NOT in the arithmetic and must not be: a culling dated after
+       the day somebody sprayed had not happened when they sprayed, and the
+       seedlings were standing. It is here so a screen can SAY so. */
+    let cull2Later = 0, laterOn = null;
     for (const ev of _events) {
       if (ev.plotKey !== pk) continue;
       if (wanted.length && !wanted.includes(ev.batchKey)) continue;
       // Only movement up to the work date counts — anything dated later had
       // not happened yet, so those seedlings were still standing.
-      if (ev.ms > cutoff) continue;
+      if (ev.ms > cutoff) {
+        if (ev.type === '2nd_Culling') {
+          cull2Later += Math.abs(Number(ev.qty || 0));
+          // The EARLIEST one left out, which is the next thing that would
+          // move this figure if the work date were a day later.
+          if (laterOn == null || ev.ms < laterOn) laterOn = ev.ms;
+        }
+        continue;
+      }
       (per[ev.batchKey] ||= { evs: [], label: ev.batch }).evs.push(ev);
     }
     const keep2 = !!(opts && opts.keepCull2);
@@ -320,7 +338,14 @@
          standing — so a screen can say WHY an interrow row reads higher than
          the P & D row beside it on the same plot and the same day. */
       cull2: Math.round(cull2),
-      keptCull2: keep2 && cull2 > 0
+      keptCull2: keep2 && cull2 > 0,
+      /* Taken off this figure, which is every job but interrow. Stated
+         rather than left to be inferred from a number nobody can check. */
+      cull2Off: keep2 ? 0 : Math.round(cull2),
+      /* And the one the date left out — see the loop above. `cull2LaterOn`
+         is the day it is dated, as YYYY-MM-DD, so the screen can name it. */
+      cull2Later: Math.round(cull2Later),
+      cull2LaterOn: laterOn == null ? null : new Date(laterOn).toISOString().slice(0, 10)
     };
   }
 

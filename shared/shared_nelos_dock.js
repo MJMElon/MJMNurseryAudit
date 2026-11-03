@@ -1087,8 +1087,14 @@
              filled in by the routing rule when a work is chosen. Changing
              either afterwards overrides the rule for this one case, which
              is the whole reason they are still here and not a line of
-             text. */
-          '<div class="nd-fld nd-2">' +
+             text.
+
+             AND THE ROW IS NOT ON SCREEN UNTIL IT HAS AN ANSWER — see
+             showDest(). Standing open over an unchosen work it asked a
+             question the form was about to answer itself, which read as
+             two contradictory instructions: pick who solves this, over a
+             Work list full of jobs this system does not solve. */
+          '<div class="nd-fld nd-2" id="nd-f-dest" hidden>' +
             '<div>' +
               '<label class="nd-lbl" for="nd-f-to">Assign to</label>' +
               '<select class="nd-in" id="nd-f-to">' +
@@ -2369,6 +2375,7 @@
       onNursery();
       formEl.querySelector('#nd-f-plot').value = editing.plot_name || '';
       formEl.querySelector('#nd-f-desc').value = editing.description || '';
+      showDest();
       return;
     }
     /* The work list is the raising system's, so it can be drawn before
@@ -2376,6 +2383,7 @@
        WORK is the first question now, because the destination follows from
        it. */
     onAssignTo();
+    showDest();
     setTimeout(function () {
       var first = worksFor(sourceModule()).length
         ? formEl.querySelector('#nd-f-work') : to;
@@ -2431,14 +2439,33 @@
      Changing the destination afterwards still overrides it, which is the
      whole reason that select is still here.
 
-     No rule, or no nelos_routes to read, leaves both exactly as they are. */
+     NO RULE FALLS BACK TO THE SYSTEM THAT RAISED IT, which is what the
+     footer on Case Routing promises in those words and what
+     nelos_route_case() does with a case that names no queue. Left as it
+     was instead, the row would reveal whatever the LAST work put there —
+     a destination that is nobody's answer, reading as if it were one.
+     Nelos itself is the exception, as it is in the dashboard's routedTo():
+     the case log is not a queue anybody works, so there is nothing to fall
+     back to and the row asks.
+
+     NO nelos_routes TO READ leaves both exactly as they are, which is the
+     fail-open every other gate here follows: a list that could not be
+     fetched must not move an answer somebody gave. */
   function onWork() {
     var work = formEl.querySelector('#nd-f-work').value;
-    if (!work) return;
-    var rule = routeFor(sourceModule(), work);
-    if (!rule || !rule.to_module) return;
-
     var to = formEl.querySelector('#nd-f-to');
+    if (!work) { showDest(); return; }
+
+    var rule = routeFor(sourceModule(), work);
+    if (!rule || !rule.to_module) {
+      if ((_routes || []).length) {
+        var home = sourceModule() === 'nelos' ? '' : sourceModule();
+        if (to.value !== home) { to.value = home; onAssignTo(); }
+      }
+      showDest();
+      return;
+    }
+
     if (to.value !== rule.to_module) {
       to.value = rule.to_module;
       onAssignTo();                       // the PIC list belongs to the system
@@ -2450,6 +2477,31 @@
         Array.prototype.some.call(pic.options, function (o) { return o.value === rule.to_user_id; })) {
       pic.value = rule.to_user_id;
     }
+    showDest();
+  }
+
+  /* WHO SOLVES IT IS SHOWN ONCE THERE IS SOMETHING TO SHOW, and the office
+     said what the old screen read like: a box headed "Assign to" standing
+     open above a Work list full of jobs the raising system does not solve.
+     Two instructions, and the form was about to answer one of them itself.
+
+     Three ways there is something to show, and the last is the one that is
+     easy to drop:
+
+       1. a WORK is chosen, so the rule has had its say and the answer is
+          there to be read — and overridden, which is why these are still
+          selects and not a line of text;
+       2. an existing case is being EDITED, where the destination is a fact
+          about that case rather than a question;
+       3. there is NO work list to choose from — a system with no case
+          titles set up falls back to a typed line, nothing derives a
+          destination from a sentence somebody typed, and the person has to
+          say where it goes. Hidden there, the form could not be filled in
+          at all. */
+  function showDest() {
+    var work = formEl.querySelector('#nd-f-work');
+    formEl.querySelector('#nd-f-dest').hidden =
+      !(editing || work.hidden || work.value);
   }
 
   function onNursery() {
@@ -2579,13 +2631,19 @@ async function uploadPhoto(token) {
     var fromList = !workSel.hidden;
     var title    = fromList ? workSel.value : typedEl.value.trim();
 
-    if (!assignTo) return formError('Choose who this is for.');
+    /* THE WORK IS ASKED FIRST, because it is the first question on the
+       screen and the destination is hidden until it has been answered. The
+       other order refused with "Choose who this is for" over a box that is
+       not on the form — a refusal pointing at nothing, which is worse than
+       no refusal. Once a work is chosen the row is showing, so the second
+       message always names something the person can see. */
     if (!title) {
       if (fromList) return formError('Choose the work.');
       formError('Say what the case is.');
       typedEl.focus();
       return;
     }
+    if (!assignTo) return formError('Choose who this is for.');
 
     var btn = panel.querySelector('.nd-save');
     var reset = function () {

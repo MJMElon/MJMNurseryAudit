@@ -357,6 +357,7 @@ async function sbFetch(path, options = {}) {
       'Authorization': `Bearer ${token || SUPA_KEY}`,
       'Content-Type': 'application/json',
       'Prefer': options.prefer || 'return=representation',
+      ...(options.range ? { 'Range-Unit': 'items', 'Range': options.range } : {}),
       ...(options.headers || {})
     }
   });
@@ -397,11 +398,70 @@ function _rememberNoCreatedAt(table) {
   catch (e) {}
 }
 
+/* ── A READ OVER 1,000 ROWS CAME BACK CUT, AND SAID NOTHING ──
+   PostgREST answers at most `db-max-rows` rows and Supabase sets that to
+   1,000. There is no error and no flag on the body: the read simply ends,
+   and the caller gets a short list that looks exactly like a short month.
+
+   The Monthly Audit Report is where it showed. October held 1,783
+   maintenance audits and the report drew **1,000** of them — a figure the
+   office read as the month's work. 783 records, on no report, with
+   nothing anywhere saying so.
+
+   So every select PAGES. It asks for `PAGE` rows at a time through the
+   Range header and stops when a page comes back short, which is the only
+   signal there is that the end has been reached.
+
+   Three things in it:
+
+   - **A FULL LAST PAGE IS NOT THE END.** A table holding exactly 2,000
+     rows answers the second page full, so the loop has to ask a third
+     time and get nothing. Stopping on a full page would lose a round
+     number of rows, which is the same fault one page along.
+   - **THE ROWS ARE DE-DUPED ON `id`.** `order=created_at.desc` leaves
+     rows written in the same millisecond in no defined order — a phone
+     pushes a plot batch by batch in ONE insert — so the same row can
+     answer on two pages while another is skipped. The skip cannot be
+     repaired from here, but a row counted twice can, and it is the one
+     that would double a figure. A table with no `id` is left as it comes.
+   - **IT STOPS AT `MAX_PAGES` AND SAYS SO.** A loop with no ceiling on a
+     read that keeps answering full is a page that hangs for ever. 50
+     pages is 50,000 rows, far past anything this module asks for, and
+     reaching it is logged as the fault it would be. */
+const SB_PAGE = 1000;
+const SB_MAX_PAGES = 50;
+
+async function sbSelectAll(path) {
+  const out = [];
+  const seen = new Set();
+  let dropped = 0;
+  for (let page = 0; page < SB_MAX_PAGES; page++) {
+    const from = page * SB_PAGE;
+    const rows = await sbFetch(path, { range: from + '-' + (from + SB_PAGE - 1) });
+    if (!Array.isArray(rows)) return rows;
+    for (const r of rows) {
+      const id = r && r.id;
+      if (id === undefined || id === null) { out.push(r); continue; }
+      if (seen.has(id)) { dropped++; continue; }
+      seen.add(id);
+      out.push(r);
+    }
+    /* Short page is the end. A FULL one never is, even if it is the last
+       row in the table -- the next ask is what says so. */
+    if (rows.length < SB_PAGE) {
+      if (dropped) console.warn('[sb] ' + dropped + ' repeated row(s) dropped while paging', path);
+      return out;
+    }
+  }
+  console.warn('[sb] stopped at ' + (SB_MAX_PAGES * SB_PAGE) + ' rows -- the read is still answering full pages', path);
+  return out;
+}
+
 const sb = {
   async select(table, query = '') {
-    if (_noCreatedAt.has(table)) return sbFetch(`${table}?${query}`);
+    if (_noCreatedAt.has(table)) return sbSelectAll(`${table}?${query}`);
     try {
-      return await sbFetch(`${table}?${query}&order=created_at.desc`);
+      return await sbSelectAll(`${table}?${query}&order=created_at.desc`);
     } catch (e) {
       /* Some audit tables were made by hand and have no created_at. PostgREST
          rejects the whole read with a 400 on the order clause, which reaches
@@ -411,7 +471,7 @@ const sb = {
       if (/created_at/.test(e.message) && /42703|does not exist/i.test(e.message)) {
         console.warn('[sb] no created_at on', table, '— reading unordered');
         _rememberNoCreatedAt(table);
-        return await sbFetch(`${table}?${query}`);
+        return await sbSelectAll(`${table}?${query}`);
       }
       throw e;
     }

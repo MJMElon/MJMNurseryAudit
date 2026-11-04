@@ -232,8 +232,13 @@ input.input:focus{border-color:var(--green);background:var(--card);
 .mod-block{border-top:1px solid var(--line)}
 .mod-block-head{padding:12px 20px;background:#f8fafc;display:flex;align-items:center;
                 justify-content:space-between;gap:10px}
+/* margin-right:auto rather than a third flex rule. The head is
+   space-between, which with the name, the badge and the maintenance note
+   would stand the badge in the MIDDLE of the row; an auto margin eats the
+   free space instead, so the name stays left and the badge keeps its note
+   beside it. With two children it changes nothing at all. */
 .mod-block-name{font-size:11.5px;font-weight:900;color:var(--ink);letter-spacing:.05em;
-                text-transform:uppercase}
+                text-transform:uppercase;margin-right:auto}
 
 /* ── TABLE ── */
 .tbl-wrap{overflow-x:auto}
@@ -264,6 +269,20 @@ input.input:focus{border-color:var(--green);background:var(--card);
 .rec-table th.grp{text-align:center;border-left:1px solid var(--line)}
 .badge-papan{background:#fff3e0;color:var(--papan)}
 .badge-maint{background:#fce4ec;color:var(--maint)}
+/* The admin tag on a Done By cell, and the note on the block head that
+   says the table was narrowed. Both print: the note is the only thing on
+   a printed sheet that says the month held more than is on it. */
+.doneby-tag{display:inline-block;margin-left:6px;padding:1px 7px;border-radius:20px;
+            background:#f1f5f9;color:#475569;font-size:10px;font-weight:700;
+            text-transform:uppercase;letter-spacing:.4px;vertical-align:middle}
+.mod-block-note{font-size:11px;font-weight:600;color:#b45309}
+/* The case id is an IDENTIFIER and never a quantity, so it is set in the
+   figures of a mono face and muted: somebody running down the column is
+   asking whether two rows differ, not reading a number. It does not wrap --
+   an id broken over two lines reads as two ids. */
+.case-id{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+         font-size:11px;color:#64748b;white-space:nowrap;letter-spacing:-.2px}
+.case-none{font-size:11px;color:#b45309;font-weight:600}
 .badge-batch{background:#ede7fb;color:var(--batch)}
 /* The four age figures, inside the section rather than up with the page's
    own summary: they are about these batches, not about the report. */
@@ -490,6 +509,34 @@ body.is-full #btn-full{display:none}
               <label class="tick-chip"><input type="checkbox" class="mod-cb" onchange="toggleMod(this,'bheight')">📦 Height by Batch</label>
             </div>
           </div>
+
+          <!-- MAINTENANCE IS THE ONE MODULE WHOSE TABLE HOLDS TWO
+               DIFFERENT ACTS. An auditor walks the plot and answers
+               Satisfied or Unsatisfied; an ADMIN closes a cold task from
+               the to-do board, which writes an ordinary row here with
+               result "Closed by admin" -- deliberately, so the closure
+               carries a name and a date like any other record. The office
+               asked to be able to tell them apart: "we want to filter to
+               see the cases closed by auditor, now it can view the cases
+               closed by admin also".
+
+               BOTH START TICKED, which is exactly what the report has
+               always shown, so nothing moves for anybody until somebody
+               unticks one. That is the opposite of the Nursery and Module
+               rows above, and on purpose: those ask WHICH REPORT to draw
+               and an empty tick there is "forgot to pick", while this one
+               narrows a report already asked for.
+
+               The row is hidden unless Maintenance is ticked -- a filter
+               for a module that is not in the report is a control that
+               does nothing. -->
+          <div id="f-doneby-row" style="display:none">
+            <div class="filter-label" style="margin:0 0 8px">Maintenance — Done By</div>
+            <div class="tick-row" id="f-doneby-chips">
+              <label class="tick-chip"><input type="checkbox" class="f-doneby-cb" value="auditor" checked>🔧 Audited by auditor</label>
+              <label class="tick-chip"><input type="checkbox" class="f-doneby-cb" value="admin" checked>🗂️ Closed by admin</label>
+            </div>
+          </div>
           <button class="btn-generate" onclick="generateReport()">
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
             <span>Generate Report</span>
@@ -535,8 +582,8 @@ body.is-full #btn-full{display:none}
 
 </div>
 <script src="audit_lang.js?v=20261022e"></script>
-<script src="audit_supabase.js?v=20261027a"></script>
-<script src="audit_dexie_offline.js?v=20261008b"></script>
+<script src="audit_supabase.js?v=20261104a"></script>
+<script src="audit_dexie_offline.js?v=20261104b"></script>
 <!-- Welcome-name fill for the shared FC ribbon. -->
 <script src="audit_ribbon.js?v=20261028a"></script>
 <script>
@@ -565,6 +612,38 @@ const selectedMods=new Set();
 // .checked is the state, not a class toggled by hand on the label.
 function toggleMod(cb,mod){
   if(cb.checked) selectedMods.add(mod); else selectedMods.delete(mod);
+  if(mod==='maint'){
+    const row=document.getElementById('f-doneby-row');
+    if(row) row.style.display=cb.checked?'':'none';
+  }
+}
+
+/* WHO DID IT -- the third copy of this string.
+   audit_home.html WRITES it on an admin closure and
+   audit_maintenance_script.js colours it grey so a closed task does not
+   read as the amber that means waiting. Change one, change all three, and
+   never change the STRING: a row written before would keep the old
+   wording and fall on the wrong side of this filter for ever. */
+const MAINT_CLOSED_RESULT = 'Closed by admin';
+
+/* The row decides, off the result it was SAVED with -- never off the
+   auditor_name, which both kinds carry (the admin closure writes the
+   admin who pressed the button, which is the point of it). */
+function maintDoneBy(r){
+  return (r && r.result === MAINT_CLOSED_RESULT) ? 'admin' : 'auditor';
+}
+
+/* Read off the DOM at generate time, the same way selectedAuditNurseries
+   is, rather than kept in a Set that has to be held in step.
+   NEITHER TICKED is every maintenance row dropped, and that is correct:
+   somebody has unticked both on purpose, and the empty table says so
+   under its own heading. */
+function selectedDoneBy(){
+  return [...document.querySelectorAll('.f-doneby-cb:checked')].map(cb=>cb.value);
+}
+
+function filterByDoneBy(rows,kinds){
+  return (rows||[]).filter(r=>kinds.indexOf(maintDoneBy(r))!==-1);
 }
 
 // Nursery — Pre-Nursery / BNN / UNN 1 / UNN 2 — same tick-chip idea as
@@ -659,7 +738,7 @@ async function fetchData(month,year){
   if(selectedMods.has('height')||selectedMods.has('bheight'))
                                  tasks.push(sb.select('audit_height_records', `select=record_id,nursery,plot,batch,sample_1,sample_2,sample_3,avg_height,auditor_name,date&${df}`).then(r=>out.height=r).catch(()=>out.height=[]));
   if(selectedMods.has('papan'))  tasks.push(sb.select('audit_papan_audits',   `select=audit_id,nursery,plot,batch_no,presence,info_correct,condition,auditor_name,date&${df}`).then(r=>out.papan=r).catch(()=>out.papan=[]));
-  if(selectedMods.has('maint'))  tasks.push(sb.select('audit_maintenance_audits',`select=audit_id,nursery,plot,task_type,result,auditor_name,date&${df}`).then(r=>out.maint=r).catch(()=>out.maint=[]));
+  if(selectedMods.has('maint'))  tasks.push(sb.select('audit_maintenance_audits',`select=audit_id,task_id,nursery,plot,task_type,result,auditor_name,date&${df}`).then(r=>out.maint=r).catch(()=>out.maint=[]));
   await Promise.all(tasks);
   return out;
 }
@@ -721,12 +800,37 @@ const MOD_COLS={
     {h:'Info',     v:r=>r.info_correct||'—'},
     {h:'Height',   v:r=>r.condition||'—'}
   ],
+  /* `auditor_name` was in the select from the day this table was written
+     and in none of its columns, so the one question the office actually
+     asks of a maintenance record -- who did this -- could only be
+     answered out of the database. It is a column now, and it names the
+     ADMIN on a closure, because the closure writes whoever pressed the
+     button. */
   maint:[
-    {h:'#',      v:(r,i)=>i+1, label:'Record', num:true},
-    {h:'Date',   v:r=>fmtDate(r.date)},
-    {h:'Plot',   v:r=>`<b>${esc(r.plot)}</b>`,     raw:true},
-    {h:'Task',   v:r=>r.task_type||'—'},
-    {h:'Result', v:r=>r.result||'—'}
+    {h:'#',       v:(r,i)=>i+1, label:'Record', num:true},
+    {h:'Date',    v:r=>fmtDate(r.date)},
+    {h:'Plot',    v:r=>`<b>${esc(r.plot)}</b>`,     raw:true},
+    {h:'Task',    v:r=>r.task_type||'—'},
+    /* THE CASE, because without it three rows reading B01 / Weeding /
+       Unsatisfactory on one day are indistinguishable on screen -- and the
+       office has now asked twice whether the report is counting one case
+       three times. It is not: a maintenance task comes from ONE work
+       record, so a plot weeded by three workers, or over three batches, is
+       three tasks and three audits, and all three belong here. There is
+       also a UNIQUE index on task_id (RUN_ME_remove_duplicate_audits.sql),
+       so two rows CANNOT share a case any more -- which makes this column
+       a proof rather than a label: three different numbers are three
+       different cases, by construction.
+
+       A sentence under the table saying all that would be the screen
+       arguing for a figure. The column simply shows it. */
+    {h:'Case',    v:r=>r.task_id==null ? '<span class="case-none">no case</span>'
+                                       : `<span class="case-id">${esc(String(r.task_id))}</span>`,
+                  raw:true},
+    {h:'Result',  v:r=>r.result||'—'},
+    {h:'Done By', v:r=>esc(r.auditor_name||'—')
+                       + (maintDoneBy(r)==='admin'
+                           ? ' <span class="doneby-tag">admin</span>' : ''), raw:true}
   ]
 };
 
@@ -1073,6 +1177,12 @@ function buildTable(cols, rows, noun){
    lists are not divided by nursery and its figures are about the batch. */
 const NURSERY_MODS=['plot','height','papan','maint'];
 
+/* Set by generateReport when the Done By tick took rows out, and read by
+   buildNurserySection a moment later -- the same shape selectedMods
+   already has, rather than threading one more argument through a
+   function every module shares. Null means nothing was narrowed. */
+let _maintNarrowed = null;
+
 function buildNurserySection(label, sub, headClass, data, nurseries){
   const mods=[...selectedMods].filter(m=>NURSERY_MODS.indexOf(m)>=0);
   const modLabels={plot:'📋 Plot Condition',height:'📏 Seedling Height',papan:'🪧 Papan Tanda',maint:'🔧 Maintenance'};
@@ -1087,6 +1197,7 @@ function buildNurserySection(label, sub, headClass, data, nurseries){
         <div class="mod-block-head">
           <span class="mod-block-name">${modLabels[mod]}</span>
           <span class="badge ${modBadge[mod]}">${fmtNum(rows.length)} records</span>
+          ${mod==='maint'&&_maintNarrowed?`<span class="mod-block-note">${esc(_maintNarrowed)}</span>`:''}
         </div>
         <div class="mod-block-body">${buildModTable(mod,rows)}</div>
       </div>`;
@@ -1133,6 +1244,30 @@ async function generateReport(){
     // (summary counts, the nursery-section tables) ever sees them, so
     // there's exactly one place this filter has to be applied.
     if(plotQuery) for(const m of ['plot','height','papan','maint']) if(data[m]) data[m]=filterByPlot(data[m],plotQuery);
+    /* Narrowed in the SAME place and for the same reason: every figure
+       downstream -- the summary card, the section total, the records
+       badge and the table itself -- is counted off data.maint, so a
+       filter applied anywhere else would leave one of them disagreeing
+       with the rest. */
+    const doneBy=selectedDoneBy();
+    if(selectedMods.has('maint')&&data.maint){
+      const before=data.maint.length;
+      data.maint=filterByDoneBy(data.maint,doneBy);
+      /* A REPORT SHORT OF ROWS HAS TO SAY WHY. Printed, this sheet is
+         read by somebody adding up, and a maintenance table narrowed to
+         one kind is indistinguishable from a month that only had that
+         kind in it. Said only where it NARROWED something -- a note on a
+         report nothing was taken out of is a note nobody reads. */
+      const dropped=before-data.maint.length;
+      _maintNarrowed = dropped>0
+        ? (doneBy.length===0
+            ? 'all '+fmtNum(before)+' hidden — nothing ticked under Done By'
+            : 'showing '+(doneBy.indexOf('admin')!==-1?'admin closures':'auditor audits')
+              +' only — '+fmtNum(dropped)+' other '+(dropped===1?'record':'records')+' hidden')
+        : null;
+    } else {
+      _maintNarrowed = null;
+    }
     const countAll=(d,n)=>[...selectedMods].filter(m=>NURSERY_MODS.indexOf(m)>=0)
                                            .reduce((s,m)=>s+(filterByNursery(d[m],n).length),0);
     /* The ledger reads are the one part of this report that can fail on its

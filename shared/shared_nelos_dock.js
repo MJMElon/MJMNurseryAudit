@@ -1614,12 +1614,16 @@
     } catch (_) { return (_routes = []); }
   }
 
-  /* The rule for one piece of work, asked exactly the way nelos_route_case()
-     asks it: the category's own rule first, then the section default. */
-  function routeFor(source, work) {
-    var list = (_routes || []).filter(function (r) { return r.source_module === source; });
-    return list.filter(function (r) { return r.category === work; })[0] ||
-           list.filter(function (r) { return !r.category; })[0] || null;
+  /* A SECTION DEFAULT, which is all of nelos_routes that is still live.
+     A per-category row there is inert: the title names its own solver now
+     and both this form and nelos_route_case() read that first. What a
+     default still answers is a title neither knows — a line somebody
+     typed — and the office may have set one, so it is asked in the same
+     order the trigger asks it. */
+  function defaultRouteFor(source) {
+    return (_routes || []).filter(function (r) {
+      return r.source_module === source && !r.category;
+    })[0] || null;
   }
 
   async function loadCategories() {
@@ -1627,8 +1631,15 @@
     var token = await accessToken();
     if (!token) return (_cats = []);
     try {
+      /* EVERY COLUMN, not the five this reads. raise_modules, pic_seat_no
+         and pic_user_id arrive with
+         RUN_ME_nelos_routing_is_the_category.sql, and naming a column a
+         table has not got is not an empty cell in PostgREST — the whole
+         select comes back 400 and the Work list is empty, on every page the
+         dock is on. nelos_user_setting.html reads this table the same way
+         for the same reason. */
       var res = await fetch(CFG.url + '/rest/v1/nelos_categories' +
-                            '?select=name,module_key,default_priority,default_days&active=is.true' +
+                            '?select=*&active=is.true' +
                             '&order=sort_order.asc,name.asc', { headers: authHeaders(token) });
       if (!res.ok) return (_cats = []);
       var rows = await res.json();
@@ -1671,8 +1682,14 @@
     var token = await accessToken();
     if (!token) return (_people = []);
     try {
+      /* seat_no as well as the pin, because the PIC the office sets on Case
+         Routing is a SEAT ("Admin 2") and the box on this form is a PERSON
+         — so the seat has to be resolved to whoever holds it. Asked as
+         `*` for the same reason the categories are: seat_no arrives with
+         migration_nelos_seats.sql and naming it on a database without it
+         empties the PIC list instead of leaving out one field. */
       var res = await fetch(CFG.url + '/rest/v1/nelos_handlers' +
-                            '?select=user_id,full_name,email,primary_module',
+                            '?select=*',
                             { headers: authHeaders(token) });
       if (!res.ok) return (_people = []);
       var rows = await res.json();
@@ -1680,35 +1697,92 @@
     } catch (_) { return (_people = []); }
   }
 
-  /* That system's own case titles. nelos_categories.module_key scopes
-     them, which is the whole point of that column — the Audit Portal
-     should not be offering "Height Shortfall". */
-  function worksFor(moduleKey) {
-    if (!moduleKey) return [];
-    return (_cats || []).filter(function (c) { return c.module_key === moduleKey; });
+  /* "ANY SYSTEM MAY RAISE THIS." A sentinel inside raise_modules rather
+     than a column of its own: three readers ask this question — this file,
+     the Admin Portal copy of this form, and the Case Routing screen — and
+     one array is one thing for each of them to read. */
+  var ANY_SYSTEM = '*';
+
+  /* MAY THIS SYSTEM RAISE THIS TITLE? Three states, and all three are real:
+       • raise_modules absent or null — nobody has been asked, which is not
+         a no anywhere in this system. A database that has not run
+         RUN_ME_nelos_routing_is_the_category.sql answers this for every
+         title, so the Work list goes on offering everything rather than
+         emptying itself over a column.
+       • a single star — any system.
+       • an empty array — nobody raises it by hand. An automatic title
+         wants exactly this, and it is why the empty case must NOT be
+         folded in with the absent one above. */
+  function mayRaiseFrom(c, moduleKey) {
+    var rm = c.raise_modules;
+    if (rm === undefined || rm === null) return true;
+    if (!rm.length) return false;
+    return rm.indexOf(ANY_SYSTEM) >= 0 || rm.indexOf(moduleKey) >= 0;
   }
 
-  /* WHICH LIST THE WORK DROPDOWN IS FILLED FROM, and it is the system
-     RAISING the case, not the one it is being sent to.
+  /* The case titles this system may raise. It used to be the titles the
+     system OWNED (nelos_categories.module_key), and that column turned
+     over: it is the system that SOLVES a title now, and who may raise one
+     is the From System tick list on Case Routing. */
+  function worksFor(moduleKey) {
+    if (!moduleKey) return [];
+    return (_cats || []).filter(function (c) { return mayRaiseFrom(c, moduleKey); });
+  }
 
-     It was the destination, and that is what the office walked into: on the
-     FC Portal, choosing "give this to Admin" offered ADMIN's titles, so
-     "Request Transplanting Signboard" — an FC Portal title, set up under FC
-     Portal on Case Routing, with a rule saying Admin Portal solves it —
-     could not be chosen from the FC Portal at all. The screen that lists
-     the titles under the system that raises them and the form that asked
-     the question the other way round were two answers to one question.
+  /* WHICH LIST THE WORK DROPDOWN IS FILLED FROM: the titles the system this
+     case is being raised in is allowed to raise. Nothing else.
 
-     The destination falls OUT of the work now, from the rule the office
-     set, which is what that screen is for.
+     It was the DESTINATION's titles once, which is what the office walked
+     into: on the FC Portal, choosing "give this to Admin" offered ADMIN's
+     titles, so a title set up for the FC Portal to raise could not be
+     chosen from the FC Portal at all. It was then the raising system's OWN
+     titles, which was right as far as it went and still asked the question
+     of a column that meant something else.
 
-     A system with no titles of its own still falls back to the
-     destination's, so raising a case from the hub — where the source is
-     Nelos itself — goes on working exactly as it did. */
+     IT NEEDS NO FALLBACK ANY MORE, and that is the measure of the change. A
+     system with no titles of its own used to borrow the destination's, a
+     crutch for the hub — where the source is Nelos itself and Nelos owns
+     nothing. A title the office has left open to any system is in every
+     Work list including that one, so the hub is answered by the rule rather
+     than by an exception. Where the list really is empty the form falls
+     back to a typed line, as it already did. */
   function workList() {
-    var mine = worksFor(sourceModule());
-    if (mine.length) return mine;
-    return worksFor(formEl.querySelector('#nd-f-to').value);
+    return worksFor(sourceModule());
+  }
+
+  /* THE ROW BEHIND THE CHOSEN WORK, and it is taken out of the list the
+     person was actually shown. Two titles can be spelled the same under two
+     different solvers, which is the one thing that makes routing a guess —
+     the SQL check names any that exist — and asking the list on screen
+     resolves it the way the person saw it rather than by picking one. */
+  function workRow(name) {
+    if (!name) return null;
+    return workList().filter(function (x) { return x.name === name; })[0] || null;
+  }
+
+  /* THE SEAT THE OFFICE SET FOR THE CHOSEN WORK, and only while the
+     destination is still the one the title names. Overriding Assign to
+     sends this one case to another system, where that number is a
+     different person or nobody at all — so the seat does not travel with
+     it, and the whole of the new queue takes the case. */
+  function seatOfWork() {
+    var row = workRow(formEl.querySelector('#nd-f-work').value);
+    if (!row || row.pic_seat_no == null) return null;
+    if (formEl.querySelector('#nd-f-to').value !== row.module_key) return null;
+    return Number(row.pic_seat_no);
+  }
+
+  /* WHO HOLDS A SEAT, e.g. who "Admin 2" is. The office sets the PIC on
+     Case Routing as a seat, because a seat is a job and outlasts whoever is
+     sitting in it; the box on this form names a person. Nobody in that
+     seat answers empty, which leaves the PIC unset — the whole queue takes
+     it, which is what no PIC has always meant. */
+  function seatHolder(moduleKey, seatNo) {
+    if (!moduleKey || seatNo == null || seatNo === '') return '';
+    var p = (_people || []).filter(function (x) {
+      return x.primary_module === moduleKey && Number(x.seat_no) === Number(seatNo);
+    })[0];
+    return p ? String(p.user_id) : '';
   }
 
   /* Sorted by name inside the system: the pin decides who is in the list,
@@ -2391,10 +2465,14 @@
     }, 60);
   }
 
-  /* Changing the system invalidates the two answers that hang off it.
-     The WORK list is one of them only where this system has no titles of
-     its own — see workList(). Where it has, the list is the same whatever
-     the destination says, and rebuilding it here is harmless. */
+  /* Changing the system invalidates the PIC, which is a list of the people
+     pinned to it.
+
+     THE WORK LIST IS NO LONGER ONE OF THEM. It is the titles the raising
+     system may raise, so the destination cannot change it — rebuilding it
+     here writes the same options back, and that is deliberately left in
+     rather than pulled apart: this runs on every path into the form, and a
+     list drawn in one place is one place for it to be wrong. */
   function onAssignTo() {
     var key = formEl.querySelector('#nd-f-to').value;
     var works = workList(), pics = picsFor(key);
@@ -2456,9 +2534,25 @@
     var to = formEl.querySelector('#nd-f-to');
     if (!work) { showDest(); return; }
 
-    var rule = routeFor(sourceModule(), work);
-    if (!rule || !rule.to_module) {
-      if ((_routes || []).length) {
+    /* THE TITLE NAMES THE QUEUE, so the page somebody is standing on
+       decides nothing. It used to be a rule keyed on (source, category) and
+       the source is the PAGE — so the same title raised from a page that
+       was not its own system matched no rule and the case stayed where it
+       was raised, which is the fault this answers. Asked in the same order
+       nelos_route_case() asks it: the title, then the section default, then
+       the system it was raised in. */
+    var row = workRow(work);
+    var dest = row && row.module_key;
+    if (!dest) {
+      var def = defaultRouteFor(sourceModule());
+      dest = def && def.to_module;
+    }
+
+    if (!dest) {
+      /* FAILS OPEN. Unreadable categories AND no routes at all is a
+         database that could not answer, not an answer of nobody — so both
+         boxes are left exactly as the person left them. */
+      if ((_cats || []).length || (_routes || []).length) {
         var home = sourceModule() === 'nelos' ? '' : sourceModule();
         if (to.value !== home) { to.value = home; onAssignTo(); }
       }
@@ -2466,16 +2560,20 @@
       return;
     }
 
-    if (to.value !== rule.to_module) {
-      to.value = rule.to_module;
+    if (to.value !== dest) {
+      to.value = dest;
       onAssignTo();                       // the PIC list belongs to the system
     }
-    /* The PIC the rule names, where it names one and the person has not
-       already chosen somebody themselves. */
+
+    /* THE PIC, where the office named one and the person has not already
+       chosen somebody themselves. The box is a PERSON and the setting is a
+       SEAT, so the seat is resolved to whoever holds it in that system —
+       and a seat nobody holds names nobody rather than clearing the list. */
     var pic = formEl.querySelector('#nd-f-pic');
-    if (rule.to_user_id && !pic.value &&
-        Array.prototype.some.call(pic.options, function (o) { return o.value === rule.to_user_id; })) {
-      pic.value = rule.to_user_id;
+    var wantId = row && row.pic_user_id ? String(row.pic_user_id) : seatHolder(dest, row && row.pic_seat_no);
+    if (wantId && !pic.value &&
+        Array.prototype.some.call(pic.options, function (o) { return o.value === wantId; })) {
+      pic.value = wantId;
     }
     showDest();
   }
@@ -2707,6 +2805,24 @@ async function uploadPhoto(token) {
       raised_by:       u.name,
       raised_by_id:    u.id
     };
+    /* THE SEAT, so the office setting actually reaches the case. The
+       trigger cannot supply it: it returns early on a case that already
+       names its queue — "routing is the default, not a rule" — and this
+       form always names one, so a PIC set as "Admin 2" on Case Routing had
+       never once landed on a case raised from a form. isMine() reads
+       assigned_seat_no, and NULL there means the whole queue, which is
+       what no PIC means and stays the default.
+
+       Sent only when there is one, so a database that has not run the
+       routing migration still takes the insert. */
+    var seatNo = seatOfWork();
+    if (seatNo != null) row.assigned_seat_no = seatNo;
+    /* An EDIT that moved the work from a seated title to an unseated one
+       has to clear the old seat, or the case stays in a seat nobody chose.
+       Only on an edit of a listed work, so a fresh insert on a database
+       without the column is still never sent it. */
+    else if (was && fromList) row.assigned_seat_no = null;
+
     // photo_url arrives with migration_nelos_case_tools.sql. Only send the
     // column when there is a photo, so a database without it still takes
     // the insert.

@@ -52,31 +52,45 @@
 
   /* ── WHAT A WORK RECORD'S PLOT AND BATCH IS WORTH ───────────────────────
 
-     The Main Nursery Movement Report's Balance column, as at the work date,
-     less any 2nd culling that had happened by then.
+     THE SUMMARY REPORT'S BALANCE, for the same plot, the same batches and
+     the same date. The office asked for it in one line — *"我要link这个
+     summary report"* — and it is the report they reconcile against, so
+     this file is that report asked one plot at a time rather than a second
+     answer beside it.
 
        Balance = transplanted from PN + transfer in
                - sold - 3rd culled - transfer out + stock adjustment
-               - 2nd culled
+               - 2nd culled, UNLESS the same plot and batch already carries
+                 an evidenced 3rd culling
 
      The first line is MOVE_COLS.main in operation_reports.html, column for
-     column. The second is this file's own, and is the difference between
-     this number and the report's: the report leaves the 2nd culling out
-     because it is Tab 6's running snapshot of a batch working through the
-     3rd culling, but a worker spraying the plot the morning after a 2nd
-     culling is spraying what is left, not what was there before it.
+     column. The last is MOVE_COLS.main2 and netOfRow()'s own condition,
+     and the condition is the whole of what was wrong here before: a 3rd
+     culling ALREADY INCLUDES the seedlings 2nd culled on the way to it
+     (the Batch Report's own rule — cull2 "is inside cull3"), so a figure
+     that takes both off takes one loss off twice. On a plot 2nd culled and
+     then 3rd culled this file read LOWER than the report it claims to be,
+     by exactly the 2nd culling, and the piece-rate money read low with it.
 
-     THE PHONE'S BATCH LIST DOES NOT DO THIS. shared_plot_batch_balance is
-     the report exactly, so the batches offered for a plot and the figure
-     beside each match the report row for row. The two are different
-     questions and the answers differ by the dead count; that is deliberate.
+     The bucket the condition is asked of is the PLOT AND BATCH, which is
+     what `per` below is, because that is the bucket the report asks it of
+     (`e.place + SEP + e.batch` in buildMovementSection).
 
      Worked example — U1 batch 250, 100 transplanted, 2nd culled 10 Sep with
-     5 dead, 25 sold on the 18th:
+     5 dead, 25 sold on the 18th, 3rd culled 60 on the 24th and flown:
          work on  1 Sep → 100   nothing has happened yet
          work on 11 Sep →  95   the 5 dead are off
          work on 18 Sep →  70   and the 25 sold, the same day counting
-         work on 28 Sep →  70   nothing since
+         work on 25 Sep →  15   the 60 third culled, and the 5 dead are back
+                                IN — they are inside that 60
+
+     THE PHONE SENDS NONE OF THIS, and it no longer reaches a cell.
+     shared_plot_batch_balance counts neither culling, so the figure a
+     maintenance record carries from a handset is a third answer again; the
+     office asked for it out — *"link的capacity完全不要管手机送进来的"* — and
+     applyFieldRecords stopped filling the quantity from it. The batches
+     ticked still fill the batch cell, which is a field observation and is
+     what this figure is then asked about.
 
      Two columns carry the report's own condition, applied where the events
      are built because both need the remark: a 3rd culling counts only once
@@ -258,18 +272,52 @@
   /* How a record's quantity is to be counted. One place, so the quantity, the
      batch names and every caller agree. */
   function qtyOpts(r) {
-    return { keepCull2: isInterrow(r && (r.jenis || r.work_type)) };
+    return { keepCull2: isInterrow(r && (r.jenis || r.work_type)),
+             exclBal:   !!(r && r.exclBal) };
+  }
+
+  /* ── A BALANCE LEFT BEHIND A TRANSFER IS THE CULLED BALANCE ─────────────
+     A 3rd-culling transfer moves the good seedlings of a batch onto a -R
+     plot. What that batch still shows on the plot it LEFT is what is about
+     to be culled, and the link went on quoting it as capacity — so a plot
+     near culling paid the workers for seedlings nobody was keeping.
+
+     Only the office can tell whether a given round of work was done before
+     the culling or after it, so it is a CHOICE on the row, never a rule:
+     `exclBal` on the record ("Exclude balance"). Off, the figure is what it
+     always was. On, every batch that has had a Cull3_Transfer out of this
+     plot by the work date contributes nothing; the other batches standing on
+     the plot are untouched. `culledBal` is that balance, returned whether or
+     not it is excluded, so a screen can offer the choice only where there is
+     one to make. */
+
+  /* A 3RD CULLING SUPERSEDES THE 2ND, and this is the one place that says
+     so. It is netOfRow()'s `superseded` in operation_reports.html, asked of
+     one plot-and-batch bucket's events instead of one row's columns: a 3rd
+     culling already includes the seedlings 2nd culled on the way to it, so
+     taking the 2nd off as well takes one loss off twice.
+
+     An unevidenced 3rd culling never became an event (see _load), so this
+     cannot be satisfied by a claim nobody has flown — which is the same
+     condition the report's own cull3 column carries. */
+  function cull2Superseded(evs) {
+    return (evs || []).some(e => e.type === '3rd_Culling'
+                              && Math.abs(Number(e.qty || 0)) > 0);
   }
 
   /* What one plot and batch is worth, up to a date. Every event already
      carries its own sign and the ones that take no part never became
      events, so this is a plain sum.
 
-     opts.keepCull2 leaves the 2nd culling standing — see isInterrow above. */
+     Two things keep the 2nd culling standing, for two unrelated reasons:
+     opts.keepCull2 because interrow sprays the ground and not the seedlings
+     (see isInterrow above), and a 3rd culling because it already contains
+     it (see cull2Superseded). */
   function liveCount(evs, opts) {
     const keep2 = !!(opts && opts.keepCull2);
+    const skip2 = keep2 || cull2Superseded(evs);
     return evs.reduce((sum, e) => {
-      if (keep2 && e.type === '2nd_Culling') return sum;
+      if (skip2 && e.type === '2nd_Culling') return sum;
       return sum + signed(e.type, e.qty);
     }, 0);
   }
@@ -297,6 +345,7 @@
        the day somebody sprayed had not happened when they sprayed, and the
        seedlings were standing. It is here so a screen can SAY so. */
     let cull2Later = 0, laterOn = null;
+    const leftBy = new Set();   // batches transferred OUT of this plot by the cut-off
     for (const ev of _events) {
       if (ev.plotKey !== pk) continue;
       if (wanted.length && !wanted.includes(ev.batchKey)) continue;
@@ -311,19 +360,37 @@
         }
         continue;
       }
+      if (ev.type === 'Cull3_Transfer_Out') leftBy.add(ev.batchKey);
       (per[ev.batchKey] ||= { evs: [], label: ev.batch }).evs.push(ev);
     }
     const keep2 = !!(opts && opts.keepCull2);
     Object.values(per).forEach(b => { b.closing = liveCount(b.evs, opts); });
 
-    const keys = Object.keys(per);
-    if (!keys.length) return null;
-    let raw = 0, cull2 = 0;
+    const allKeys = Object.keys(per);
+    if (!allKeys.length) return null;
+    let culledBal = 0;
+    allKeys.forEach(k => { if (leftBy.has(k)) culledBal += Math.max(0, per[k].closing); });
+    const excl = !!(opts && opts.exclBal) && culledBal > 0;
+    const keys = excl ? allKeys.filter(k => !leftBy.has(k)) : allKeys;
+    /* ASKED PER BUCKET, never over the plot as a whole, because the
+       supersede rule is per plot-and-batch: a plot with one batch 3rd
+       culled and one not has some of its 2nd culling taken off and some of
+       it standing, and a screen saying "taken off" about all of it would be
+       wrong about half. cull2Off and cull2Inside are therefore the two
+       halves of cull2 and add up to it. */
+    let raw = 0, cull2 = 0, cull2Off = 0, cull2Inside = 0, cull3 = 0;
     keys.forEach(k => {
       raw += per[k].closing;
+      let c2 = 0, c3 = 0;
       per[k].evs.forEach(e => {
-        if (e.type === '2nd_Culling') cull2 += Math.abs(Number(e.qty || 0));
+        if (e.type === '2nd_Culling') c2 += Math.abs(Number(e.qty || 0));
+        if (e.type === '3rd_Culling') c3 += Math.abs(Number(e.qty || 0));
       });
+      cull2 += c2;
+      cull3 += c3;
+      if (keep2) return;                             // interrow keeps it all
+      if (cull2Superseded(per[k].evs)) cull2Inside += c2;
+      else                             cull2Off    += c2;
     });
     return {
       // NOT floored at zero: the movement report shows a negative balance
@@ -339,13 +406,25 @@
          the P & D row beside it on the same plot and the same day. */
       cull2: Math.round(cull2),
       keptCull2: keep2 && cull2 > 0,
-      /* Taken off this figure, which is every job but interrow. Stated
-         rather than left to be inferred from a number nobody can check. */
-      cull2Off: keep2 ? 0 : Math.round(cull2),
+      /* Taken off this figure. Stated rather than left to be inferred from
+         a number nobody can check. */
+      cull2Off: Math.round(cull2Off),
+      /* And the half that was NOT, because the 3rd culling it is inside has
+         already taken it off. A figure with nothing deducted and a figure
+         with a deduction that would have been double are the same number on
+         screen, which is how the first version of this rule went unnoticed
+         for as long as it did. */
+      cull2Inside: Math.round(cull2Inside),
+      cull3: Math.round(cull3),
       /* And the one the date left out — see the loop above. `cull2LaterOn`
          is the day it is dated, as YYYY-MM-DD, so the screen can name it. */
       cull2Later: Math.round(cull2Later),
-      cull2LaterOn: laterOn == null ? null : new Date(laterOn).toISOString().slice(0, 10)
+      cull2LaterOn: laterOn == null ? null : new Date(laterOn).toISOString().slice(0, 10),
+      /* The balance left behind a transfer out — see "the culled balance"
+         above — and whether this figure has it taken off. */
+      culledBal: Math.round(culledBal),
+      culledBatches: allKeys.filter(k => leftBy.has(k)).map(k => per[k].label),
+      exclBal: excl
     };
   }
 
@@ -425,7 +504,7 @@
     error: () => _err,
     events: () => _events,
     parseDate, logDate, plotKey, batchKey, batchList,
-    signed, liveCount, linkedQty, recQty, recBatches, freezeFor,
+    signed, liveCount, cull2Superseded, linkedQty, recQty, recBatches, freezeFor,
     isInterrow, qtyOpts
   };
 })(window);

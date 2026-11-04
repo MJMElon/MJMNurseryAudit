@@ -265,7 +265,19 @@ function describeSbError(e){
          + (/403|row-level|policy/i.test(why) ? ' — storage permission refused it' : '')
          + '. The record and photo are kept on this phone.';
   }
-  if(p.code === '23505') return 'Already saved (duplicate record).';
+  if(p.code === '23505'){
+    /* Two different things now come back 23505, and they send somebody to
+       two different places. The audit table carries a UNIQUE index on
+       task_id (RUN_ME_remove_duplicate_audits.sql), so a save refused by
+       THAT one is not this record arriving twice -- it is the task already
+       carrying an audit somebody else keyed, which is the fault that index
+       exists to stop. Saying "already saved" there sends the auditor
+       looking for their own record, which is not what is in the table. */
+    if(/audit_maint_one_per_task/i.test(p.raw || ''))
+      return 'This task already has an audit. Open it and edit that one '
+           + 'rather than recording a second.';
+    return 'Already saved (duplicate record).';
+  }
   if(p.code === '23503') return 'A linked record (batch or task) is missing.';
   if(/timeout/i.test(p.raw)) return 'Server did not answer in time — will retry.';
 

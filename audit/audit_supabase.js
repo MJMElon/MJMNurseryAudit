@@ -565,7 +565,9 @@ const sb = {
   async delete(table, id) {
     return sbFetch(`${table}?id=eq.${id}`, { method: 'DELETE', headers: { 'Prefer': 'return=minimal' } });
   },
-  async uploadPhoto(bucket, filename, base64dataUrl) {
+  /* `exact` means the CALLER owns the path and this function adds nothing
+     to it. See the note on the path below for why that matters. */
+  async uploadPhoto(bucket, filename, base64dataUrl, exact) {
     if (!base64dataUrl || !base64dataUrl.startsWith('data:')) return base64dataUrl;
     const [meta, data] = base64dataUrl.split(',');
     const mime = meta.match(/:(.*?);/)[1];
@@ -574,7 +576,23 @@ const sb = {
     for (let i = 0; i < binary.length; i++) arr[i] = binary.charCodeAt(i);
     const blob = new Blob([arr], { type: mime });
     const ext  = mime.split('/')[1] || 'jpg';
-    const path = `${filename}_${Date.now()}.${ext}`;
+    /* THE CLOCK IS THE FALLBACK AND NEVER THE RULE.
+
+       A path ending in Date.now() is a NEW FILE on every attempt, and
+       that is the whole of how one press of Save left the office seven
+       pictures of one plot -- the name could not help being different,
+       so nothing about sending the same photo twice could ever be
+       recognised as sending the same photo twice.
+
+       A caller that knows which PRESS the picture belongs to passes
+       `exact` and owns the path outright. The x-upsert below then makes
+       a second upload of that press write the SAME object, so no retry
+       anywhere -- the sweep, a timeout that actually landed, a race
+       nobody has thought of yet -- can make a second file.
+
+       A caller with no press id keeps the clock, which is what it has
+       always relied on to avoid writing over somebody else. */
+    const path = exact ? `${filename}.${ext}` : `${filename}_${Date.now()}.${ext}`;
     const token = await accessToken();   // storage policies are per-role too
     const res = await fetch(`${SUPA_URL}/storage/v1/object/${bucket}/${path}`, {
       method: 'POST',

@@ -51,6 +51,18 @@
    so an eight-column plot-condition row is read down instead of
    dragged sideways. Those rules are scoped to `screen` — print keeps
    real tables at every width.
+
+   TWO THINGS ABOUT WHAT IT COVERS AND WHAT IT COUNTS, both the
+   office's own asks and both written up where they live:
+
+   - THE PERIOD IS A FROM DATE AND A TO DATE, not a month and a year.
+     Both ends inclusive. See the filter markup.
+   - A RECORD IS A VISIT, NOT A ROW, on Plot Condition and on
+     Maintenance — the same plot on the same day whatever the batch,
+     the same plot and task on the same day whatever the case. The
+     batches and the cases are still each on their own line. See
+     MOD_RECORD_KEY, and recordCount, which every figure on the page
+     goes through.
    ══════════════════════════════════════════════════════════════════ */
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{
@@ -86,13 +98,15 @@ html,body{min-height:100%;font-family:'Outfit',system-ui,sans-serif;font-size:16
 .filter-card{background:var(--card);border:1px solid var(--line);border-left:10px solid var(--green);
              border-radius:1.75rem;padding:20px 22px 18px;box-shadow:0 1px 3px rgba(16,40,60,.05);
              margin-bottom:24px}
-/* Month/Year narrow and fixed — a month name and a four-digit year never
-   need a 210px-wide column — Nursery sized to exactly fit its four chips
-   on one line (max-content, not 1fr, so it doesn't stretch or wrap), and
-   Plot takes whatever's left over. All four in the one row on a desk;
-   the 900px query below falls back to the old auto-fit wrap for anything
-   narrower. */
-.filter-grid{display:grid;grid-template-columns:130px 100px max-content minmax(200px,260px);gap:16px;align-items:end}
+/* From/To narrow and fixed — a date box never needs a 210px-wide column —
+   Nursery sized to exactly fit its four chips on one line (max-content,
+   not 1fr, so it doesn't stretch or wrap), and Plot takes whatever's left
+   over. All four in the one row on a desk; the 900px query below falls
+   back to the old auto-fit wrap for anything narrower. */
+.filter-grid{display:grid;grid-template-columns:150px 150px max-content minmax(180px,240px);gap:16px;align-items:end}
+/* A date input draws its own picker glyph and will otherwise sit a
+   hair taller than the text box beside it. */
+.filter-grid input[type=date]{min-width:0}
 @media (max-width:900px){
   .filter-grid{grid-template-columns:repeat(auto-fit,minmax(210px,1fr))}
 }
@@ -361,6 +375,20 @@ body.is-full #btn-full{display:none}
   /* A card row is a label on the left and its answer on the right; the
      centring the table wants would put this one in neither place. */
   .rec-table td.grp{text-align:right;border-left:none;font-size:inherit}
+  /* A CARD THAT CONTINUES THE ONE ABOVE IT SAYS SO.
+     A record is drawn as one block with its plot and its day merged down
+     the side -- which a table does with a rowspan and a stack of cards
+     cannot do at all, so these cards would otherwise open on a batch with
+     nothing saying which plot it is in. Indented, and headed with what it
+     is a continuation of. */
+  .rec-table tbody tr.rec-cont{margin-left:14px;border-left:3px solid var(--green)}
+  .rec-table tbody tr.rec-cont::before{content:attr(data-cont);display:block;
+                      padding:6px 13px;font-size:9.5px;font-weight:800;letter-spacing:.7px;
+                      text-transform:uppercase;color:var(--ink3);background:#f8fafc;
+                      border-bottom:1px solid #f1f5f9}
+  /* and its first cell is a batch, not a record number, so it must not
+     take the card-header treatment the rule below gives one. */
+  .rec-table tbody tr.rec-cont td:first-child{background:transparent;font-weight:inherit}
   /* The first cell becomes the card's header rather than just another
      row: without it a card of eight identical grey-label rows gives no
      answer to "where does one record stop and the next begin". */
@@ -455,24 +483,23 @@ body.is-full #btn-full{display:none}
 
       <div class="filter-card" id="filter-card">
         <div class="filter-grid">
+          <!-- THE REPORT IS THE DATES SOMEBODY PICKED, not a calendar
+               month. It was a Month select and a Year select, so a
+               fortnight, a single day or a run that crosses the 1st could
+               not be asked for at all. Both ends are INCLUSIVE — the read
+               below is date >= from and date <= to — which is what "from
+               the 5th to the 9th" means to anybody reading it.
+
+               It still OPENS on the current month, first to last, so
+               somebody who ticks a module and presses Generate gets
+               exactly the report this page has always given them. -->
           <div>
-            <div class="filter-label">Month</div>
-            <div class="select-wrap">
-              <select class="input" id="f-month" aria-label="Month">
-                <option value="1">January</option><option value="2">February</option>
-                <option value="3">March</option><option value="4">April</option>
-                <option value="5">May</option><option value="6">June</option>
-                <option value="7">July</option><option value="8">August</option>
-                <option value="9">September</option><option value="10">October</option>
-                <option value="11">November</option><option value="12">December</option>
-              </select>
-            </div>
+            <div class="filter-label">From date</div>
+            <input class="input" id="f-from" type="date" aria-label="From date">
           </div>
           <div>
-            <div class="filter-label">Year</div>
-            <div class="select-wrap">
-              <select class="input" id="f-year" aria-label="Year"></select>
-            </div>
+            <div class="filter-label">To date</div>
+            <input class="input" id="f-to" type="date" aria-label="To date">
           </div>
           <div>
             <div class="filter-label">Nursery</div>
@@ -565,7 +592,7 @@ body.is-full #btn-full{display:none}
     <div id="report-output">
       <div class="empty-report">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
-        <p>Choose a month and press <strong>Generate Report</strong>.</p>
+        <p>Choose a date range and press <strong>Generate Report</strong>.</p>
       </div>
     </div>
   </div>
@@ -582,14 +609,13 @@ body.is-full #btn-full{display:none}
 
 </div>
 <script src="audit_lang.js?v=20261022e"></script>
-<script src="audit_supabase.js?v=20261105a"></script>
-<script src="audit_dexie_offline.js?v=20261105a"></script>
+<script src="audit_supabase.js?v=20261105b"></script>
+<script src="audit_dexie_offline.js?v=20261105b"></script>
 <!-- Welcome-name fill for the shared FC ribbon. -->
 <script src="audit_ribbon.js?v=20261028a"></script>
 <script>
 'use strict';
 
-const MONTHS=['January','February','March','April','May','June','July','August','September','October','November','December'];
 const PN_NURSERIES=['PN'];
 const MN_NURSERIES=['BNN','UNN1','UNN2'];
 
@@ -702,12 +728,26 @@ document.addEventListener('keydown',e=>{
     toggleFullScreen();
 });
 
+/* LOCAL time, never toISOString(). toISOString() is the day before in
+   Malaysia for the whole of the early morning, which on the 1st of a month
+   opens the report on the wrong month -- the same trap `_localISO()` on the
+   audit board already names. */
+function _localISO(d){
+  return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')
+                        +'-'+String(d.getDate()).padStart(2,'0');
+}
+
 function initFilters(){
+  /* The current month, first to last, so pressing Generate with nothing
+     else touched draws the report this page has always drawn. The last day
+     is used rather than today, because a month still running has no audits
+     dated after today anyway and an auditor saving one this afternoon is
+     then already inside the range. */
   const now=new Date();
-  document.getElementById('f-month').value=now.getMonth()+1;
-  const ySel=document.getElementById('f-year');
-  const cy=now.getFullYear();
-  for(let y=cy;y>=cy-3;y--){const o=document.createElement('option');o.value=y;o.textContent=y;if(y===cy)o.selected=true;ySel.appendChild(o);}
+  const first=new Date(now.getFullYear(),now.getMonth(),1);
+  const last=new Date(now.getFullYear(),now.getMonth()+1,0);
+  document.getElementById('f-from').value=_localISO(first);
+  document.getElementById('f-to').value=_localISO(last);
 }
 
 function esc(v){
@@ -720,15 +760,14 @@ function fmtDate(iso){
   return s[2]+' '+['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][+s[1]-1]+' '+s[0];
 }
 
-function monthRange(month,year){
-  const start=`${year}-${String(month).padStart(2,'0')}-01`;
-  const end=`${year}-${String(month).padStart(2,'0')}-${new Date(year,month,0).getDate()}`;
-  return{start,end};
+/* What the heading says the report covers. One day reads as one date --
+   "05 Nov 2026 – 05 Nov 2026" is the same answer twice. */
+function periodLabel(from,to){
+  return from===to ? fmtDate(from) : fmtDate(from)+' – '+fmtDate(to);
 }
 
-async function fetchData(month,year){
-  const{start,end}=monthRange(month,year);
-  const df=`date=gte.${start}&date=lte.${end}`;
+async function fetchData(from,to){
+  const df=`date=gte.${from}&date=lte.${to}`;
   const out={};
   const tasks=[];
   if(selectedMods.has('plot'))   tasks.push(sb.select('audit_plot_audits',   `select=audit_id,nursery,plot,batch,pest,tikus,disease,warna_daun,auditor_name,date&${df}`).then(r=>out.plot=r).catch(()=>out.plot=[]));
@@ -759,6 +798,99 @@ function filterByPlot(rows,query){
   return(rows||[]).filter(r=>String(r.plot||'').toLowerCase().includes(q));
 }
 
+/* ── ONE RECORD IS ONE VISIT, NOT ONE ROW ─────────────────────────────
+
+   A table row is what the DATABASE holds, and on two of these modules that
+   is finer than the thing the office counts:
+
+   - **Plot Condition** in the main nursery is one row per plot per BATCH
+     (audit_script.js says why: a plot holds several batches, each with its
+     own age and its own audit). So one walk round B01 with seven batches
+     standing in it is SEVEN rows, numbered 1 to 7, and the report said
+     seven audits where somebody did one.
+   - **Maintenance** is one row per CASE, and a case is one work record —
+     so a plot sprayed by three workers on one morning is three cases and
+     three audits. The office met exactly that and asked twice whether the
+     report was counting one thing three times (it was not; they really are
+     three cases, which is why the Case column exists).
+
+   So a RECORD is the visit: the same plot on the same day, whatever the
+   batch; the same plot and the same task on the same day, whatever the
+   case. It is numbered once, counted once in every figure on the page, and
+   drawn as ONE BLOCK with its identity merged down the side.
+
+   **AND THE BATCHES AND CASES ARE STILL THERE, each on its own line** --
+   that was the other half of what was asked, and it is also the only safe
+   way to do this. A plot's readings are PER BATCH: a rat found on batch 253
+   and nothing on 268 is the whole reason the alert board is per batch, so
+   folding four readings into one cell could hide the one that matters. Each
+   batch keeps its line and its own four readings; only the plot, the day
+   and the record number are merged over them.
+
+   The other two modules are untouched. Papan Tanda is one sign per plot and
+   Seedling Height is measured plot by plot, so neither has a row the office
+   reads as a repeat. */
+function _recKey(v){
+  return String(v==null?'':v).toUpperCase().replace(/[^A-Z0-9]/g,'');
+}
+function _recDay(r){
+  return String((r&&r.date)||'').slice(0,10);
+}
+const MOD_RECORD_KEY={
+  plot:  r=>_recDay(r)+'|'+_recKey(r.plot),
+  maint: r=>_recDay(r)+'|'+_recKey(r.plot)+'|'+_recKey(r.task_type)
+};
+/* What a continuation line is told to say on a PHONE, where the table folds
+   into one card per row and a rowspan means nothing -- so the cards after
+   the first would otherwise carry a batch and four readings with no plot
+   and no date on them. */
+const MOD_CONT_NOTE={
+  plot:  'same plot · same day',
+  maint: 'same plot · same task · same day'
+};
+/* The unit each module's figures are counted in, for the line under the
+   table. A record is a visit; the lines under it are its batches or its
+   cases. BOTH SPELLINGS, because `noun+'s'` reads "6 batchs" -- the kind
+   of thing nobody notices in code and everybody notices on a printed
+   sheet. */
+const MOD_LINE_NOUN={ plot:['batch','batches'], maint:['case','cases'] };
+
+/* HOW MANY RECORDS these rows are. Every figure on the page goes through
+   this -- the summary card, the section total, the records badge and the
+   table's own total -- for the reason the Done By filter already states in
+   its own comment: one of them counted differently is one of them
+   disagreeing with the rest. A module with no record key counts rows, which
+   is what it always did. */
+function recordCount(mod,rows){
+  const keyOf=MOD_RECORD_KEY[mod];
+  if(!keyOf) return (rows||[]).length;
+  return new Set((rows||[]).map(keyOf)).size;
+}
+
+/* The ordinal of the RECORD a row belongs to, so the # column numbers
+   visits and not lines.
+
+   It reads off CONSECUTIVE runs, which the caller's sort is what makes --
+   the same assumption `spans` in buildTable already makes, stated once and
+   relied on by both. Memoised per array, because a column is asked once per
+   row and walking the whole array each time would be quadratic on the
+   eighteen hundred maintenance rows a month now carries. */
+const _recNoCache=new WeakMap();
+function _recNo(rows,i,keyOf){
+  let m=_recNoCache.get(rows);
+  if(!m||m.keyOf!==keyOf){
+    const no=[]; let n=0, prev=null;
+    rows.forEach((r,ix)=>{
+      const k=keyOf(r);
+      if(ix===0||k!==prev){ n++; prev=k; }
+      no[ix]=n;
+    });
+    m={keyOf,no};
+    _recNoCache.set(rows,m);
+  }
+  return m.no[i];
+}
+
 /* ── COLUMNS ──
    The four table shapes as data rather than as four hand-written blocks
    of HTML. Each column knows its own heading, and that heading is what
@@ -766,10 +898,15 @@ function filterByPlot(rows,query){
    folds into a readable card on a phone. Written out once, they cannot
    drift apart from the headings above them. */
 const MOD_COLS={
+  /* #, Date and Plot are the RECORD -- one walk round a plot on a day --
+     and are drawn once over its batches. Everything from Batch rightwards
+     is per batch, because that is what was audited. */
   plot:[
-    {h:'#',       v:(r,i)=>i+1, label:'Record', num:true},
-    {h:'Date',    v:r=>fmtDate(r.date)},
-    {h:'Plot',    v:r=>`<b>${esc(r.plot)}</b>`,    raw:true},
+    {h:'#',       group:MOD_RECORD_KEY.plot,
+                  v:(r,i,rows)=>_recNo(rows,i,MOD_RECORD_KEY.plot), label:'Record', num:true},
+    {h:'Date',    group:MOD_RECORD_KEY.plot, v:r=>fmtDate(r.date)},
+    {h:'Plot',    group:MOD_RECORD_KEY.plot,
+                  v:r=>`<b>${esc(r.plot)}</b>`,    raw:true},
     {h:'Batch',   v:r=>r.batch||'—'},
     {h:'Pest',    v:r=>r.pest||'—'},
     {h:'Animal',  v:r=>r.tikus||'—'},
@@ -807,10 +944,17 @@ const MOD_COLS={
      ADMIN on a closure, because the closure writes whoever pressed the
      button. */
   maint:[
-    {h:'#',       v:(r,i)=>i+1, label:'Record', num:true},
-    {h:'Date',    v:r=>fmtDate(r.date)},
-    {h:'Plot',    v:r=>`<b>${esc(r.plot)}</b>`,     raw:true},
-    {h:'Task',    v:r=>r.task_type||'—'},
+    /* #, Date, Plot and Task are the RECORD -- one task on one plot on one
+       day -- drawn once over the cases it took. Case, Result and Done By
+       stay per line: a closure and a real audit on the same plot, task and
+       day are two cases that say different things, and that is exactly the
+       pair the duplicate repair had to arbitrate 188 of. */
+    {h:'#',       group:MOD_RECORD_KEY.maint,
+                  v:(r,i,rows)=>_recNo(rows,i,MOD_RECORD_KEY.maint), label:'Record', num:true},
+    {h:'Date',    group:MOD_RECORD_KEY.maint, v:r=>fmtDate(r.date)},
+    {h:'Plot',    group:MOD_RECORD_KEY.maint,
+                  v:r=>`<b>${esc(r.plot)}</b>`,     raw:true},
+    {h:'Task',    group:MOD_RECORD_KEY.maint, v:r=>r.task_type||'—'},
     /* THE CASE, because without it three rows reading B01 / Weeding /
        Unsatisfactory on one day are indistinguishable on screen -- and the
        office has now asked twice whether the report is counting one case
@@ -843,16 +987,24 @@ const MOD_COLS={
 // falls through to plot-only ordering for that one.
 function _auditPlotBatchSort(rows){
   const natCmp=(a,b)=>String(a??'').localeCompare(String(b??''),undefined,{numeric:true,sensitivity:'base'});
-  /* Plot, then the DAY, then batch.
+  /* Plot, then the DAY, then the TASK, then batch.
      The day was not in here, so a plot audited twice in a month came out
      interleaved by batch -- the 5th and the 19th alternating down the page,
      which is two visits read as one. It also made the plot average
      unmergeable: a figure about a day can only be drawn once over the rows it
      covers if those rows are together.
+     THE TASK IS IN HERE FOR THAT SECOND REASON, one module along. A
+     maintenance record is a plot AND a task on a day, so B01 weeded and
+     manured on the 21st is two records -- and sorted on plot and day alone
+     their cases interleave, which would leave each record drawn as two or
+     three broken runs instead of one block. It is undefined on every other
+     module, where natCmp reads it as '' and the chain falls straight
+     through to the batch.
      Dates are ISO in this table, so comparing them as text is comparing them
      as dates. */
   return rows.slice().sort((a,b)=>natCmp(a.plot,b.plot)
                                ||natCmp(a.date,b.date)
+                               ||natCmp(a.task_type,b.task_type)
                                ||natCmp(a.batch??a.batch_no,b.batch??b.batch_no));
 }
 
@@ -948,11 +1100,14 @@ async function sbAllRows(table,query){
   }
 }
 
-async function fetchBatchLedger(month,year){
-  const{end}=monthRange(month,year);
-  const today=new Date().toISOString().slice(0,10);
-  // A month still running is as at today; a month gone by, as at its end.
-  const asOf=end<today?end:today;
+async function fetchBatchLedger(to){
+  const today=_localISO(new Date());
+  /* AS AT THE END OF THE RANGE, never as at today -- so a range that has
+     gone by reads the same in December as it did when it was current. A
+     range running past today is as at today, there being nothing standing
+     in a plot tomorrow. (It was the end of the month; it is the TO date
+     now, which is the same sentence about a range somebody chose.) */
+  const asOf=to<today?to:today;
   const LOG='shared_inventory_logs';
   const[seeds,planted,gone]=await Promise.all([
     sbAllRows(LOG,'select=batch_name,transaction_date,created_at&transaction_type=eq.Seeds_Received'),
@@ -963,12 +1118,12 @@ async function fetchBatchLedger(month,year){
   return{asOf,seeds,planted,gone};
 }
 
-/* The plot's figure is its LAST audit day in the month, not the month
+/* The plot's figure is its LAST audit day in the RANGE, not the range
    averaged: a plot walked on the 5th and again on the 19th grew in between,
    and the 19th is how tall it is now. Blank readings are dropped before
    anything is converted — Number(null) is 0, and a blank is not a seedling
    of no height. A real 0 still counts. */
-function _plotHeightInMonth(plot,heightRows){
+function _plotHeightInRange(plot,heightRows){
   const mine=(heightRows||[]).filter(r=>_canonPlot(r.plot)===plot);
   if(!mine.length) return null;
   const day=mine.map(r=>String(r.date||'').slice(0,10)).filter(Boolean).sort().pop();
@@ -1023,7 +1178,7 @@ function buildBatchHeight(led,heightRows){
     const plots=[...(plotsOf[batch]||[])].sort(natCmp);
     const mine=(plots.length?plots:['—']).map(plot=>({
       batch,grp,months,seed:seedDay[batch],plot,
-      h:plot==='—'?null:_plotHeightInMonth(plot,heightRows)
+      h:plot==='—'?null:_plotHeightInRange(plot,heightRows)
     }));
     const avg=_mean(mine.filter(r=>r.h).map(r=>r.h.value));
     mine.forEach(r=>{r.batchAvg=avg;});
@@ -1114,14 +1269,29 @@ function buildModTable(mod, rows){
   if(!rows||!rows.length) return '<div class="no-data">No records found.</div>';
   const cols=MOD_COLS[mod];
   if(!cols) return '<div class="no-data">No records found.</div>';
-  return buildTable(cols,_auditPlotBatchSort(rows),'record');
+  const sorted=_auditPlotBatchSort(rows);
+  const keyOf=MOD_RECORD_KEY[mod];
+  if(!keyOf) return buildTable(cols,sorted,'record');
+  /* THE FOOT SAYS BOTH FIGURES wherever they differ -- "18 records · 47
+     batches". The records figure is the one every other figure on the page
+     now carries, and somebody who knew the table as 47 rows has to be able
+     to see where the 47 went; saying only the smaller number is how a count
+     that dropped reads as work that vanished. */
+  const recs=recordCount(mod,sorted);
+  const noun=MOD_LINE_NOUN[mod]||['line','lines'];
+  const total='Total: '+fmtNum(recs)+' record'+(recs!==1?'s':'')
+            + (sorted.length!==recs
+                ? ' · '+fmtNum(sorted.length)+' '+noun[sorted.length===1?0:1]
+                : '');
+  return buildTable(cols,sorted,'record',{contKey:keyOf,contNote:MOD_CONT_NOTE[mod],total});
 }
 
 /* The table itself, given its columns and its rows ALREADY in the order they
    are to be drawn in. The row merging below reads off that order, so a
    caller that sorts after this has broken it. */
-function buildTable(cols, rows, noun){
+function buildTable(cols, rows, noun, opts){
   if(!rows||!rows.length) return '<div class="no-data">No records found.</div>';
+  opts=opts||{};
 
   /* A merged column's heading is centred over it, or the heading and the
      figure it names sit at opposite ends of the same column. */
@@ -1152,7 +1322,14 @@ function buildTable(cols, rows, noun){
 
   let body='';
   rows.forEach((r,i)=>{
-    body+='<tr>'+cols.map((c,ci)=>{
+    /* A line that CONTINUES the record above it. On a desk and on paper the
+       rowspan says so by itself and this mark paints nothing; on a phone the
+       table is one card per row and a rowspan means nothing at all, so
+       without it the cards after the first carry a batch and its readings
+       with no plot and no day on them. */
+    const cont=opts.contKey && i>0 && opts.contKey(rows[i-1])===opts.contKey(r);
+    body+=(cont?`<tr class="rec-cont" data-cont="${esc(opts.contNote||'continued')}">`:'<tr>')
+        +cols.map((c,ci)=>{
       // A row inside a group that is not its first draws no cell at all.
       if(spans[ci] && !spans[ci][i]) return '';
       /* rows as well as the row: a column can be a figure about the GROUP
@@ -1167,7 +1344,9 @@ function buildTable(cols, rows, noun){
     }).join('')+'</tr>';
   });
   const word=noun||'record';
-  body+=`<tr class="total-row"><td colspan="${cols.length}" data-label="">Total: ${fmtNum(rows.length)} ${esc(word)}${rows.length!==1?'s':''}</td></tr>`;
+  const total=opts.total
+    || `Total: ${fmtNum(rows.length)} ${esc(word)}${rows.length!==1?'s':''}`;
+  body+=`<tr class="total-row"><td colspan="${cols.length}" data-label="">${total}</td></tr>`;
 
   return`<div class="tbl-wrap"><table class="rec-table"><thead>${head}</thead><tbody>${body}</tbody></table></div>`;
 }
@@ -1191,12 +1370,16 @@ function buildNurserySection(label, sub, headClass, data, nurseries){
   let modSections='';
   mods.forEach(mod=>{
     const rows=filterByNursery(data[mod],nurseries);
-    total+=rows.length;
+    /* RECORDS, not rows -- see MOD_RECORD_KEY. On the two modules with a
+       record key this is fewer than the rows in the table, and the table's
+       own foot says both figures. */
+    const recs=recordCount(mod,rows);
+    total+=recs;
     modSections+=`
       <div class="mod-block">
         <div class="mod-block-head">
           <span class="mod-block-name">${modLabels[mod]}</span>
-          <span class="badge ${modBadge[mod]}">${fmtNum(rows.length)} records</span>
+          <span class="badge ${modBadge[mod]}">${fmtNum(recs)} records</span>
           ${mod==='maint'&&_maintNarrowed?`<span class="mod-block-note">${esc(_maintNarrowed)}</span>`:''}
         </div>
         <div class="mod-block-body">${buildModTable(mod,rows)}</div>
@@ -1227,8 +1410,15 @@ async function generateReport(){
   const wantNurserySections=[...selectedMods].some(m=>NURSERY_MODS.indexOf(m)>=0);
   if(wantNurserySections&&tickedNurseries.length===0){showToast('⚠ Select at least one nursery');return;}
 
-  const month=parseInt(document.getElementById('f-month').value);
-  const year=parseInt(document.getElementById('f-year').value);
+  /* THE RANGE, both ends inclusive. ISO text compares as a date, which is
+     what lets the from/to test below be a string comparison -- the same
+     reasoning the row sort already relies on. An empty box is somebody not
+     having picked rather than "everything", because a report with one end
+     open is not a thing anybody means to ask for. */
+  const from=document.getElementById('f-from').value;
+  const to=document.getElementById('f-to').value;
+  if(!from||!to){showToast('⚠ Pick a from date and a to date');return;}
+  if(from>to){showToast('⚠ The from date is after the to date');return;}
   const plotQuery=document.getElementById('f-plot').value.trim();
   // Whichever of Pre-Nursery/BNN/UNN1/UNN2 are ticked (see the tick-chip
   // row) — Main Nursery is no longer all-or-nothing: BNN can be included
@@ -1236,10 +1426,10 @@ async function generateReport(){
   const showPN=wantNurserySections&&tickedNurseries.includes('PN');
   const mnNurseries=MN_NURSERIES.filter(n=>tickedNurseries.includes(n));
   const showMN=wantNurserySections&&mnNurseries.length>0;
-  const periodStr=`${MONTHS[month-1]} ${year}`;
+  const periodStr=periodLabel(from,to);
   setLoading(true);
   try{
-    const data=await fetchData(month,year);
+    const data=await fetchData(from,to);
     // Plot search narrows every module's rows before anything downstream
     // (summary counts, the nursery-section tables) ever sees them, so
     // there's exactly one place this filter has to be applied.
@@ -1258,24 +1448,28 @@ async function generateReport(){
          one kind is indistinguishable from a month that only had that
          kind in it. Said only where it NARROWED something -- a note on a
          report nothing was taken out of is a note nobody reads. */
+      /* CASES, not records: what this tick takes out is rows, and a row
+         here is one case. A record can lose one of its cases and still be
+         on the report, so calling them records would be a figure that does
+         not match the one in the badge above it. */
       const dropped=before-data.maint.length;
       _maintNarrowed = dropped>0
         ? (doneBy.length===0
             ? 'all '+fmtNum(before)+' hidden — nothing ticked under Done By'
             : 'showing '+(doneBy.indexOf('admin')!==-1?'admin closures':'auditor audits')
-              +' only — '+fmtNum(dropped)+' other '+(dropped===1?'record':'records')+' hidden')
+              +' only — '+fmtNum(dropped)+' other '+(dropped===1?'case':'cases')+' hidden')
         : null;
     } else {
       _maintNarrowed = null;
     }
     const countAll=(d,n)=>[...selectedMods].filter(m=>NURSERY_MODS.indexOf(m)>=0)
-                                           .reduce((s,m)=>s+(filterByNursery(d[m],n).length),0);
+                                           .reduce((s,m)=>s+recordCount(m,filterByNursery(d[m],n)),0);
     /* The ledger reads are the one part of this report that can fail on its
        own, and a section that quietly draws nothing is a section that says
        there are no batches. It says what went wrong instead. */
     let batchHeight=null;
     if(selectedMods.has('bheight')){
-      try{ batchHeight=buildBatchHeight(await fetchBatchLedger(month,year),data.height||[]); }
+      try{ batchHeight=buildBatchHeight(await fetchBatchLedger(to),data.height||[]); }
       catch(e){ console.error('[batch-height]',e); batchHeight={error:e.message}; }
     }
     const pnTotal=showPN?countAll(data,PN_NURSERIES):0;
@@ -1291,10 +1485,13 @@ async function generateReport(){
 
     // Count per module across selected nurseries
     const countedNurseries = [...(showPN?PN_NURSERIES:[]), ...drawnMN];
-    const plotTotal   = filterByNursery(data.plot||[],   countedNurseries).length;
-    const heightTotal = filterByNursery(data.height||[], countedNurseries).length;
-    const papanTotal  = filterByNursery(data.papan||[],  countedNurseries).length;
-    const maintTotal  = filterByNursery(data.maint||[],  countedNurseries).length;
+    /* Through recordCount, so the card agrees with the badge and the table
+       foot under it. Height and Papan have no record key and so still count
+       rows, which is what one sign and one plot measurement each are. */
+    const plotTotal   = recordCount('plot',  filterByNursery(data.plot||[],   countedNurseries));
+    const heightTotal = recordCount('height',filterByNursery(data.height||[], countedNurseries));
+    const papanTotal  = recordCount('papan', filterByNursery(data.papan||[],  countedNurseries));
+    const maintTotal  = recordCount('maint', filterByNursery(data.maint||[],  countedNurseries));
 
     let summaryCards=`<div class="sum-card"><div class="sum-val">${fmtNum(grandTotal)}</div><div class="sum-label">Total Audits</div></div>`;
     if(selectedMods.has('plot'))   summaryCards+=`<div class="sum-card"><div class="sum-val" style="color:var(--pn)">${fmtNum(plotTotal)}</div><div class="sum-label">Plot Condition</div></div>`;

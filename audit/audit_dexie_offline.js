@@ -169,10 +169,19 @@ async function clearDone(){
   await db.queue.where({synced:1}).delete();
 }
 
-/* ── Photo upload helper ── */
-async function uploadPhoto(table, field, base64){
-  const name = `${table}_${field}_${Date.now()}`;
-  return await sb.uploadPhoto('audit-photos', name, base64);
+/* ── Photo upload helper ──
+   NAMED AFTER THE PRESS, never the clock. One press of Save therefore
+   leaves ONE file per field however many times the picture is sent: the
+   path is the same every time and the upload overwrites it. See the
+   note on smartSave for where the press id comes from.
+
+   A queue row written by an older build carries no press, and that one
+   keeps the clock-derived name exactly as it always did -- there is
+   nothing in such a row to name it after. */
+async function uploadPhoto(table, field, base64, press){
+  const name = press ? `${table}_${field}_${press}`
+                     : `${table}_${field}_${Date.now()}`;
+  return await sb.uploadPhoto('audit-photos', name, base64, !!press);
 }
 
 /* Write an uploaded photo url into the queued payload, so the record
@@ -288,45 +297,34 @@ function describeSbError(e){
    SMART SAVE
 ================================================================ */
 
-/* ── ONE PRESS OF SAVE IS ONE AUDIT ──
+/* ── ONE PRESS OF SAVE IS ONE AUDIT, AND ONE PHOTO ──
    A save that is sent twice has to be recognisable as the same save, or
-   the second arrival is a second row. client_uid is that: one id per
-   press, carried on every retry of that press, with a unique index on it
-   in the database (shared/RUN_ME_one_audit_per_save.sql) so the repeat
-   comes back 23505 — which the sweep below has retired quietly since the
-   day it was written. That path had simply never had anything to fire
-   on, because nothing in these tables was ever unique.
+   the second arrival is a second row and a second picture. So every
+   press of Save is given an id of its own, MADE ON THE PHONE, and
+   carried on every retry of that press. It does two jobs:
+
+     1. it is `client_uid` on the row, with a unique index behind it
+        (shared/RUN_ME_one_audit_per_save.sql), so the second arrival of
+        one press comes back 23505 — which the sweep below has retired
+        quietly since the day it was written. That path had simply never
+        had anything to fire on, because nothing in these tables was
+        ever unique;
+     2. it NAMES THE PHOTO, so a second upload of that press writes the
+        SAME object in the bucket instead of a new file beside it.
+
+   STAMPED AT THE PRESS, ONLINE OR OFF, AND THAT IS THE HALF THAT WAS
+   MISSING. The first version asked the database whether the column
+   existed before it would stamp anything, so a save made with NO SIGNAL
+   — which is the ordinary case standing in a nursery — went into the
+   outbox carrying no id at all, and when the sweep later sent it and the
+   insert timed out while landing, nothing anywhere could tell its second
+   arrival from a new audit. The id needs no network. It is made here,
+   every time, whatever the signal is doing.
 
    NOT audit_id, which looks like the natural key and is not: it is the
    number of audits the phone can see plus one, so two auditors saving at
    the same moment both answer the same and a unique index on it would
-   refuse the second person their work. This one is random.
-
-   ASKED OF THE TABLE, ONCE. Naming a column the table has not got is not
-   an empty cell in PostgREST, it is the whole insert refused — which on
-   this screen is an auditor standing in a plot being told the save
-   failed. So the column goes on the row only where a read of it answers. */
-const _hasUid = new Map();
-
-async function _tableTakesUid(table){
-  if(_hasUid.has(table)) return _hasUid.get(table);
-  try{
-    await sb.select(table, 'select=client_uid&limit=1');
-    _hasUid.set(table, true);
-    return true;
-  }catch(e){
-    /* ONLY A REFUSAL THAT NAMES THE COLUMN IS AN ANSWER. No signal, a
-       policy, a dropped connection — none of those is the column being
-       absent, and remembering them as one would switch the guard off for
-       the rest of the session over a bad moment. Those are not cached, so
-       the next save asks again. */
-    if(/client_uid/.test(e && e.message || '')){
-      _hasUid.set(table, false);
-    }
-    return false;
-  }
-}
-
+   refuse the second person their work. This one is random. */
 function _newUid(){
   try{
     if(typeof crypto !== 'undefined' && crypto.randomUUID) return crypto.randomUUID();
@@ -334,15 +332,61 @@ function _newUid(){
   return 'u' + Date.now().toString(36) + Math.random().toString(36).slice(2, 10);
 }
 
+/* ── AND THE WRITE IS WHAT SAYS WHETHER THE COLUMN IS THERE ──
+   Naming a column the table has not got is not an empty cell in
+   PostgREST, it is the whole insert refused — which on this screen is an
+   auditor standing in a plot being told the save failed. That was first
+   guarded by READING the column before stamping, and a read is the wrong
+   question to ask: a SELECT can be refused by a policy while the INSERT
+   is perfectly allowed, and in this module the grant, the policy and the
+   table itself have each failed on their own. A read that cannot answer
+   then left the press unstamped, which is the one outcome worth avoiding.
+
+   So the stamp goes on every insert, and the ONE answer that is not
+   ambiguous is what takes it off again: a 42703 that NAMES the column.
+   That is remembered for the rest of the session, and THE SAME ROW IS
+   SENT AGAIN AT ONCE, so the press is not lost over it. A refusal for any
+   other reason is not an answer and is left to the caller.
+
+   The PHOTO keeps its press-derived name either way, so one press is one
+   file even on a database with no client_uid column at all. */
+const _noUid = new Set();
+
+function _withoutUid(row){
+  const out = {...row};
+  delete out.client_uid;
+  return out;
+}
+
+async function _insertOnce(table, row, ms){
+  const stamped = !!row && row.client_uid !== undefined;
+  if(stamped && _noUid.has(table)){
+    return await withTimeout(sb.insert(table, _withoutUid(row)), ms);
+  }
+  try{
+    return await withTimeout(sb.insert(table, row), ms);
+  }catch(e){
+    const p = parseSbError(e);
+    if(stamped && p.code === '42703'
+       && ((p.message || '') + ' ' + (p.raw || '')).indexOf('client_uid') >= 0){
+      _noUid.add(table);
+      console.warn('[SmartSave] no client_uid column on', table,
+                   '— sending without the stamp');
+      return await withTimeout(sb.insert(table, _withoutUid(row)), ms);
+    }
+    throw e;
+  }
+}
+
 async function smartSave(table, method, payload, editId=null){
 
-  /* An UPDATE names the row it changes, so it cannot land twice. Only an
-     insert needs the stamp. */
-  let body = payload;
-  if(method === 'insert' && !payload.client_uid && navigator.onLine
-     && await _tableTakesUid(table)){
-    body = {...payload, client_uid: _newUid()};
-  }
+  /* THE ID OF THIS PRESS. It names the photo whatever the method is, so
+     one press of Edit leaves one file too; it goes on the ROW only for an
+     insert, because an UPDATE names the row it changes and cannot land
+     twice — and a fresh stamp written over an existing row would be
+     claiming that row came from a press it did not. */
+  const press = payload.client_uid || _newUid();
+  const body  = (method === 'insert') ? {...payload, client_uid: press} : payload;
 
   /* DECLARED OUT HERE, and that is the whole of the duplicate the office
      found on U03.
@@ -373,20 +417,26 @@ async function smartSave(table, method, payload, editId=null){
              queues it, the photo is kept in IndexedDB, and the sync retries
              it. Slower, but the photo survives. */
           photoUploads.push(
-            uploadPhoto(table, f, v).then(url => {
+            uploadPhoto(table, f, v, press).then(url => {
               if(!url) throw new Error('photo upload rejected for '+f);
               clean[f] = url;
             })
           );
         }
       }
+      /* Fifteen seconds is a TIMEOUT here too, so an upload that was
+         still in flight when it fired may well have landed, and `clean`
+         may still be holding the raw picture when the catch below queues
+         it. The sweep then sends that picture again — and because the
+         path is the press's, it writes the same object. The press owning
+         its filename is what makes a race nobody can prevent cost
+         nothing. */
       if(photoUploads.length) await withTimeout(Promise.all(photoUploads), 15000);
 
       /* Save record (8s timeout) */
-      const result = await withTimeout(
-        method==='insert' ? sb.insert(table, clean) : sb.update(table, editId, clean),
-        8000
-      );
+      const result = method === 'insert'
+        ? await _insertOnce(table, clean, 8000)
+        : await withTimeout(sb.update(table, editId, clean), 8000);
       console.log('[SmartSave] ✅ Saved online:', table);
       return result;
 
@@ -415,7 +465,12 @@ async function smartSave(table, method, payload, editId=null){
         }
       }
     }
-    stored.__qkey = qkey;
+    stored.__qkey  = qkey;
+    /* The press rides into the outbox, so the sweep names the photo after
+       the SAME press days later. On an insert it is already there as
+       client_uid; this is what carries it for an UPDATE, and what lets
+       one rule read it for both. */
+    stored.__press = press;
     await enqueue(table, method, stored, editId);
     console.log('[SmartSave] 📴 Queued:', table);
     refreshBadge();
@@ -511,6 +566,15 @@ async function syncNow(manual){
       const qkey = p.__qkey;
       delete p.__qkey;
 
+      /* The press this record came from, so every photo the sweep sends
+         is named after the same press the phone gave it — however many
+         sweeps it takes. `client_uid` is the fallback for a row queued
+         by the build that stamped the row and not the file; a row older
+         than both has neither, and its photo keeps the clock-derived
+         name it would always have had. */
+      const press = p.__press || p.client_uid;
+      delete p.__press;
+
       /* Restore photos */
       for(const f of Object.keys(p)){
         const v = p[f];
@@ -525,7 +589,7 @@ async function syncNow(manual){
                photo. Delete the local one only once it is safely uploaded,
                and let a failure abort the item so it retries with the photo
                still in hand. */
-            const url = await withTimeout(uploadPhoto(item.table, rField, data), UPLOAD_TIMEOUT_MS);
+            const url = await withTimeout(uploadPhoto(item.table, rField, data, press), UPLOAD_TIMEOUT_MS);
             if(!url) throw new Error('photo upload rejected for '+rField);
             p[f] = url;
             /* The url goes into the QUEUE ROW before the photo leaves the
@@ -540,7 +604,7 @@ async function syncNow(manual){
             await removePhotos(rKey);
           } else { p[f]=null; }
         } else if(v.startsWith('data:')){
-          const url = await withTimeout(uploadPhoto(item.table, f, v), UPLOAD_TIMEOUT_MS);
+          const url = await withTimeout(uploadPhoto(item.table, f, v, press), UPLOAD_TIMEOUT_MS);
           if(!url) throw new Error('photo upload rejected for '+f);
           p[f] = url;
           await _rememberPhotoUrl(item, f, url);
@@ -548,7 +612,7 @@ async function syncNow(manual){
       }
 
       /* Save */
-      if(item.method==='insert') await withTimeout(sb.insert(item.table, p), INSERT_TIMEOUT_MS);
+      if(item.method==='insert') await _insertOnce(item.table, p, INSERT_TIMEOUT_MS);
       else await withTimeout(sb.update(item.table, item.edit_id, p), INSERT_TIMEOUT_MS);
 
       await setDone(item.id);

@@ -195,7 +195,35 @@ function fmtDT(iso){
   if(!iso)return'—';
   return new Date(iso).toLocaleString('en-MY',{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit',hour12:true});
 }
-function getAuditForTask(taskId){return audits.find(a=>a.taskId===taskId)||null;}
+/* ── ONE MORNING ON ONE PLOT IS ONE CASE, SO ONE ANSWER ANSWERS IT ──
+   The office, in one line: "as long as is the same work, no matter
+   submitted by how many workers, it should consider as 1 time only."
+
+   Takes a TASK (which is a case, carrying every record id behind it) or a
+   bare id, so an older caller that passes one still gets the same answer.
+   Any audit on any of the case own records answers the case -- an audit an
+   auditor walked and saved, or a closure an admin pressed the cross on.
+   Kept in step with the board own grouping in audit_home.html; change one,
+   change the other, or a chip that cleared there is a card still waiting
+   here. */
+function getAuditForTask(task){
+  const ids = (task && task.ids && task.ids.length)
+            ? task.ids
+            : [String(task && task.id != null ? task.id : task)];
+  for (let i = 0; i < ids.length; i++){
+    const a = audits.find(x => x.taskId === String(ids[i]));
+    if (a) return a;
+  }
+  return null;
+}
+/* The case a given audit belongs to -- its record may not be the one the
+   case is NAMED after, so a find on `id` alone answers undefined and the
+   detail panel loses its task info. */
+function _taskOfAudit(audit){
+  if (!audit) return null;
+  const want = String(audit.taskId);
+  return tasks.find(t => (t.ids || [String(t.id)]).indexOf(want) !== -1) || null;
+}
 function resultBadgeClass(r){
   if(r==='Satisfactory')return'badge-satisfactory';
   if(r==='Unsatisfactory')return'badge-unsatisfactory';
@@ -315,8 +343,8 @@ function selectNursery(n, el){
    exist; writes are guarded so a stale cached page does not throw. */
 function updateStats(){
   const filtered=filterTasks(tasks);
-  const pending=filtered.filter(t=>!getAuditForTask(t.id));
-  const done=filtered.filter(t=>!!getAuditForTask(t.id));
+  const pending=filtered.filter(t=>!getAuditForTask(t));
+  const done=filtered.filter(t=>!!getAuditForTask(t));
   const _st=document.getElementById('stat-total');   if(_st)_st.textContent=fmtNum(filtered.length);
   const _sp=document.getElementById('stat-pending'); if(_sp)_sp.textContent=fmtNum(pending.length);
   const _sd=document.getElementById('stat-done');    if(_sd)_sd.textContent=fmtNum(done.length);
@@ -326,7 +354,7 @@ function updateStats(){
   // audit and height audit's tab-badges.
   document.querySelectorAll('.nursery-tab-item').forEach(btn=>{
     const n=btn.dataset.n; if(!n) return;
-    const count=tasks.filter(t=>t.nursery===n && !getAuditForTask(t.id)).length;
+    const count=tasks.filter(t=>t.nursery===n && !getAuditForTask(t)).length;
     let dot=btn.querySelector('.tab-badge');
     if(count>0){
       if(!dot){dot=document.createElement('span');dot.className='tab-badge';btn.appendChild(dot);}
@@ -337,6 +365,68 @@ function updateStats(){
       btn.removeAttribute('aria-label');
     }
   });
+}
+
+/* ── ONE MORNING ON ONE PLOT FOR ONE JOB IS ONE CASE ────────────────
+   The office asked for it in one line -- "as long as is the same work, no
+   matter submitted by how many workers, it should consider as 1 time
+   only" -- and they are right about the ground: a plot weeded by three
+   people on one morning is one plot to walk, not three.
+
+   A maintenance TASK is one work RECORD, and there are two tables of
+   them (a phone record per worker, and the office schedule row for the
+   same morning), so one morning could wear seven cards. The auditor
+   walks the plot once, saves once, and the other six stayed.
+
+   THE KEY IS THE OFFICE OWN SENTENCE and nothing else: nursery, plot,
+   the job, and the day the work was done. Not the batch -- two workers
+   on one plot may well tick different ones, and that is still one
+   morning. Not the worker, which is the whole point. Not which table it
+   came from.
+
+   Kept in step with audit_home.html, which groups the board chips by the
+   same four things; change one, change the other. The spellings differ
+   (this file labels the work type, the board canonicalises it) and the
+   PARTITION is what has to agree, which is what the test compares.
+
+   The case is NAMED after its lowest id, so it is the same card on every
+   load whatever order the read came back in -- and that is a phone
+   record rather than an office schedule row, a BIGSERIAL id being small
+   where a Date.now() one is near 1.79e12. Every id rides on `ids`,
+   because getAuditForTask has to ask them all. */
+function _maintCaseKey(t){
+  return (t.nursery||'') + '|' + _canonicalPlot(t.plot||'') + '|' +
+         (t.type||'') + '|' + (t.completedDate||'');
+}
+function _casesOf(list){
+  const groups = new Map();
+  (list||[]).forEach(t => {
+    const k = _maintCaseKey(t);
+    if (!groups.has(k)) groups.set(k, []);
+    groups.get(k).push(t);
+  });
+  const uniq = a => Array.from(new Set(a.filter(Boolean)));
+  const out = [];
+  groups.forEach(rows => {
+    const sorted = rows.slice().sort((a, b) => Number(a.id) - Number(b.id));
+    const c = Object.assign({}, sorted[0]);
+    c.ids      = sorted.map(r => String(r.id));
+    c.id       = c.ids[0];
+    c.records  = sorted.length;
+    /* MERGED, never one record standing for the rest: a card naming one
+       of three workers is a card that says the other two did not key
+       anything. The same for the chemical, the round and the batch --
+       they describe the morning, and where the three records agree the
+       join is the single value they all carry. */
+    c.worker   = uniq(sorted.map(r => r.worker)).join(', ');
+    c.chemical = uniq(sorted.map(r => r.chemical)).join(', ');
+    c.round    = uniq(sorted.map(r => r.round)).join(', ');
+    c.batch    = uniq(sorted.map(r => r.batch)).join(', ');
+    c.workerPhotos = sorted.reduce((a, r) => a.concat(r.workerPhotos || []), []);
+    c._sources = uniq(sorted.map(r => r._source));
+    out.push(c);
+  });
+  return out;
 }
 
 /* Applies BOTH filters together — nursery first (cheaper), then task
@@ -559,13 +649,19 @@ async function loadAll(){
     // operation Maintenance module's persistRecords()). Every element
     // carries {id, tarikh, jenis, racun, plot, batch, qty, gaia,
     // remark, checked}. A row without a real tarikh is still pending
-    // on the office side — skip it. Dedupe against field_records on
-    // (nursery, plot, batch, work_type, work_date) so a row that the
-    // field portal also submitted only produces one card.
+    // on the office side — skip it.
+    /* THE DEDUPE THAT USED TO BE HERE IS GONE, and it is the grouping
+       below that replaced it. It dropped an office row matching a field
+       record on (nursery, plot, BATCH, work_type, work_date), which is
+       narrower in one direction -- two workers ticking different batches
+       were two cards -- and worse, it dropped the office row's ID before
+       anything could ask whether THAT id carried the audit. The board
+       does not drop it, so a morning the admin had closed under the
+       office id read as answered there and as still waiting here: two
+       screens, two answers. Every record now reaches the grouping and
+       the group carries every id. */
     const officeBlob = Array.isArray(oRows) && oRows.length ? oRows[0] : null;
     const officeRecs = (officeBlob && Array.isArray(officeBlob.records)) ? officeBlob.records : [];
-    const seenKey = new Set(tasks.map(t =>
-      t.nursery + '|' + t.plot + '|' + (t.batch||'') + '|' + t.type + '|' + (t.completedDate||'')));
     officeRecs.forEach(rec => {
       const workType = JENIS_TO_WORKTYPE[rec.jenis] || 'other';
       if (SKIP_WORK_TYPES.has(workType)) return;
@@ -585,9 +681,6 @@ async function loadAll(){
         return;
       }
       const round = _parseRound(rec.racun);
-      const key = nursery + '|' + plot + '|' + (rec.batch||'') + '|' + (WORK_TYPE_LABEL[workType]||'Others') + '|' + (workDate||'');
-      if (seenKey.has(key)) return;                         // field portal already carried this
-      seenKey.add(key);
       tasks.push({
         id:            String(rec.id),                      // record.id is JS Date.now() — fits BIGINT, unlikely to clash
         nursery,
@@ -605,6 +698,9 @@ async function loadAll(){
         _source:       'office'
       });
     });
+
+    /* ── THE CARD IS A CASE, NOT A RECORD ──────────────────────── */
+    tasks = _casesOf(tasks);
 
     audits = aRows.map(r=>({
       uid:     String(r.id),
@@ -641,7 +737,7 @@ async function loadAll(){
            in that case, but a stale URL might name one). */
         const canon = _canonicalPlot(p);
         const cand = tasks.filter(t => _canonicalPlot(t.plot||'') === canon &&
-                                       !getAuditForTask(t.id));
+                                       !getAuditForTask(t));
         const target = cand.find(t => t.nursery === activeNursery) || cand[0];
         if (!target) { MJMAuditDeepLink.reveal(); return; }
         openForm(target.id, false, null);
@@ -681,8 +777,8 @@ async function loadAll(){
    how much time is left inside the audit window. */
 function renderLists(){
   const filtered = filterTasks(tasks);
-  const pending  = filtered.filter(t=>!getAuditForTask(t.id));
-  const done     = filtered.filter(t=>!!getAuditForTask(t.id));
+  const pending  = filtered.filter(t=>!getAuditForTask(t));
+  const done     = filtered.filter(t=>!!getAuditForTask(t));
 
   /* Progress on the To Audit header replaces the old Total / Pending
      / Audited dashboard: "audited / total tasks", like the other
@@ -750,7 +846,7 @@ function _timelineHtml(list, isAudited){
     /* Date column retired — the "by <due date>" line under each card
        carries the same day already, and dropping the box lets each
        card use the full row width. */
-    const cards = items.map(t => makeTaskCard(t, isAudited ? getAuditForTask(t.id) : null)).join('');
+    const cards = items.map(t => makeTaskCard(t, isAudited ? getAuditForTask(t) : null)).join('');
     return `<div class="timeline-day"><div class="timeline-tasks">${cards}</div></div>`;
   }).join('');
 }
@@ -776,8 +872,14 @@ function makeTaskCard(t, audit){
   // the audit is filed. Round chip and Pending status pill were
   // retired at the auditor's request.
   const countdownHtml = audit ? '' : _countdownChip(t);
+  /* A case of several records SAYS SO. The grouping is what the office
+     asked for, and a card that quietly stood for three records would be
+     the screen deciding something on its own. */
+  const recHtml = (t.records && t.records > 1)
+    ? `<span class="task-chip">${fmtNum(t.records)} records, one job</span>` : '';
   const chips = `<div class="task-chips">
     ${t.batch?`<span class="task-chip">Batch ${t.batch}</span>`:''}
+    ${recHtml}
     ${t.workerPhotos&&t.workerPhotos.length?`<span class="task-chip">📸 ${fmtNum(t.workerPhotos.length)} worker photo${t.workerPhotos.length>1?'s':''}</span>`:''}
     ${countdownHtml}
   </div>`;
@@ -969,7 +1071,7 @@ async function saveAudit(){
 function openDetail(auditUid){
   const audit=audits.find(a=>a.uid===auditUid);if(!audit)return;
   detailId=auditUid;
-  const t=tasks.find(x=>x.id===audit.taskId);
+  const t=_taskOfAudit(audit);
   const heroImg=document.getElementById('detail-img');
   const heroPh=document.getElementById('detail-placeholder');
   if(audit.photo){heroImg.src=audit.photo;heroImg.style.display='block';heroPh.style.display='none';}
@@ -999,7 +1101,11 @@ function openDetail(auditUid){
 function closeDetail(){setView('list');}
 function reAuditFromDetail(){
   const audit=audits.find(a=>a.uid===detailId);
-  if(audit)openForm(audit.taskId,true,audit.uid);
+  if(!audit)return;
+  /* openForm finds the case by the id the case is NAMED after, which is
+     not necessarily the record this audit was saved against. */
+  const t=_taskOfAudit(audit);
+  openForm(t?t.id:audit.taskId,true,audit.uid);
 }
 
 /* --- LIGHTBOX --- */

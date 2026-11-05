@@ -1143,7 +1143,7 @@
 </div>
 
 <script src="audit_lang.js?v=20261022e"></script>
-<script src="audit_supabase.js?v=20261105a"></script>
+<script src="audit_supabase.js?v=20261105b"></script>
 <script src="audit_ribbon.js?v=20261028a"></script>
 <!-- Works out which plots still owe work, for the circles under each
      to-do row. Needs sb.select from audit_supabase.js above it. -->
@@ -1888,15 +1888,42 @@ function loadAuditTodo(){
       diag.audited = audited.size;
       const buckets = new Map();                  // 'YYYY-MM-DD' → {y,m,d,nurseries:Set,plots:Map}
       const _p2 = v => String(v).padStart(2, '0');
+      /* ── ONE MORNING ON ONE PLOT IS ONE CASE ─────────────────────
+         The office, in one line: "as long as is the same work, no matter
+         submitted by how many workers, it should consider as 1 time only."
+
+         A maintenance TASK is one work RECORD, and one morning on one plot
+         can be several -- a phone record per worker, plus the office
+         schedule row for the same morning. The auditor walks that plot
+         once and saves once, which answers ONE task id, and the rest kept
+         their chips. That is what the office was looking at as B06 three
+         times and U02 seven, and it is why an October plot they had
+         audited was still on the list.
+
+         So push() no longer writes a chip. It collects CASES, and the
+         grouping below is what the board draws: nursery + plot + work type
+         + the DAY THE WORK WAS DONE, which is the office own sentence
+         with nothing else in it -- not the batch, not the worker, not
+         which of the two tables it came from.
+
+         THE GROUP IS A VIEW AND NEVER A ROW. Every record is still its own
+         row in both tables and still carries its own deadline into
+         MAINT_DUE, which Audit History reads. What is one is the question
+         the board asks.
+
+         One effect on the DIAGNOSTICS, and it is the only one: the
+         audited test has moved out of here, so skippedNoPlot and
+         skippedOutOfScope now count every record walked rather than only
+         the unanswered ones, and skippedAudited is counted at the
+         grouping. */
+      const CASES = [];
       const push = (id, workDateISO, workType, plotRaw, nurseryNameRaw) => {
         const win = _wtWinFor(workType);
         if (win <= 0)                              { diag.skippedPd++; return; }
-        /* The date is read BEFORE the audited test now, so the deadline
+        /* The date is read BEFORE anything is dropped, so the deadline
            can be recorded for a task that has already been audited --
            Audit History needs it and the walk is the only thing that
-           knows it. The one visible effect is on the diagnostics: an
-           audited row with no work date counts as skippedNoDate rather
-           than skippedAudited. */
+           knows it. */
         if (!workDateISO)                          { diag.skippedNoDate++; return; }
         const [Y,M,D] = workDateISO.split('-').map(Number);
         const dl = new Date(Y, M-1, D);
@@ -1904,32 +1931,13 @@ function loadAuditTodo(){
         const y = dl.getFullYear(), m = dl.getMonth(), d = dl.getDate();
         const dueISO = y + '-' + _p2(m + 1) + '-' + _p2(d);
         MAINT_DUE[String(id)] = { due: dueISO, on: workDateISO };
-        if (audited.has(String(id)))               { diag.skippedAudited++; return; }
         const plot = _canonPlot(plotRaw);
         const n = _nurseryFor(plot, nurseryNameRaw);
         if (!n)                                    { diag.skippedNoPlot++; return; }
         if (SCOPE_NURSERIES.indexOf(n) === -1)     { diag.skippedOutOfScope++; return; }
-        const k  = y + '-' + m + '-' + d;
-        if (!buckets.has(k))
-          buckets.set(k, { y, m, d, nurseries: new Set(), plots: new Map(), items: [] });
-        const bucket = buckets.get(k);
-        bucket.nurseries.add(n);
-        if (!bucket.plots.has(n)) bucket.plots.set(n, new Set());
-        bucket.plots.get(n).add(plot);
-        /* The same walk also keeps WHICH work each plot is waiting on, and
-           the day it was done. The deadline alone cannot say either: two
-           plots share a deadline because their windows happen to end
-           together, not because the same job was done on them. Oldest case
-           first needs the work date, not the deadline. */
-        /* The TASK ID rides with the item. A chip is a pending maintenance
-           record, and the only thing that can retire one is an
-           audit_maintenance_audits row carrying its task_id -- which is
-           what the admin close below writes. Without the id on the item
-           the chip knows which plot it is and not which record. */
-        bucket.items.push({ id: id, nursery: n, plot, wt: _wtCanon(workType),
-                            on: workDateISO, due: dueISO });
-        diag.kept++;
-        if (diag.sampleKept.length < 3) diag.sampleKept.push({ plot:plotRaw, workType, workDateISO, deadline: y+'-'+String(m+1).padStart(2,'0')+'-'+String(d).padStart(2,'0'), nursery: n });
+        CASES.push({ id: String(id), nursery: n, plot, wt: _wtCanon(workType),
+                     on: workDateISO, due: dueISO, y, m, d,
+                     plotRaw: plotRaw, workType: workType });
       };
       /* Raw sample BEFORE push() filters anything out, so a run where
          everything gets skipped still shows what the real column
@@ -1966,6 +1974,56 @@ function loadAuditTodo(){
         });
       officeRecs.forEach(rec => {
         push(rec.id, _tarikhToISO(rec.tarikh), JENIS_TO_WT[rec.jenis] || 'other', rec.plot);
+      });
+      /* ── AND ANY ANSWER ON ANY OF ITS RECORDS ANSWERS THE WHOLE GROUP ──
+         That is the half that takes the audited plot off the board. The
+         auditor saved against one of the morning records; the group is
+         one case, so the case is answered. A closure an admin pressed the
+         cross on counts the same way -- both are a row in
+         audit_maintenance_audits, which is the one thing that has ever
+         retired a chip.
+
+         The REPRESENTATIVE is the lowest id, so the chip names the same
+         record on every load whatever order the read came back in -- and
+         that is the phone record rather than the office schedule row,
+         since a BIGSERIAL id is small where a Date.now() one is near
+         1.79e12. Every id in the group rides on the item as `ids`,
+         because the admin close has to answer the case the chip stands
+         for and not one record of it. */
+      const _caseKey = c => c.nursery + '|' + c.plot + '|' + c.wt + '|' + c.on;
+      const caseGroups = new Map();
+      CASES.forEach(c => {
+        const k = _caseKey(c);
+        if (!caseGroups.has(k)) caseGroups.set(k, { ids: [], c: c });
+        caseGroups.get(k).ids.push(c.id);
+      });
+      diag.cases  = CASES.length;
+      diag.groups = caseGroups.size;
+      diag.recordsFolded = CASES.length - caseGroups.size;
+      caseGroups.forEach(g => {
+        if (g.ids.some(id => audited.has(id))) { diag.skippedAudited += g.ids.length; return; }
+        const c = g.c;
+        const ids = g.ids.slice().sort((a, b) => Number(a) - Number(b));
+        const k = c.y + '-' + c.m + '-' + c.d;
+        if (!buckets.has(k))
+          buckets.set(k, { y: c.y, m: c.m, d: c.d,
+                           nurseries: new Set(), plots: new Map(), items: [] });
+        const bucket = buckets.get(k);
+        bucket.nurseries.add(c.nursery);
+        if (!bucket.plots.has(c.nursery)) bucket.plots.set(c.nursery, new Set());
+        bucket.plots.get(c.nursery).add(c.plot);
+        /* The item also keeps WHICH work this plot is waiting on, and the
+           day it was done. The deadline alone cannot say either: two plots
+           share a deadline because their windows happen to end together,
+           not because the same job was done on them. Oldest case first
+           needs the work date, not the deadline. */
+        bucket.items.push({ id: ids[0], ids: ids, nursery: c.nursery, plot: c.plot,
+                            wt: c.wt, on: c.on, due: c.due });
+        diag.kept++;
+        if (diag.sampleKept.length < 3)
+          diag.sampleKept.push({ plot: c.plotRaw, workType: c.workType,
+                                 workDateISO: c.on, deadline: c.due,
+                                 nursery: c.nursery, records: ids.length });
       });
       MAINT_OCCURRENCES = Array.from(buckets.values());
       diag.buckets = MAINT_OCCURRENCES.length;
@@ -2031,27 +2089,36 @@ function loadAuditTodo(){
            the row appears when THIS auditor has maintenance owing and
            not otherwise. */
         const auditedIds = new Set((aRows||[]).map(a => String(a.task_id)));
-        const loose = [];
+        const looseRaw = [];
         /* Pending work that resolves to NO nursery at all. It is not this
            auditor's or anyone else's until something can place it, and it
            is the one case where staying silent is wrong: the row vanishes
            and nothing anywhere says a dozen records were dropped. Counted
            so the row can say so. */
         let unplaceable = 0;
+        /* The audited test is NOT applied here any more -- it is applied to
+           the GROUP below, for the reason the strict walk gives at length:
+           one morning on one plot for one job is one case however many
+           workers keyed it, so an answer on any of its records answers it.
+           Only the unplaceable COUNT still asks, because that count drives
+           a sentence calling those records pending. */
         const pushLoose = (id, workDateISO, workType, plotRaw, nurseryNameRaw) => {
           if (SKIP_FALLBACK_TYPES.has(String(workType||'').toLowerCase())) return;
-          if (auditedIds.has(String(id)))  return;
           if (!workDateISO)                return;
           const plot = _canonPlot(plotRaw);
           const n = _nurseryFor(plot, nurseryNameRaw);
-          if (!n) { unplaceable++; return; }            // cannot say which nursery
+          if (!n) {                                    // cannot say which nursery
+            if (!auditedIds.has(String(id))) unplaceable++;
+            return;
+          }
           if (SCOPE_NURSERIES.indexOf(n) === -1) return;
           /* The id rides here too. The today-bucket this list feeds is a
              real row with real chips, and a chip with no id is a chip an
              admin cannot close -- which showed up as the x appearing on
              the overdue row and not on the one beside it. */
-          loose.push({ id: id, nursery: n, plot, wt: _wtCanon(workType), on: workDateISO,
-                       due: (MAINT_DUE[String(id)] || {}).due || '' });
+          looseRaw.push({ id: String(id), nursery: n, plot, wt: _wtCanon(workType),
+                          on: workDateISO,
+                          due: (MAINT_DUE[String(id)] || {}).due || '' });
         };
         (fRows||[]).forEach(r => pushLoose(r.id, r.work_date, r.work_type, r.plot_name, r.nursery_name));
         const looseOffice = (oRows && oRows[0] && Array.isArray(oRows[0].records))
@@ -2061,6 +2128,26 @@ function loadAuditTodo(){
           pushLoose(rec.id, _tarikhToISO(rec.tarikh),
                     JENIS_TO_WT[rec.jenis] || 'other', rec.plot);
         });
+
+        /* Grouped by the same key as the strict walk, and answered by the
+           same test. Without it this walk is the way a second worker own
+           record gets back onto the board: its own dedupe below is on
+           nursery|plot|work type with no DAY in it, which is coarser in
+           one direction and says nothing at all about two records of the
+           same morning. */
+        const looseGroups = new Map();
+        looseRaw.forEach(c => {
+          const k = c.nursery + '|' + c.plot + '|' + c.wt + '|' + c.on;
+          if (!looseGroups.has(k)) looseGroups.set(k, { ids: [], c: c });
+          looseGroups.get(k).ids.push(c.id);
+        });
+        const loose = [];
+        looseGroups.forEach(g => {
+          if (g.ids.some(id => auditedIds.has(id))) return;
+          const ids = g.ids.slice().sort((a, b) => Number(a) - Number(b));
+          loose.push(Object.assign({}, g.c, { id: ids[0], ids: ids }));
+        });
+        diag.looseRecords = looseRaw.length;
 
         /* Placed work raises a normal row. Work that could not be placed
            at all raises one too, empty but explaining itself — never
@@ -3845,7 +3932,7 @@ loadHistory();
 document.addEventListener('mjm-lang-changed', renderHistory);
 
 </script>
-<script src="audit_dexie_offline.js?v=20261105a"></script>
+<script src="audit_dexie_offline.js?v=20261105b"></script>
 
 <!-- Nelos floating To-Do dock — the round button in the corner.
      See shared/shared_nelos_dock.js -->

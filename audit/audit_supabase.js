@@ -398,6 +398,52 @@ function _rememberNoCreatedAt(table) {
   catch (e) {}
 }
 
+/* ── AND THE SAME MEMORY FOR `id`, WHICH IS THE TIEBREAKER ──
+   A read is paged (see below), and PAGING A NON-UNIQUE ORDER IS UNSTABLE
+   BY CONSTRUCTION. `created_at.desc` alone leaves rows written in the same
+   millisecond in no defined order, and the two pages are two separate
+   requests: the database is free to answer the tie one way for page one
+   and the other way for page two. A row can then come back TWICE, which
+   the de-dupe catches, and -- the half that cannot be caught -- another
+   row is SKIPPED, silently, for ever.
+
+   That is not rare here. A phone pushes a plot batch by batch in ONE
+   insert and the audit board's section close writes a dozen rows in one
+   go, so a run of rows sharing `created_at` to the microsecond sitting
+   across the 1,000-row boundary is the ordinary case rather than the
+   unlucky one.
+
+   And a SKIPPED audit row is not a cosmetic loss. The auditor board asks
+   one question of that table -- `select=task_id`, is this task audited --
+   so a task id that falls through the boundary reads as NOT AUDITED, and
+   its plot comes back onto the To Do list over work somebody has already
+   done or an admin has already closed.
+
+   So the order carries a UNIQUE tiebreaker. `created_at.desc,id.desc`
+   leaves "newest first" exactly as it was and makes the sequence total,
+   which is the only thing that makes a page boundary mean anything. A
+   table with no `id` is remembered the same way one with no `created_at`
+   is, and pays for the failed attempt once. */
+const _NO_ID_KEY = 'mjm_sb_no_id';
+const _noId = (function () {
+  try {
+    return new Set(JSON.parse(localStorage.getItem(_NO_ID_KEY) || '[]'));
+  } catch (e) { return new Set(); }
+})();
+function _rememberNoId(table) {
+  _noId.add(table);
+  try { localStorage.setItem(_NO_ID_KEY, JSON.stringify([..._noId])); }
+  catch (e) {}
+}
+/* The order clause this table can actually be read with. Empty where the
+   table has neither column, which is where this reader was. */
+function _orderFor(table) {
+  const parts = [];
+  if (!_noCreatedAt.has(table)) parts.push('created_at.desc');
+  if (!_noId.has(table))        parts.push('id.desc');
+  return parts.length ? '&order=' + parts.join(',') : '';
+}
+
 /* ── A READ OVER 1,000 ROWS CAME BACK CUT, AND SAID NOTHING ──
    PostgREST answers at most `db-max-rows` rows and Supabase sets that to
    1,000. There is no error and no flag on the body: the read simply ends,
@@ -459,22 +505,33 @@ async function sbSelectAll(path) {
 
 const sb = {
   async select(table, query = '') {
-    if (_noCreatedAt.has(table)) return sbSelectAll(`${table}?${query}`);
-    try {
-      return await sbSelectAll(`${table}?${query}&order=created_at.desc`);
-    } catch (e) {
-      /* Some audit tables were made by hand and have no created_at. PostgREST
-         rejects the whole read with a 400 on the order clause, which reaches
-         the screen as an empty list — indistinguishable from "no records".
-         Read it unordered instead, and remember so this table never pays
-         for the failed attempt again. */
-      if (/created_at/.test(e.message) && /42703|does not exist/i.test(e.message)) {
-        console.warn('[sb] no created_at on', table, '— reading unordered');
-        _rememberNoCreatedAt(table);
-        return await sbSelectAll(`${table}?${query}`);
+    /* A LADDER, not two ifs. Some audit tables were made by hand and have
+       no created_at; a view may have no id. PostgREST rejects the WHOLE
+       read with a 400 on the order clause, which reaches the screen as an
+       empty list — indistinguishable from "no records" — so each column
+       that is not there is dropped, remembered, and asked for again. Two
+       columns is at most two retries, and the third ask is the unordered
+       one, which cannot fail on an order clause it does not carry. */
+    for (let attempt = 0; attempt < 3; attempt++) {
+      try {
+        return await sbSelectAll(`${table}?${query}${_orderFor(table)}`);
+      } catch (e) {
+        const msg = String((e && e.message) || '');
+        if (!/42703|does not exist/i.test(msg)) throw e;
+        if (/created_at/.test(msg) && !_noCreatedAt.has(table)) {
+          console.warn('[sb] no created_at on', table, '— dropping it from the order');
+          _rememberNoCreatedAt(table);
+          continue;
+        }
+        if (/\bid\b/.test(msg) && !_noId.has(table)) {
+          console.warn('[sb] no id on', table, '— dropping it from the order');
+          _rememberNoId(table);
+          continue;
+        }
+        throw e;
       }
-      throw e;
     }
+    return await sbSelectAll(`${table}?${query}`);
   },
   /* Can this login save at all? Asked at sign in, before an auditor
      spends a day filling in forms the database is going to refuse.

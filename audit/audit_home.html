@@ -1143,7 +1143,7 @@
 </div>
 
 <script src="audit_lang.js?v=20261022e"></script>
-<script src="audit_supabase.js?v=20261104a"></script>
+<script src="audit_supabase.js?v=20261105a"></script>
 <script src="audit_ribbon.js?v=20261028a"></script>
 <!-- Works out which plots still owe work, for the circles under each
      to-do row. Needs sb.select from audit_supabase.js above it. -->
@@ -1785,13 +1785,74 @@ function loadAuditTodo(){
      into per-work-type groups (Manuring / Weeding / Interrow / P&D /
      Others). Tapping a chip deep-links straight into that plot's audit
      form via ?plot= on the maintenance page. */
+  /* ── A PHONE RECORD RAISES AN AUDIT ONCE THE CONDUCTOR HAS VERIFIED IT ──
+     The office asked for it in one line -- "it should be shown here after FC
+     verified the job" -- over a board carrying 77 weeding chips on one day.
+
+     A maintenance record saved on a phone is a CLAIM until a Field Conductor
+     presses Verify, and the conductor can also SEND IT BACK. This board asked
+     for neither column, so it raised a task for all three states at once:
+
+       - a record nobody has looked at yet, which is work the conductor has
+         still to accept;
+       - a record the conductor REJECTED, which `add_maint_field_reject.sql`
+         says in its own words goes back on the week as still outstanding --
+         so the auditor was being sent to audit a record the conductor had
+         explicitly refused;
+       - and then the record the worker keyed AGAIN to replace it, which is
+         how one morning on one plot comes to wear two chips.
+
+     The office own Work Maintenance page has always read the verified ones
+     only (`_verifiedOnly` in plot_maintenance_script.js). This is that rule,
+     asked one screen along, and it is applied ONCE to the row list so the
+     strict walk, the fallback walk and the diagnostics all see the same
+     records -- two filters is two answers.
+
+     IT FAILS OPEN. A database that predates those columns refuses the WHOLE
+     read over a column it has not got, which would take every maintenance
+     row off the board rather than show one too many. So the columns are
+     asked for by name, a refusal that names them drops them, and that
+     database behaves exactly as this page did before the gate. */
+  async function _readMaintFieldRecords(diag){
+    const BASE = 'id,work_date,nursery_name,plot_name,work_type,jenis';
+    try {
+      const rows = await sb.select('nops_maint_field_records',
+                                   'select=' + BASE + ',verified_at,rejected_at');
+      diag.fGate = 'verified only';
+      diag.fRaw  = (rows || []).length;
+      const out = [];
+      let unverified = 0, rejected = 0;
+      (rows || []).forEach(r => {
+        if (r && r.rejected_at)  { rejected++;   return; }
+        if (!r || !r.verified_at){ unverified++; return; }
+        out.push(r);
+      });
+      diag.fUnverified = unverified;
+      diag.fRejected   = rejected;
+      return out;
+    } catch (e) {
+      const msg = String((e && e.message) || e);
+      if (/verified_at|rejected_at/i.test(msg)) {
+        console.warn('[audit-home] no verified_at/rejected_at on '
+                   + 'nops_maint_field_records — every record raises a task');
+        diag.fGate = 'NOT INSTALLED - every record raises a task';
+        try {
+          const rows = await sb.select('nops_maint_field_records', 'select=' + BASE);
+          diag.fRaw = (rows || []).length;
+          return rows || [];
+        } catch (e2) { diag.fError = String(e2?.message || e2); return []; }
+      }
+      diag.fError = msg;
+      return [];
+    }
+  }
   async function loadMaintTimeline(){
     const diag = { fRows: 0, oRecs: 0, audited: 0, kept: 0, skippedPd: 0,
                    skippedAudited: 0, skippedNoPlot: 0, skippedOutOfScope: 0,
                    skippedNoDate: 0, sampleKept: [] };
     try {
       const [fRows, aRows, oRows, cRows] = await Promise.all([
-        sb.select('nops_maint_field_records', 'select=id,work_date,nursery_name,plot_name,work_type,jenis').catch(e => { diag.fError = String(e?.message||e); return []; }),
+        _readMaintFieldRecords(diag),
         sb.select('audit_maintenance_audits', 'select=task_id').catch(e => { diag.aError = String(e?.message||e); return []; }),
         sb.select('nops_maint_records',       'select=records').catch(e => { diag.oError = String(e?.message||e); return []; }),
         /* The plots this yard added by hand. Fails open: without it the
@@ -2895,6 +2956,44 @@ function loadAuditTodo(){
       if (typeof loadHistory === 'function') await loadHistory();
       else if (typeof renderHistory === 'function') renderHistory();
     } catch (err) {
+      /* ── A CHIP THAT IS ALREADY AUDITED MUST NOT COST THE SECTION ──
+         The rows go up as ONE insert, and `audit_maint_one_per_task` is a
+         UNIQUE index on task_id (RUN_ME_remove_duplicate_audits.sql), so
+         PostgREST refuses the WHOLE insert over a single task that already
+         carries a row -- the section closes NONE of its plots and the
+         alert reads as a constraint name.
+
+         A chip like that should not be on the board at all; it is there
+         because the task's audit was not visible when the board was drawn
+         (see the paging tiebreaker in audit_supabase.js). But a stale
+         chip must not be able to block the plots beside it, so the rows
+         that really do need a closure are sent again on their own, still
+         as ONE insert, and the ones that were already answered are NAMED
+         rather than reported as a failure. */
+      const msg = (err && err.message) ? String(err.message) : '';
+      if (/23505/.test(msg) && list.length > 1) {
+        try {
+          const have = new Set((await sb.select('audit_maintenance_audits', 'select=task_id') || [])
+                                 .map(a => String(a.task_id)));
+          const left = rows.filter(r => !have.has(String(r.task_id)));
+          const already = rows.length - left.length;
+          if (left.length) {
+            const res2 = await sb.insert('audit_maintenance_audits', left);
+            if (res2 && res2.error) throw new Error(res2.error.message || 'refused');
+          }
+          await loadMaintTimeline();
+          renderAll();
+          if (typeof loadHistory === 'function') await loadHistory();
+          else if (typeof renderHistory === 'function') renderHistory();
+          if (already) alert(already + ' of these ' + rows.length
+                             + ' were already audited or closed, so they needed no closing. '
+                             + (left.length ? 'The other ' + left.length + ' are closed now.'
+                                            : 'Nothing was left to close.'));
+          return;
+        } catch (err2) {
+          console.error('[audit-home] second pass could not close the plots:', err2);
+        }
+      }
       console.error('[audit-home] could not close the plot:', err);
       alert(t('close_plot_failed') + ' ' + (err && err.message ? err.message : ''));
     }
@@ -3746,7 +3845,7 @@ loadHistory();
 document.addEventListener('mjm-lang-changed', renderHistory);
 
 </script>
-<script src="audit_dexie_offline.js?v=20261104b"></script>
+<script src="audit_dexie_offline.js?v=20261105a"></script>
 
 <!-- Nelos floating To-Do dock — the round button in the corner.
      See shared/shared_nelos_dock.js -->

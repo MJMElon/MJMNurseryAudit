@@ -287,13 +287,82 @@ function describeSbError(e){
 /* ================================================================
    SMART SAVE
 ================================================================ */
+
+/* ── ONE PRESS OF SAVE IS ONE AUDIT ──
+   A save that is sent twice has to be recognisable as the same save, or
+   the second arrival is a second row. client_uid is that: one id per
+   press, carried on every retry of that press, with a unique index on it
+   in the database (shared/RUN_ME_one_audit_per_save.sql) so the repeat
+   comes back 23505 — which the sweep below has retired quietly since the
+   day it was written. That path had simply never had anything to fire
+   on, because nothing in these tables was ever unique.
+
+   NOT audit_id, which looks like the natural key and is not: it is the
+   number of audits the phone can see plus one, so two auditors saving at
+   the same moment both answer the same and a unique index on it would
+   refuse the second person their work. This one is random.
+
+   ASKED OF THE TABLE, ONCE. Naming a column the table has not got is not
+   an empty cell in PostgREST, it is the whole insert refused — which on
+   this screen is an auditor standing in a plot being told the save
+   failed. So the column goes on the row only where a read of it answers. */
+const _hasUid = new Map();
+
+async function _tableTakesUid(table){
+  if(_hasUid.has(table)) return _hasUid.get(table);
+  try{
+    await sb.select(table, 'select=client_uid&limit=1');
+    _hasUid.set(table, true);
+    return true;
+  }catch(e){
+    /* ONLY A REFUSAL THAT NAMES THE COLUMN IS AN ANSWER. No signal, a
+       policy, a dropped connection — none of those is the column being
+       absent, and remembering them as one would switch the guard off for
+       the rest of the session over a bad moment. Those are not cached, so
+       the next save asks again. */
+    if(/client_uid/.test(e && e.message || '')){
+      _hasUid.set(table, false);
+    }
+    return false;
+  }
+}
+
+function _newUid(){
+  try{
+    if(typeof crypto !== 'undefined' && crypto.randomUUID) return crypto.randomUUID();
+  }catch(_){}
+  return 'u' + Date.now().toString(36) + Math.random().toString(36).slice(2, 10);
+}
+
 async function smartSave(table, method, payload, editId=null){
+
+  /* An UPDATE names the row it changes, so it cannot land twice. Only an
+     insert needs the stamp. */
+  let body = payload;
+  if(method === 'insert' && !payload.client_uid && navigator.onLine
+     && await _tableTakesUid(table)){
+    body = {...payload, client_uid: _newUid()};
+  }
+
+  /* DECLARED OUT HERE, and that is the whole of the duplicate the office
+     found on U03.
+
+     It used to live inside the try below, so when the online insert
+     failed the catch fell through to the queue carrying `payload` — the
+     ORIGINAL, still holding the photo as raw data rather than the link
+     that had just been uploaded into `clean`. A slow answer therefore
+     cost a SECOND upload of the same picture under a new name, which is
+     why seven copies of one audit pointed at seven different files.
+
+     And the insert that "failed" may well have landed: eight seconds is
+     a timeout, not a refusal. So the queued copy carries the stamp as
+     well, and the database refuses it rather than writing it again. */
+  const clean = {...body};
 
   /* Online path */
   if(navigator.onLine){
     try{
       /* Upload photos first (15s total timeout) */
-      const clean = {...payload};
       const photoUploads = [];
       for(const f of Object.keys(clean)){
         const v = clean[f];
@@ -327,10 +396,14 @@ async function smartSave(table, method, payload, editId=null){
     }
   }
 
-  /* Offline path — store photos in IndexedDB */
+  /* Offline path — store photos in IndexedDB.
+
+     It queues `clean`, never `payload`: a photo already uploaded is kept
+     as its link, so only a picture that never reached storage is written
+     into IndexedDB and sent again. See the note on `clean` above. */
   try{
     const qkey = 'q'+Date.now()+Math.random().toString(36).slice(2,6);
-    const stored = {...payload};
+    const stored = {...clean};
     for(const f of Object.keys(stored)){
       const v = stored[f];
       if(v && typeof v==='string' && v.startsWith('data:')){

@@ -236,7 +236,7 @@ select.cf-native-hidden{display:none!important;}
 
     // THE HIDE HAS TO SURVIVE THE PAGE RESTYLING ITS OWN SELECT.
     // Several pages colour a <select> by state and do it the blunt way --
-    // `sel.className = 'lvl-select lvl-admin'` on the User Access drawer,
+    // `sel.className = 'lvl-select lvl-admin'` on the Module Assess Control drawer,
     // `select.className = 'input-style ... t3-dest-plot'` on Tab 3's
     // destination plot. An assignment to .className REPLACES the class
     // list, so it takes cf-native-hidden with it, and the browser's own

@@ -30,7 +30,7 @@
   <link rel="stylesheet" href="audit_ribbon.css?v=20260826a"/>
 
   <!-- Anti-flicker auth guard -->
-  <script src="audit_login_guard.js?v=20261027a"></script>
+  <script src="audit_login_guard.js?v=20261027b"></script>
   <script>MJMAuditLogin.requireSignIn();</script>
   <style>body{opacity:0;transition:opacity 0.2s ease;}</style>
 
@@ -1142,8 +1142,8 @@
   </div>
 </div>
 
-<script src="audit_lang.js?v=20261022e"></script>
-<script src="audit_supabase.js?v=20261105b"></script>
+<script src="audit_lang.js?v=20261022f"></script>
+<script src="audit_supabase.js?v=20261105c"></script>
 <script src="audit_ribbon.js?v=20261028a"></script>
 <!-- Works out which plots still owe work, for the circles under each
      to-do row. Needs sb.select from audit_supabase.js above it. -->
@@ -1157,7 +1157,7 @@
      here. It injects the dialog's own styles, so this page needs no
      stylesheet of ours. -->
 <script src="audit_history.js?v=20261012e"></script>
-<!-- The portal permission layer used to load here for the User Access card.
+<!-- The portal permission layer used to load here for the Module Assess Control card.
      That card lives on the back end now and nothing on the auditor view
      reads MJMAccess, so the three scripts came out: an auditor on nursery
      signal no longer waits on a CDN and two shared files to see the page. -->
@@ -1317,7 +1317,7 @@ function loadAuditTodo(){
   let scope = MJMAuditLogin.scope();
   if (!scope) {
     /* permissions.audit_landing is the portal an admin set for this auditor
-       on Settings → User Access. It leads, because it is the answer someone
+       on Settings → Module Assess Control. It leads, because it is the answer someone
        gave deliberately; the older profile fields stay behind it so nothing
        already relying on them breaks. */
     const pref = ((user.permissions && user.permissions.audit_landing)

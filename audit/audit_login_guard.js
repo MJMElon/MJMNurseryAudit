@@ -196,8 +196,8 @@
      text was the problem; both nurseries are offered now and the choice is
      the auditor's.
 
-     If per-person limits are wanted later they belong in User Access,
-     alongside the other permissions, not in a substring match on a job
+     If per-person limits are wanted later they belong in Module Assess
+     Control, alongside the other permissions, not in a substring match on a job
      title. audit_home builds its rows from this same answer, so the two
      cannot disagree. */
   function allowedScopes() {

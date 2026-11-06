@@ -84,7 +84,7 @@
     // guard refuses anybody else touching manage_users or super_admin.
     out.super_admin = !!perms.super_admin;
     // Per-page and per-function access INSIDE a module, managed from that
-    // module's own User Access page. Any `<module>_pages` / `<module>_actions`
+    // module's own Module Assess Control page. Any `<module>_pages` / `<module>_actions`
     // key is carried through, so adding a module needs no change here.
     //
     //   <module>_pages   { batch:'admin'|'normal'|'none', ... }
@@ -569,7 +569,7 @@
   function requireOperationAction(page, action, message) {
     if (canDoOperation(page, action)) return true;
     try {
-      alert(message || 'Access denied — you do not have permission for this action. Ask an admin to grant it in User Access.');
+      alert(message || 'Access denied — you do not have permission for this action. Ask an admin to grant it in Module Assess Control.');
     } catch (e) { /* non-browser context */ }
     return false;
   }
@@ -609,7 +609,7 @@
   function requireAction(moduleName, page, action, message) {
     if (canDo(moduleName, page, action)) return true;
     try {
-      alert(message || 'Access denied — you do not have permission for this action. Ask an admin to grant it in User Access.');
+      alert(message || 'Access denied — you do not have permission for this action. Ask an admin to grant it in Module Assess Control.');
     } catch (e) { /* non-browser context */ }
     return false;
   }

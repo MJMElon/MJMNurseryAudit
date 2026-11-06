@@ -363,7 +363,7 @@ function verdict(anonRead, userRead) {
            'audit policy cannot grant you anything. Send this screen over — this needs an SQL fix.';
   } else if (findings.includes('NO_AUDIT_PERM')) {
     title = 'This account has not been given the Audit module';
-    body = 'Nobody has granted it in Settings, User Access, Edit Access — the email in ' +
+    body = 'Nobody has granted it in Settings, Module Assess Control, Edit Access — the email in ' +
            'section 2 above is the account to find there. It is an office action, not a ' +
            'fault: grant Audit (Normal) and this phone works. No SQL is needed for it.';
   } else if (findings.includes('CANNOT_SAVE')) {

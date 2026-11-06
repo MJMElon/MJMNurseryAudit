@@ -505,7 +505,7 @@
 
 </div>
 
-<script src="audit_lang.js?v=20261022e"></script>
+<script src="audit_lang.js?v=20261022f"></script>
 <script src="audit_offline_vault.js?v=20260831a"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <!-- Customers cannot enter the staff system — the one rule, in one file. -->
@@ -519,7 +519,7 @@
      with the way through to the audit portal); everyone else goes straight
      to the auditor view. Kept here rather than imported because this page
      deliberately does not load audit_supabase.js. */
-  /* The portal an admin set for this auditor on Settings → User Access.
+  /* The portal an admin set for this auditor on Settings → Module Assess Control.
      Applied at sign-in rather than only as a default, so an auditor who
      switched nursery once still starts each session where their work is.
      The key matches scopeKey() in audit_login_guard.js — keep the two in

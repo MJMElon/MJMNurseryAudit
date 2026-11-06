@@ -14,8 +14,8 @@
 <script src="../shared/shared_staff_gate.js"></script>
 <script src="../shared/shared_access.js"></script>
 <script src="audit_settings.js?v=4"></script>
-<script src="audit_system_setting.js?v=3"></script>
-<script src="../shared/shared_module_access.js?v=4"></script>
+<script src="audit_system_setting.js?v=4"></script>
+<script src="../shared/shared_module_access.js?v=6"></script>
 <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;700;900&display=swap" rel="stylesheet">
 </head>
 <body>
@@ -23,9 +23,9 @@
 /* ══════════════════════════════════════════════════════════════════════
    NURSERY AUDIT — SETTINGS
 
-   The module files two things under one door: who may do what (the User
-   Access screen every module shares), and the settings that belong to the
-   installation itself rather than to a person.
+   The module files two things under one door: who may do what (the Module
+   Assess Control screen every module shares), and the settings that belong
+   to the installation itself rather than to a person.
 
    The file keeps its old name so every link, bookmark and the service
    worker's cache list still find it; only what it is called on screen
@@ -40,7 +40,7 @@ MJMModuleAccess.init({
   // What the module calls this screen now that it holds more than one thing.
   pageLabel:   'Settings',
   barLabel:    'Module Settings',
-  accessLabel: 'User Access',
+  accessLabel: 'Module Assess Control',
   tabs: [
     { key: 'system', label: 'System Setting',
       html: AuditSystemSetting.html, mount: AuditSystemSetting.mount }

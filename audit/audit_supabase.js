@@ -106,7 +106,7 @@ function canOpenAuditPage(page) {
     const p = u.permissions || {};
     // audit_actions is authoritative; audit_pages mirrors it.
     const acts = p.audit_actions && p.audit_actions[page];
-    /* `view` MISSING is not `view` false. User Access lists Record a new
+    /* `view` MISSING is not `view` false. Module Assess Control lists Record a new
        audit and Edit and delete past audits for each page, so a saved row
        can easily read { record:true, edit:false } with no `view` key in
        it at all — and `!!acts.view` then denied the page to somebody the
@@ -130,14 +130,14 @@ function canOpenAuditPage(page) {
 /* ================================================================
    WHAT THEY MAY DO INSIDE A PAGE
 
-   User Access has listed "Record a new audit" and "Edit & delete past
+   Module Assess Control has listed "Record a new audit" and "Edit & delete past
    audits" against each of the four modules since that screen was
    written, and NOTHING HAS EVER READ THEM. Unticking Edit for an
    auditor saved cleanly, showed as set on both screens that offer it,
    and that auditor went on editing and deleting — which is the exact
    fault the `view` half of this file was written to correct, one level
-   down. Putting the same two ticks on a second screen (555 MJM Team ->
-   User Access -> Auditor Portal) is what made it worth closing.
+   down. Putting the same two ticks on a second screen (Nursery 555 Team ->
+   Module Assess Control -> Auditor Portal) is what made it worth closing.
 
    Three things about the shape, and the first is the whole reason this
    is not simply a check at the save:
@@ -243,7 +243,7 @@ function showNoAccessNotice() {
     'background:#b45309;color:#fff;font-size:12.5px;font-weight:600;text-align:center;' +
     "font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;cursor:pointer";
   b.textContent = '🔒 You no longer have access to that page. Ask an admin to switch it ' +
-                  'back on in User Access.';
+                  'back on in Module Assess Control.';
   b.onclick = () => b.remove();
   document.body.appendChild(b);
   setTimeout(() => b.remove(), 9000);
@@ -284,7 +284,7 @@ async function applyAuditAccess() {
 
   /* Anything drawn from the cached permissions — the admin-only Back End
      link, say — was decided before this refresh landed, so a role changed
-     in User Access would not show until the load after next. Tell the page
+     in Module Assess Control would not show until the load after next. Tell the page
      the fresh answer is in. */
   document.dispatchEvent(new Event('mjm-audit-access-ready'));
 }

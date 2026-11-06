@@ -1,8 +1,9 @@
 /* ══════════════════════════════════════════════════════════════════════
    NURSERY AUDIT — SYSTEM SETTING
 
-   The second half of Settings (audit_user_access.html). User Access says
-   who may do what; this says what the module asks for in the first place:
+   The second half of Settings (audit_user_access.html). Module Assess
+   Control says who may do what; this says what the module asks for in
+   the first place:
 
      • Rounds and schedule — how many times each audit runs in a month and
        on which days, per nursery scope. Add or remove rounds freely; a

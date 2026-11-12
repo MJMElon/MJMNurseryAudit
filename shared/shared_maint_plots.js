@@ -154,6 +154,40 @@
     return (idx || {})[plotKey(plot)] || null;
   }
 
+  /* WHICH GANG IS PAID FOR LOADING A DO. worked_by_by_nursery is keyed by
+     the GANG: the DO Signing app ticks a nursery list of workers, and every
+     other nursery can be opened under it by hand, because a UNN 1 gang
+     regularly loads seedlings off a UNN 2 plot. The Loading Seedlings sheet
+     and the claim then asked only the PLOT nursery, so such a DO was on the
+     UNN 2 sheet with nobody ticked and on no UNN 1 sheet at all: carried and
+     paid to nobody. October 2026 had two of them, DO-NPGCE401 and
+     DO-0HVUL302, 700 seedlings off N16.
+
+     The rule, per item line of the DO:
+     - the gang of the nursery the plot is in, if that gang is ticked;
+     - otherwise the gangs that ARE ticked, the line divided equally between
+       them, so a line is never paid twice;
+     - otherwise (nobody ticked anywhere) the plot nursery, so an unticked
+       DO still shows on its own sheet as a question to answer.
+     Where the plot nursery gang is ticked nothing moves -- where the
+     seedlings were is still who carried them, unless they say otherwise.
+
+     ownerQty(d) is the plot side, [{nursery, qty}] per line, built by the
+     caller with its own plot index, so the one rule serves both screens.
+     SHARED: nursery_ops Loading Seedlings sheet and the npayroll claim. */
+  function doLoaderQty(d, nursery, lines) {
+    const by = (d && d.worked_by_by_nursery) || {};
+    const ticked = Object.keys(by).filter(k => Array.isArray(by[k]) && by[k].length);
+    let qty = 0;
+    (lines || []).forEach(({ nursery: owner, qty: q }) => {
+      if (!q) return;
+      if (owner && ticked.includes(owner)) { if (owner === nursery) qty += q; return; }
+      if (ticked.length) { if (ticked.includes(nursery)) qty += q / ticked.length; return; }
+      if (owner === nursery) qty += q;
+    });
+    return qty;
+  }
+
   global.MJMMaintPlots = { NURSERIES, base, merged, index, nurseryOfPlot, plotKey,
-                           loadCustom, loadStock, loadAll };
+                           loadCustom, loadStock, loadAll, doLoaderQty };
 })(typeof window !== 'undefined' ? window : globalThis);

@@ -11,12 +11,10 @@
 ================================================================ */
 'use strict';
 
-const NURSERY_PLOTS = {
-  PN:   Array.from({length:52}, (_,i)=>'P'+String(i+1).padStart(2,'0')),
-  BNN:  Array.from({length:14}, (_,i)=>'B'+String(i+1).padStart(2,'0')),
-  UNN1: Array.from({length:18}, (_,i)=>'U'+String(i+1).padStart(2,'0')),
-  UNN2: Array.from({length:20}, (_,i)=>'N'+String(i+1).padStart(2,'0'))
-};
+/* THE PLOTS, FROM SEEDLING STOCK — audit_plots.js is the whole of why. The
+   LIVE object that file fills in place, so the grid and the plot dropdown
+   pick up a plot the office added; the four ranges are still the floor. */
+const NURSERY_PLOTS = MJMAuditPlots.all();
 const NURSERY_LABELS = {PN:'PN',BNN:'BNN',UNN1:'UNN 1',UNN2:'UNN 2'};
 
 let records=[], activeTab='PN', activeView='list';
@@ -121,25 +119,15 @@ function selectTab(nursery){
 
 /* Canonical plot code — NURSERY_PLOTS is padded ('B01'), but the
    operation ledger and shared_plots keep the unpadded form ('B1').
-   Preserves the '-R' reserve suffix. Same helper the plot audit uses. */
-function _canonicalPlot(raw){
-  const s=String(raw||'').trim().toUpperCase();
-  const m=s.match(/^([A-Z]+)(\d+)(-R)?$/);
-  if(!m)return s;
-  return m[1]+m[2].padStart(2,'0')+(m[3]||'');
-}
+   Preserves the '-R' reserve suffix. Same helper the plot audit uses —
+   MJMAuditPlots.canon, which is where that one reads it from too. */
+const _canonicalPlot = MJMAuditPlots.canon;
 /* Reverse lookup keyed by BOTH padded and unpadded plot codes so a raw
    log spelling from the ledger resolves without a normalise-then-lookup
-   two-step. */
-const PLOT_TO_NURSERY=(function(){
-  const m={};
-  Object.keys(NURSERY_PLOTS).forEach(n=>NURSERY_PLOTS[n].forEach(p=>{
-    m[p]=n;
-    const stripped=p.replace(/^([A-Z]+)0+(\d)/,'$1$2');
-    if(stripped!==p)m[stripped]=n;
-  }));
-  return m;
-})();
+   two-step. Handed back LIVE by audit_plots.js and never built with an
+   IIFE here: a map built at script load is a snapshot, and a plot the
+   office added lands after it. This was the IIFE. */
+const PLOT_TO_NURSERY = MJMAuditPlots.byPlot();
 
 /* --- LOAD FROM SUPABASE ---
    Fetch audit records + batch roster (from two sources) + balance in
@@ -1945,7 +1933,10 @@ function init(){
   /* ?plot=<code> opens that plot directly — routes via openPlot so
      PN lands on the multi-batch form and MN lands on the batch list,
      the same way a plot-tile tap does. */
-  loadRecords().then(() => {
+  /* The office's plot list first — it fills NURSERY_PLOTS and
+     PLOT_TO_NURSERY in place and the grid is built off both. Never
+     rejects: with no line the four ranges are what is drawn. */
+  MJMAuditPlots.load().then(loadRecords).then(() => {
     MJMAuditDeepLink.openPlot(NURSERY_PLOTS[activeTab] || [], openPlot);
   });
 }

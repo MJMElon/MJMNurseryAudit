@@ -8,7 +8,7 @@
    - Supabase API: network only (never cache)
    - On activate: delete old caches, claim all clients
 ================================================================ */
-const VER = 'mjm-26111201';
+const VER = 'mjm-26111703';
 
 const ALL_FILES = [
   './audit_index.html',
@@ -32,6 +32,15 @@ const ALL_FILES = [
   './audit_theme.css',
   './audit_wide.css',
   './audit_supabase.js',
+  /* The module's one plot list, and a HARD dependency of all five scripts
+     below it: each reads MJMAuditPlots at its top level, so a page that
+     could not fetch this one would not draw at all. Precached for that
+     reason rather than left to the runtime cache-first handler, which only
+     picks a file up after a first successful online fetch of a page that
+     uses it. ../shared/shared_maint_plots.js is NOT a hard dependency —
+     without it this file keeps the four fixed ranges — so it stays with the
+     other ../shared files, outside this list. */
+  './audit_plots.js',
   './audit_pending.js',
   './audit_settings.js',
   './audit_deeplink.js',

@@ -440,31 +440,18 @@ function filterTasks(list){
 
 /* Field records only carry plot_name (e.g. 'B1', 'B4-R'); the audit
    grid keys everything by nursery + padded plot code ('B01', 'B04-R').
-   This is the same helper the Plot / Height / Papan audits use. */
-function _canonicalPlot(raw){
-  const s = String(raw||'').trim().toUpperCase();
-  const m = s.match(/^([A-Z]+)(\d+)(-R)?$/);
-  if(!m) return s;
-  return m[1] + m[2].padStart(2,'0') + (m[3]||'');
-}
-const PLOT_TO_NURSERY_M = (function(){
-  const P = {
-    PN:   Array.from({length:52},(_,i)=>'P'+String(i+1).padStart(2,'0')),
-    BNN:  Array.from({length:14},(_,i)=>'B'+String(i+1).padStart(2,'0')),
-    UNN1: Array.from({length:18},(_,i)=>'U'+String(i+1).padStart(2,'0')),
-    UNN2: Array.from({length:20},(_,i)=>'N'+String(i+1).padStart(2,'0'))
-  };
-  const m = {};
-  Object.keys(P).forEach(n => P[n].forEach(p => {
-    m[p] = n;
-    const stripped = p.replace(/^([A-Z]+)0+(\d)/, '$1$2');
-    if(stripped !== p) m[stripped] = n;
-  }));
-  return m;
-})();
+   This is the same helper the Plot / Height / Papan audits use —
+   MJMAuditPlots.canon, which is where all four read it from. */
+const _canonicalPlot = MJMAuditPlots.canon;
+/* THE PLOTS, FROM SEEDLING STOCK. This was an IIFE over the four fixed
+   ranges, with the shared list layered over it by a loader of its own;
+   it is the LIVE map audit_plots.js fills in place, and that file owns
+   both the ranges and the read for the whole module. A map built at
+   script load is a snapshot, which is why this is never built here. */
+const PLOT_TO_NURSERY_M = MJMAuditPlots.byPlot();
 
 /* ── WHICH NURSERY A PLOT IS IN ──────────────────────────────────────
-   The hardcoded list below is P01-P52, B01-B14, U01-U18, N01-N20 and
+   The four fixed ranges are P01-P52, B01-B14, U01-U18, N01-N20 and
    nothing else, so a job on any other plot used to be dropped on the
    floor without a word - the audit simply never appeared and there was
    nothing on screen to say one was missing.
@@ -477,42 +464,27 @@ const PLOT_TO_NURSERY_M = (function(){
 
    shared/shared_maint_plots.js is the list the schedule and the claim
    already share. It reads shared_plots (where Seedling Stock says which
-   nursery a plot is in) and nops_maint_custom_plots (plots added by
-   hand), and matches on letters and digits. This page now reads it too.
+   nursery a plot is in, on System Settings) and nops_maint_custom_plots
+   (plots added by hand), and matches on letters and digits.
 
-   Four answers are tried, and the last of them cannot fail:
-     1. the shared list, which knows -R and anything the office added;
-     2. the hardcoded list, for when that file or its tables cannot be
-        read - it is still right for every ordinary plot;
-     3. the nursery the RECORD itself states;
-     4. the plot letter - B is Batu Niah, U is Ulu Niah 1, N is Ulu Niah
+   THIS PAGE WAS THE FIRST IN THE MODULE TO READ IT, and it did so on its
+   own: its own shim over the audit client, its own index, its own copy of
+   the ranges. The other four files in the module then had to be linked up
+   too, so audit_plots.js owns all three for the whole module and this
+   page reads that - one shim, one list, one canon. PLOT_TO_NURSERY_M
+   above IS that list, filled in place, which is why step 1 and step 2 of
+   the ladder below are now the same lookup.
+
+   Three answers are tried, and the last of them cannot fail:
+     1. the plot map - the four ranges, plus -R and anything the office
+        added on Seedling Stock, and the ranges alone when that read
+        could not be made;
+     2. the nursery the RECORD itself states;
+     3. the plot letter - B is Batu Niah, U is Ulu Niah 1, N is Ulu Niah
         2, P is the Pre-Nursery.
-   Anything that survives all four is COUNTED AND NAMED on the page
+   Anything that survives all three is COUNTED AND NAMED on the page
    rather than dropped. A job nobody can see is a job nobody does. */
-let PLOT_IDX = null;          // from shared_maint_plots, once loaded
 let unplacedTasks = [];       // {plot, type} that no rule could place
-
-/* MJMMaintPlots wants a supabase-js client and this page has its own
-   thin one. Two methods is the whole of what it asks for. */
-const _plotSb = {
-  from(table){
-    return {
-      select(cols){
-        return sb.select(table, 'select=' + String(cols).replace(/\s+/g, ''))
-                 .then(rows => ({ data: rows || [] }), error => ({ error }));
-      }
-    };
-  }
-};
-
-async function _loadPlotIndex(){
-  try{
-    if (typeof MJMMaintPlots === 'undefined') return;
-    PLOT_IDX = MJMMaintPlots.index(await MJMMaintPlots.loadAll(_plotSb));
-  }catch(e){
-    console.warn('[maint-audit] shared plot list unavailable, using the built-in one', e);
-  }
-}
 
 const _PREFIX_NURSERY = { P:'PN', B:'BNN', U:'UNN1', N:'UNN2' };
 
@@ -520,12 +492,8 @@ function _nurseryOfPlot(rawPlot, statedNursery){
   const canon = _canonicalPlot(rawPlot);
   if (!canon) return null;
 
-  if (PLOT_IDX && typeof MJMMaintPlots !== 'undefined'){
-    const hit = MJMMaintPlots.nurseryOfPlot(rawPlot, PLOT_IDX)
-             || MJMMaintPlots.nurseryOfPlot(canon, PLOT_IDX);
-    if (hit) return hit;
-  }
   if (PLOT_TO_NURSERY_M[canon]) return PLOT_TO_NURSERY_M[canon];
+  if (PLOT_TO_NURSERY_M[rawPlot]) return PLOT_TO_NURSERY_M[rawPlot];
 
   /* The record says where it was. Letters and digits only, the same rule
      every other crossing of this boundary uses, so "UNN 1" finds UNN1. */
@@ -568,9 +536,10 @@ async function loadAll(){
     }
 
     /* Before anything is placed. Soft on its own - a failure here leaves
-       the built-in list standing, which is right for every ordinary
-       plot. */
-    await _loadPlotIndex();
+       the four ranges standing, which is right for every ordinary
+       plot - and idempotent, so the other scripts on this page asking
+       for it too is one read. */
+    await MJMAuditPlots.load();
     // nops_maint_field_records is the SINGLE source of truth for tasks
     // now. As soon as a field worker keys a work_date over on the
     // operation Maintenance page, the row shows up here as a Pending

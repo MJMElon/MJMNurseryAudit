@@ -93,20 +93,34 @@
      Soft, for the same reason loadCustom is: a table that cannot be read
      gives back nothing rather than taking the claim down. */
   async function loadStock(sb) {
-    const out = {};
-    if (!sb) return out;
+    return (await loadStockStrict(sb)).by;
+  }
+
+  /* THE SAME READ, SAYING WHETHER IT ANSWERED.
+
+     `loadStock` cannot tell "the read failed" from "the read was fine and
+     this nursery has no plots keyed", because both come back as nothing —
+     and the difference is now the whole of whether a plot the office
+     DELETED disappears or the built-in range stands. See `offered` below.
+
+     `ok` is false only for a read that was refused or threw. `by` is what
+     came back, and `keyed` is the nurseries the office has actually said
+     something about. */
+  async function loadStockStrict(sb) {
+    const by = {};
+    if (!sb) return { by, ok: false, keyed: [] };
     const res = await sb.from('shared_plots').select('nursery_name, plot_name')
       .then(r => r, e => ({ error: e }));
-    if (res.error) return out;
+    if (res.error) return { by, ok: false, keyed: [] };
     const byKey = {};
     NURSERIES.forEach(n => { byKey[plotKey(n)] = n; });
     (res.data || []).forEach(r => {
       const n = byKey[plotKey(r && r.nursery_name)];
       const p = String((r && r.plot_name) || '').trim();
       if (!n || !p) return;
-      (out[n] || (out[n] = [])).push(p);
+      (by[n] || (by[n] = [])).push(p);
     });
-    return out;
+    return { by, ok: true, keyed: Object.keys(by) };
   }
 
   /* Both at once. Either one failing still gives back what the other found,
@@ -142,7 +156,106 @@
     return out;
   }
 
-  /* plot key → nursery, built once and handed back for repeated lookups. */
+  /* ══ WHAT IS OFFERED, which is not the same question as what can be PLACED
+     ═══════════════════════════════════════════════════════════════════════
+
+     A plot is added AND DELETED in one place: Seedling Stock Management →
+     System Settings. The office: *"i deleted a plot, make it remove from all
+     modules too. i added a plot, make it add for all modules too."*
+
+     The adding half was already true — the four built-in ranges were the
+     FLOOR and `shared_plots` was added on top. **That floor is exactly what
+     stopped a deletion biting**: B14 was offered whether or not the office
+     still had a row for it.
+
+     SO THE OFFICE'S LIST WINS, PER NURSERY. For a nursery the office has
+     keyed, that list IS the list — delete B14 there and it is gone from
+     every grid, dropdown and schedule row in the company. Three things keep
+     that from being a cliff, and each is a way it would otherwise go wrong:
+
+     1. A READ THAT FAILED CHANGES NOTHING (`ok` false). The ranges stand,
+        exactly as before. An empty plot picker is a module nobody can use,
+        and a grid that went blank because a table could not be read is far
+        worse than one that is a plot short. This is the fail-open rule every
+        gate here follows, and it is why `loadStockStrict` exists at all.
+     2. ASKED PER NURSERY, NEVER ONCE FOR ALL FOUR. The PRE NURSERY is
+        counted in TRAYS, so `shared_plots` may hold no PN row at all — and
+        a single global test would then wipe P01 to P52 off every screen in
+        the system. A nursery the office has said NOTHING about keeps its
+        range: an absent answer is nobody having been asked, which is the
+        oldest rule in this file.
+     3. IT IS THE LIST ONLY, NEVER THE PLACING. `index()` below still builds
+        off the ranges as well, so a maintenance record keyed on a plot that
+        has since been deleted STILL RESOLVES to its nursery and still pays.
+        Taking a plot off the pickers must not take last month's work off the
+        claim — that is the orphan-list fault this file opens with, and it
+        would be money.
+
+     WHAT IT COSTS, and `shared/CHECK_which_plots_each_module_offers.sql` is
+     what measures it: every plot in a built-in range that the office has NOT
+     keyed now DISAPPEARS. Run that check before trusting this — if it names
+     a plot nobody deleted, that plot was never keyed in Seedling Stock, and
+     the answer is to add it there. */
+  function offered(loaded) {
+    const stock  = (loaded && loaded.stock)  || {};
+    const custom = (loaded && loaded.custom) || {};
+    const ok     = !!(loaded && loaded.ok);
+    const out = {};
+    NURSERIES.forEach(n => {
+      const keyed = ok && Array.isArray(stock[n]) && stock[n].length;
+      out[n] = keyed ? stock[n].slice() : BASE[n].slice();
+    });
+    /* A plot added by hand on a schedule is the office saying it exists by
+       another route, so it is still appended — and it is deduped against
+       whichever list won above. */
+    const seen = {};
+    Object.keys(out).forEach(n => { seen[n] = new Set(out[n].map(plotKey)); });
+    Object.keys(custom).forEach(n => {
+      if (!out[n]) { out[n] = []; seen[n] = new Set(); }
+      (custom[n] || []).forEach(p => {
+        const k = plotKey(p);
+        if (!k || seen[n].has(k)) return;
+        out[n].push(p); seen[n].add(k);
+      });
+    });
+    NURSERIES.forEach(n => out[n].sort(plotOrder));
+    return out;
+  }
+
+  /* B10 after B9, and B3-R behind B3 — letters, then the number AS A NUMBER,
+     then whatever follows it. The built-in ranges are already in that order,
+     so this moves nothing that was already right. */
+  function plotOrder(a, b) {
+    return String(a).localeCompare(String(b), undefined,
+                                   { numeric: true, sensitivity: 'base' });
+  }
+
+  /* BOTH ANSWERS FROM ONE READ, which is what every caller actually wants:
+     `offer` is the list to put on a screen and `place` is the map that says
+     which nursery a plot is in. Two reads would be two answers. */
+  async function loadLists(sb) {
+    const [custom, stock] = await Promise.all([loadCustom(sb), loadStockStrict(sb)]);
+    const loaded = { custom, stock: stock.by, ok: stock.ok };
+    return {
+      offer: offered(loaded),
+      place: index(loadedFlat(custom, stock.by)),
+      stockOk: stock.ok,
+      keyed: stock.keyed
+    };
+  }
+
+  function loadedFlat(custom, stock) {
+    const out = {};
+    [custom || {}, stock || {}].forEach(src => Object.keys(src).forEach(n => {
+      (out[n] || (out[n] = [])).push(...src[n]);
+    }));
+    return out;
+  }
+
+  /* plot key → nursery, built once and handed back for repeated lookups.
+     RANGES INCLUDED, deliberately — see `offered` above: a record keyed on a
+     plot the office has since deleted has to go on resolving, or deleting a
+     plot takes last month's work off the salary claim. */
   function index(custom) {
     const by = merged(custom);
     const map = {};
@@ -189,5 +302,6 @@
   }
 
   global.MJMMaintPlots = { NURSERIES, base, merged, index, nurseryOfPlot, plotKey,
-                           loadCustom, loadStock, loadAll, doLoaderQty };
+                           loadCustom, loadStock, loadStockStrict, loadAll,
+                           loadLists, offered, plotOrder, doLoaderQty };
 })(typeof window !== 'undefined' ? window : globalThis);

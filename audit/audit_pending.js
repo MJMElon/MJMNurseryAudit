@@ -37,35 +37,23 @@
 
 (function (global) {
 
-  /* Same four lists the module scripts carry. Copied rather than
-     imported because each module script declares NURSERY_PLOTS as a
-     top-level const and loading two of them together would collide. */
-  const NURSERY_PLOTS = {
-    PN:   Array.from({length:52}, (_,i)=>'P'+String(i+1).padStart(2,'0')),
-    BNN:  Array.from({length:14}, (_,i)=>'B'+String(i+1).padStart(2,'0')),
-    UNN1: Array.from({length:18}, (_,i)=>'U'+String(i+1).padStart(2,'0')),
-    UNN2: Array.from({length:20}, (_,i)=>'N'+String(i+1).padStart(2,'0'))
-  };
+  /* THE PLOTS, FROM SEEDLING STOCK. This used to be the ORIGINAL of the
+     four lists — the module scripts each carried their own copy and this
+     file said so in as many words, and audit_plots.js is now the one all
+     five read. It is the LIVE object that file fills in place, so a plot
+     the office added takes its place in the board's plot ORDER rather than
+     arriving on the end of it with the strays. */
+  const NURSERY_PLOTS = MJMAuditPlots.all();
 
   /* Plot codes are padded here ('B01') but the operation ledger and the
      saved audits both write them however they were typed ('B1'), so
-     everything is canonicalised on the way in. Same regex the module
-     scripts use. */
-  function canonPlot(raw){
-    const s = String(raw || '').trim().toUpperCase();
-    const m = s.match(/^([A-Z]+)(\d+)(-R)?$/);
-    return m ? m[1] + m[2].padStart(2,'0') + (m[3] || '') : s;
-  }
+     everything is canonicalised on the way in. MJMAuditPlots.canon is that
+     rule, and the list it canonicalises against is the same file's. */
+  const canonPlot = MJMAuditPlots.canon;
 
-  const PLOT_TO_NURSERY = (function(){
-    const m = {};
-    Object.keys(NURSERY_PLOTS).forEach(n => NURSERY_PLOTS[n].forEach(p => {
-      m[p] = n;
-      const stripped = p.replace(/^([A-Z]+)0+(\d)/, '$1$2');
-      if (stripped !== p) m[stripped] = n;
-    }));
-    return m;
-  })();
+  /* LIVE, never an IIFE here: a map built at script load is a snapshot and
+     a plot the office added lands after it. This was the IIFE. */
+  const PLOT_TO_NURSERY = MJMAuditPlots.byPlot();
 
   const trim = v => String(v == null ? '' : v).trim();
   const key3 = (n, p, b) => n + '|' + p + '|' + b;
@@ -159,6 +147,13 @@
      loses an hour, a plot silently dropped loses a month. */
   async function load(nurseries){
     scope = (nurseries || []).slice();
+
+    /* The office's plot list, which fills NURSERY_PLOTS and
+       PLOT_TO_NURSERY in place. Awaited here rather than left to race,
+       because this file's whole job is to place a plot under a nursery and
+       a plot it cannot place is one it reports as a stray. It never
+       rejects, and it sends nothing with no line. */
+    await MJMAuditPlots.load();
 
     /* Offline: six requests would just be six round trips to the
        service worker's synthetic 503 — send none of them, and use

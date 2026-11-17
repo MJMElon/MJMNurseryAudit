@@ -17,12 +17,10 @@ const NURSERY_LABELS = {PN:'PN',BNN:'BNN',UNN1:'UNN 1',UNN2:'UNN 2'};
    range, or one made by a transfer, is still plainly in its nursery. */
 const _PREFIX_NURSERY_P = { P:'PN', B:'BNN', U:'UNN1', N:'UNN2' };
 
-const NURSERY_PLOTS = {
-  PN:   Array.from({length:52},(_,i)=>'P'+String(i+1).padStart(2,'0')),
-  BNN:  Array.from({length:14},(_,i)=>'B'+String(i+1).padStart(2,'0')),
-  UNN1: Array.from({length:18},(_,i)=>'U'+String(i+1).padStart(2,'0')),
-  UNN2: Array.from({length:20},(_,i)=>'N'+String(i+1).padStart(2,'0'))
-};
+/* THE PLOTS, FROM SEEDLING STOCK — audit_plots.js is the whole of why. The
+   LIVE object that file fills in place, so the batch form's plot dropdown
+   offers a plot the office added; the four ranges are still the floor. */
+const NURSERY_PLOTS = MJMAuditPlots.all();
 
 
 let batches=[], audits=[];
@@ -151,24 +149,15 @@ function _deriveMatureDate(b){
 /* Canonical plot code — the papan grid uses the padded form ('B01'),
    the operation ledger keeps the unpadded form ('B1'). Same helper
    the Plot Condition and Height audits use. Preserves the '-R'
-   reserve suffix. */
-function _canonicalPlot(raw){
-  const s = String(raw||'').trim().toUpperCase();
-  const m = s.match(/^([A-Z]+)(\d+)(-R)?$/);
-  if(!m) return s;
-  return m[1] + m[2].padStart(2,'0') + (m[3]||'');
-}
+   reserve suffix. It is MJMAuditPlots.canon, which is where those two
+   read it from too. */
+const _canonicalPlot = MJMAuditPlots.canon;
 /* Reverse lookup keyed by both padded and unpadded plot codes so a raw
-   log spelling resolves without a canonicalise-then-lookup two-step. */
-const PLOT_TO_NURSERY_P = (function(){
-  const m = {};
-  Object.keys(NURSERY_PLOTS).forEach(n => NURSERY_PLOTS[n].forEach(p => {
-    m[p] = n;
-    const stripped = p.replace(/^([A-Z]+)0+(\d)/, '$1$2');
-    if(stripped !== p) m[stripped] = n;
-  }));
-  return m;
-})();
+   log spelling resolves without a canonicalise-then-lookup two-step.
+   Handed back LIVE by audit_plots.js and never built with an IIFE here:
+   a map built at script load is a snapshot, and a plot the office added
+   lands after it. This was the IIFE. */
+const PLOT_TO_NURSERY_P = MJMAuditPlots.byPlot();
 
 /* Latest batch per plot. PN batches often have no date_transplant (they
    sit in the pre-nursery until they get moved), so fall back to
@@ -1434,7 +1423,10 @@ function init(){
   if (_seg) _seg.style.display = 'none';
   const _fab = document.getElementById('fab');
   if (_fab) _fab.style.display = 'none';
-  loadAll();
+  /* The office's plot list first — it fills NURSERY_PLOTS and
+     PLOT_TO_NURSERY_P in place and the roster is placed off both. Never
+     rejects: with no line the four ranges are what is used. */
+  MJMAuditPlots.load().then(loadAll);
   // Deep-link support — same contract as the other audit pages: the hub
   // sends ?nursery=X to pick the nursery filter, plus &from=home to
   // re-label the top-bar back arrow as Choose-Another-Nursery. Runs

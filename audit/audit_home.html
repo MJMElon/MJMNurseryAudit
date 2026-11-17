@@ -1147,7 +1147,9 @@
 <script src="audit_ribbon.js?v=20261028a"></script>
 <!-- Works out which plots still owe work, for the circles under each
      to-do row. Needs sb.select from audit_supabase.js above it. -->
-<script src="audit_pending.js?v=20261015a"></script>
+<script src="../shared/shared_maint_plots.js?v=20261117a"></script>
+<script src="audit_plots.js?v=20261117c"></script>
+<script src="audit_pending.js?v=20261117a"></script>
 <!-- Rounds, maintenance windows and the ages being audited. Defaults to
      what used to be hardcoded below, so this cannot break the board. -->
 <script src="audit_settings.js?v=4"></script>
@@ -1710,29 +1712,23 @@ function loadAuditTodo(){
     manuring: 'Manuring',  weeding: 'Weeding',  interrow: 'Interrow Spray',
     pd:       'P & D Spraying',                 other:    'Others'
   };
-  function _canonPlot(raw){
-    const s = String(raw||'').trim().toUpperCase();
-    const m = s.match(/^([A-Z]+)(\d+)(-R)?$/);
-    return m ? m[1] + m[2].padStart(2,'0') + (m[3]||'') : s;
-  }
-  const _PLOT_NUR = (function(){
-    const P = {
-      PN:   Array.from({length:52},(_,i)=>'P'+String(i+1).padStart(2,'0')),
-      BNN:  Array.from({length:14},(_,i)=>'B'+String(i+1).padStart(2,'0')),
-      UNN1: Array.from({length:18},(_,i)=>'U'+String(i+1).padStart(2,'0')),
-      UNN2: Array.from({length:20},(_,i)=>'N'+String(i+1).padStart(2,'0'))
-    };
-    const m = {};
-    Object.keys(P).forEach(n => P[n].forEach(p => {
-      m[p] = n;
-      const stripped = p.replace(/^([A-Z]+)0+(\d)/, '$1$2');
-      if (stripped !== p) m[stripped] = n;
-    }));
-    return m;
-  })();
+  const _canonPlot = MJMAuditPlots.canon;
+  /* THE PLOTS, FROM SEEDLING STOCK. This was an IIFE over the four fixed
+     ranges; it is the LIVE map audit_plots.js fills in place, so a plot the
+     office added on Seedling Stock Management → System Settings resolves
+     here as soon as that read lands. A map built at script load is a
+     snapshot, which is why this is never built here. */
+  const _PLOT_NUR = MJMAuditPlots.byPlot();
   /* ── WHICH NURSERY A PLOT BELONGS TO ──
-     _PLOT_NUR knows the fixed ranges only — P01–P52, B01–B14, U01–U18,
-     N01–N20. The maintenance module lets a nursery carry plots outside
+     _PLOT_NUR now carries the fixed ranges AND whatever shared_plots holds
+     — see audit_plots.js. The paragraphs below are what it was before that,
+     and the custom-plot override they describe STAYS: it is read straight
+     off nops_maint_custom_plots with diagnostics around it, and it is
+     applied BEFORE the ranges, so a wrong entry there is findable. What it
+     no longer is, is the only thing standing between this page and a plot
+     outside a range.
+
+     The maintenance module lets a nursery carry plots outside
      them: it keeps those in nops_maint_custom_plots and merges them into
      its own NURSERY_PLOTS on load (plot_maintenance_script.js:262).
 
@@ -1851,6 +1847,13 @@ function loadAuditTodo(){
                    skippedAudited: 0, skippedNoPlot: 0, skippedOutOfScope: 0,
                    skippedNoDate: 0, sampleKept: [] };
     try {
+      /* The office's plot list, which fills _PLOT_NUR in place. Awaited
+         before the walk rather than left to race: this page's whole job
+         here is to place a plot under a nursery, and one it cannot place
+         is one it drops. Asked as well as inside MJMAuditPending.load
+         because the two walks are independent; the read itself happens
+         once per page, and it never rejects. */
+      await MJMAuditPlots.load();
       const [fRows, aRows, oRows, cRows] = await Promise.all([
         _readMaintFieldRecords(diag),
         sb.select('audit_maintenance_audits', 'select=task_id').catch(e => { diag.aError = String(e?.message||e); return []; }),

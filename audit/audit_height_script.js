@@ -193,7 +193,7 @@ async function loadRecords(){
       // batch is standing on a plot at some point in its life.
       sb.select('shared_inventory_logs',
                 'select=batch_name,plot_name,transaction_type,breed_name,transaction_date,created_at,remark'
-              + '&transaction_type=in.(Planted,Transplanted,Transplanted_Premium,Transplanted_DoubleTone)')
+              + '&' + MJMAuditRoster.LOG_FILTER)
         .catch(e=>{console.warn('[height-audit] logs load failed:',e);return[];}),
       sb.select('audit_batches','select=nursery,plot,batch_no,breed')
         .catch(e=>{console.warn('[height-audit] audit_batches load failed:',e);return[];}),
@@ -212,36 +212,26 @@ async function loadRecords(){
       auditor_name:r.auditor_name||''
     }));
 
-    // Build (nursery, plot, batch) triples from BOTH sources, deduped.
-    const seen=new Set();
-    plotBatches=[];
-    const addBatch=(nursery, plot, batch, breed, planted)=>{
-      if(!nursery||!plot||!batch)return;
-      const key=nursery+'|'+plot+'|'+batch;
-      if(seen.has(key))return;
-      seen.add(key);
-      plotBatches.push({nursery, plot, batch, breed:breed||'', planted:planted||''});
-    };
-    (tRows||[]).forEach(l=>{
-      const plot=_canonicalPlot(l.plot_name);
-      const batch=String(l.batch_name||'').trim();
-      const nursery=plot?PLOT_TO_NURSERY[plot]:null;
-      addBatch(nursery, plot, batch, l.breed_name, _logDate(l));
-    });
-    (abRows||[]).forEach(r=>{
-      const plot=_canonicalPlot(r.plot);
-      const batch=String(r.batch_no||'').trim();
-      const nursery=plot?PLOT_TO_NURSERY[plot]:null;
-      addBatch(nursery, plot, batch, r.breed);
-    });
+    /* THE ROSTER AND THE BALANCE, BOTH FROM audit_roster.js — the Movement
+       Report is a SOURCE of plot·batch pairs and not only the gate over
+       them, so a batch that arrived by TRANSFER (every -R plot) is on the
+       grid. Plot Condition asks the same file the same way.
 
-    balanceByPB={};
-    (balRows||[]).forEach(r=>{
-      const plot=_canonicalPlot(r.plot_name);
-      const batch=String(r.batch_name||'').trim();
-      if(!plot||!batch)return;
-      balanceByPB[plot+'|'+batch]=Number(r.qty||0);
+       `dateOf` is this module's own `_logDate` and is why the shared builder
+       takes one: the planted date behind the age label comes off the LOG and
+       the report carries no date at all. A pair the report alone knows about
+       has none, and `_rebuildPlanted` keys on the BATCH rather than on the
+       plot, so a transferred batch still reads the age of its own sowing. */
+    const roster = MJMAuditRoster.build({
+      logs:         tRows,
+      auditBatches: abRows,
+      balance:      balRows,
+      canon:        _canonicalPlot,
+      nurseryOf:    p => PLOT_TO_NURSERY[p] || null,
+      dateOf:       _logDate
     });
+    plotBatches = roster.plotBatches;
+    balanceByPB = roster.balanceByPB;
 
     _rebuildPlanted();
     _saveOfflineCache();
@@ -250,7 +240,9 @@ async function loadRecords(){
       fromLogs:(tRows||[]).length,
       fromAuditBatches:(abRows||[]).length,
       totalPlotBatches: plotBatches.length,
-      balanceRows:(balRows||[]).length
+      balanceRows:(balRows||[]).length,
+      onlyInReport: roster.fromBalance,
+      reportPlotsOnNoNursery: roster.unplaced
     });
     renderList();
   }catch(e){showToast(t('err_load'));console.error(e);}
@@ -297,11 +289,9 @@ window.isBatchInAgeScope=isBatchInAgeScope;
 /* --- BATCH HELPERS (mirror plot-condition semantics exactly) --- */
 /* Fail closed: no balance data at all → treat every batch as required so
    the auditor decides by eye instead of skipping real work. */
+/* The one rule, in audit_roster.js — Plot Condition asks the same one. */
 function isBatchNotRequired(plot, batch){
-  if(!Object.keys(balanceByPB).length)return false;
-  const key=_canonicalPlot(plot)+'|'+String(batch||'').trim();
-  const qty=balanceByPB[key];
-  return qty===undefined||qty<=0;
+  return MJMAuditRoster.notRequired(balanceByPB, _canonicalPlot, plot, batch);
 }
 window.isBatchNotRequired=isBatchNotRequired;
 

@@ -213,7 +213,7 @@ async function loadRecords(){
       // and later Transplanted OUT to a main nursery plot).
       sb.select('shared_inventory_logs',
                 'select=batch_name,plot_name,transaction_type,breed_name'
-              + '&transaction_type=in.(Planted,Transplanted,Transplanted_Premium,Transplanted_DoubleTone)')
+              + '&' + MJMAuditRoster.LOG_FILTER)
         .catch(e => { console.warn('[plot-audit] life-stage logs load failed:', e); return []; }),
       sb.select('audit_batches', 'select=nursery,plot,batch_no,breed')
         .catch(e => { console.warn('[plot-audit] audit_batches load failed:', e); return []; }),
@@ -239,49 +239,21 @@ async function loadRecords(){
     const breedByBatch = {};
     (bMetaRows || []).forEach(b => { if (b && b.name) breedByBatch[b.name] = b.breed_name || ''; });
 
-    // Build (nursery, plot, batch) triples from BOTH sources, deduped
-    // so the same batch on the same plot doesn't produce multiple dots
-    // (Transplanted + Transplanted_Premium for one plot, or the same
-    // row appearing in both sources).
-    const seen = new Set();
-    plotBatches = [];
-    const addBatch = (nursery, plot, batch, breed) => {
-      if (!nursery || !plot || !batch) return;
-      const key = nursery + '|' + plot + '|' + batch;
-      if (seen.has(key)) return;
-      seen.add(key);
-      plotBatches.push({ nursery, plot, batch, breed: breed || breedByBatch[batch] || '' });
-    };
-    (tRows || []).forEach(l => {
-      // Canonicalise the plot as it comes off the ledger — logs use
-      // 'B1' but the audit grid iterates 'B01'.
-      const plot  = _canonicalPlot(l.plot_name);
-      const batch = String(l.batch_name || '').trim();
-      const nursery = plot ? PLOT_TO_NURSERY[plot] : null;
-      addBatch(nursery, plot, batch, l.breed_name);
+    /* THE ROSTER AND THE BALANCE, BOTH FROM audit_roster.js — the Movement
+       Report is a SOURCE of plot·batch pairs and not only the gate over
+       them, which is the whole of what the office asked for. That file is
+       the one place it is written; this module and Seedling Height had a
+       copy each and were already drifting apart on their column lists. */
+    const roster = MJMAuditRoster.build({
+      logs:         tRows,
+      auditBatches: abRows,
+      balance:      balRows,
+      canon:        _canonicalPlot,
+      nurseryOf:    p => PLOT_TO_NURSERY[p] || null,
+      breedOf:      b => breedByBatch[b] || ''
     });
-    (abRows || []).forEach(r => {
-      // audit_batches carries `nursery` directly, but re-check via
-      // PLOT_TO_NURSERY so a stale nursery label can't sneak a plot
-      // into the wrong grid.
-      const plot = _canonicalPlot(r.plot);
-      const batch = String(r.batch_no || '').trim();
-      const nursery = plot ? PLOT_TO_NURSERY[plot] : null;
-      addBatch(nursery, plot, batch, r.breed);
-    });
-    // Build the balance lookup. Plot / batch keys are upper-cased, since
-    // the view keeps them in their original spelling and audit_batches
-    // and logs both cased. The 'not required' rule fires on missing key
-    // OR value ≤ 0 (see batchesOnPlot()).
-    balanceByPB = {};
-    (balRows || []).forEach(r => {
-      // Same canonical form as the audit grid uses, so isBatchNotRequired
-      // matches without a second normalisation step.
-      const plot  = _canonicalPlot(r.plot_name);
-      const batch = String(r.batch_name || '').trim();
-      if (!plot || !batch) return;
-      balanceByPB[plot + '|' + batch] = Number(r.qty || 0);
-    });
+    plotBatches = roster.plotBatches;
+    balanceByPB = roster.balanceByPB;
 
     _saveOfflineCache();
     console.log('[plot-audit] loaded', {
@@ -289,7 +261,12 @@ async function loadRecords(){
       fromLogs: (tRows || []).length,
       fromAuditBatches: (abRows || []).length,
       totalPlotBatches: plotBatches.length,
-      balanceRows: (balRows || []).length
+      balanceRows: (balRows || []).length,
+      // What ONLY the Movement Report knew about — a batch that arrived by
+      // transfer, which is every -R plot. Nought is a real answer and means
+      // the logs already covered everything standing.
+      onlyInReport: roster.fromBalance,
+      reportPlotsOnNoNursery: roster.unplaced
     });
     renderList();
   }catch(e){showToast(t('err_load'));console.error(e);}
@@ -398,11 +375,11 @@ function syncBatchField(){
    When we don't have any balance data at all (view unreadable /
    Supabase blip), fall CLOSED to 'required' so we never accidentally
    mark a real batch as done — the auditor can decide by eye. */
+/* The one rule, in audit_roster.js — Seedling Height asks the same one.
+   Missing key OR nothing standing is a batch that has gone, and an empty
+   map fails OPEN so a refused balance read cannot empty an auditor day. */
 function isBatchNotRequired(plot, batch){
-  if (!Object.keys(balanceByPB).length) return false;   // no data → don't skip
-  const key = _canonicalPlot(plot) + '|' + String(batch || '').trim();
-  const qty = balanceByPB[key];
-  return qty === undefined || qty <= 0;
+  return MJMAuditRoster.notRequired(balanceByPB, _canonicalPlot, plot, batch);
 }
 window.isBatchNotRequired = isBatchNotRequired;
 

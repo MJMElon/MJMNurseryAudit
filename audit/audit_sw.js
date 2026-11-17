@@ -8,7 +8,7 @@
    - Supabase API: network only (never cache)
    - On activate: delete old caches, claim all clients
 ================================================================ */
-const VER = 'mjm-26111703';
+const VER = 'mjm-26111704';
 
 const ALL_FILES = [
   './audit_index.html',
@@ -41,6 +41,10 @@ const ALL_FILES = [
      without it this file keeps the four fixed ranges — so it stays with the
      other ../shared files, outside this list. */
   './audit_plots.js',
+  /* audit_roster.js is the same kind of hard dependency: Plot Condition
+     and Seedling Height both read MJMAuditRoster at their TOP LEVEL, so a
+     page that cannot fetch it half-EVALUATES rather than half-working. */
+  './audit_roster.js',
   './audit_pending.js',
   './audit_settings.js',
   './audit_deeplink.js',

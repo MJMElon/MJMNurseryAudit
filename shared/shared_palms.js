@@ -756,6 +756,70 @@
     }
   }
 
+  /* SOMEBODY LOOKED AT THIS PLOT TODAY. The office, over the board:
+     "就算plot status一样， updater的名字也要update， last update的日期也要".
+
+     A plot whose stage has NOT moved had no way to say so. The Current Status
+     cell is a <select> with the running stage already selected, and a native
+     select fires no change event when the same option is picked again — so
+     the one thing an office round produces most of the time, "I have looked
+     at B11 and it is still on Membesar", reached no screen and no table. The
+     board then read as neglect, which is exactly the fault plotLine's own
+     lastDate note was written to stop, one door along.
+
+     WHAT IT WRITES IS A DAILY REPORT, NEVER A SECOND LOG ENTRY, and that is
+     the whole decision:
+
+       * a second OPEN entry on one act_n is the duplicate this system has a
+         heading about — one stage logged twice is not a plot doing it twice —
+         and RUN_ME_upkeep_is_membersih.sql exists to clear them;
+       * closing the old one and opening a new one would RESTART the clock: a
+         plot 57 days into a 270-day Membesar would read as starting today.
+
+     The field app already has the right shape for this and has had it since
+     it was written: a Field Conductor's Save records every plot in the
+     nursery, changed or not, one row per unit per day. An unchanged plot IS a
+     plot somebody looked at. This is the office making the same record about
+     one plot.
+
+     ACTS IS EVERY OPEN STAGE, never the one a dropdown happened to be
+     showing. palms_history_latest_wins (migration_palms_latest_wins.sql) is a
+     trigger on this table: an arriving report CLOSES every open entry that
+     started before it and is NOT in its acts. PALMS allows two stages at
+     once, so a row naming one of them would silently close the other. Naming
+     them all closes nothing, which is the truth being recorded.
+
+     IT IS AN UPSERT, because the table is UNIQUE (unit_key, at_date) and says
+     why in its own words: saving a nursery twice is a correction, not a
+     second report. A second look on the same day must not come back 23505.
+
+     IT IS ALSO RUN AFTER A REAL STATUS CHANGE, and that is not belt and
+     braces. pickBy gives a tie to the daily report, so an office change made
+     in the afternoon of a day the Field Conductor had already saved read as
+     the conductor's work. Stamping the report under whoever acted makes the
+     two agree by construction, rather than by changing pickBy under Plot Life
+     as well. */
+  async function stampSave(supa, unit, acts, by) {
+    const at = todayStr();
+    const who = by || 'Office';
+    const res = await supa.from('fcportal_palms_history')
+      .upsert([{
+        unit_key: unit,
+        at_date: at,
+        acts: (acts || []).map(Number).filter((n) => n > 0).sort((a, b) => a - b),
+        recorded_by: who,
+        updated_at: new Date().toISOString(),
+      }], { onConflict: 'unit_key,at_date' });
+    if (res.error) throw res.error;
+    /* Keep the module's answer in step with what was just written, so a
+       caller that does not re-read still draws the line it has made. The
+       >= is deliberate: today's write wins a tie with today's earlier row,
+       which is the entire point of the call. */
+    const cur = SAVES[unit];
+    if (!cur || String(at) >= String(cur.at)) SAVES[unit] = { at: at, by: who };
+    return { at: at, by: who };
+  }
+
   async function loadLogs(supa) {
     const all = [];
     const PAGE = 1000;
@@ -797,6 +861,9 @@
     // does not call loadSaves keeps the old behaviour.
     loadSaves: loadSaves,
     applySaves: applySaves,
+    // "I looked at this plot today" — see the note above it. Both office
+    // PALMS pages call it, on a change and on a confirmation alike.
+    stampSave: stampSave,
     // false once a read has found no colour column: a page offering to set
     // one would be offering a save that cannot succeed.
     hasStageColours: function () { return STAGE_COLOURS !== false; },

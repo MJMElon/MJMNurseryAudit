@@ -2,8 +2,8 @@
    PALMS — the side bar
    shared/shared_palms_nav.js
 
-   PALMS is four pages: the monitoring board, Life of Plot, the motion
-   study and its settings. All four are readings of the SAME record —
+   PALMS is three pages: the monitoring board, Life of Plot and its
+   settings. All three are readings of the SAME record —
    the plot log the Field Conductor keeps in the FC Portal
    (fcportal_palms_plot_logs) — which is what makes them one module
    rather than four pages that happen to be filed together, and why the
@@ -43,11 +43,13 @@
 
      Life of Plot is deliberately NOT in this strip. It is still a page and
      still reached from the Nursery Operation Manage dashboard; it simply is
-     not one of PALMS's own three. A page that is not listed can still mount
+     not one of PALMS's own two. A page that is not listed can still mount
      the strip to get out of — an unknown data-page marks nothing current. */
   var PAGES = [
     { key: 'board',    label: 'Plot Status Map',  href: 'nursery_ops_palms_board.html' },
-    { key: 'motion',   label: 'Plot Motion Study', href: 'nursery_ops_palms_motion.html' },
+    /* The Plot Motion Study was the second entry and the office took the whole
+       page off: "Plot Motion Study也不需要存在". Nothing replaced it -- the
+       page is deleted, not hidden -- so there is no key to leave here. */
     /* nursery_ops_settings.html is the MAINTENANCE module's work types
        (P&D, Manuring, Weeding, Interrow) and is read by the monthly
        schedule — it is not PALMS and must not be reached from this strip.

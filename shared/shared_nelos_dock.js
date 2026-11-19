@@ -282,7 +282,13 @@
      migrations add the columns above the base set, and a database may have
      run either, both or neither. Once dropped it stays dropped for the
      session; there is no point asking again every thirty seconds. */
-  var COL_TIERS = [DOC_COLS, FULL_COLS, ROUTED_COLS, BASE_COLS];
+  /* Where the case is, as a coordinate — RUN_ME_nelos_case_location.sql.
+     Newest tier, so first asked for. It is in the LIST read and not only
+     the full one because Edit opens straight off a list row: without it
+     the box would open empty over a case that has a location, and the
+     save would then have nothing to tell "left alone" from "cleared". */
+  var LOC_COLS    = DOC_COLS + ',location_lat,location_lng';
+  var COL_TIERS = [LOC_COLS, DOC_COLS, FULL_COLS, ROUTED_COLS, BASE_COLS];
   var _tier = 0;
   var _cols = COL_TIERS[0];
 
@@ -527,8 +533,10 @@
         _cols = COL_TIERS[_tier];
         warn('nelos_cases is missing columns from a migration — falling back. ' +
              (_tier === 1
-               ? 'No doc_url: run shared/RUN_ME_nelos_case_document.sql.'
+               ? 'No location_lat: run shared/RUN_ME_nelos_case_location.sql.'
                : _tier === 2
+               ? 'No doc_url: run shared/RUN_ME_nelos_case_document.sql.'
+               : _tier === 3
                ? 'No photo_url: run shared/migration_nelos_case_tools.sql.'
                : 'No routing columns: run shared/migration_nelos_routing.sql and ' +
                  'shared/migration_nelos_seats.sql.'));
@@ -756,6 +764,23 @@
                 border:none; background:rgba(15,23,42,.72); color:#fff; font-size:11px;
                 font-weight:900; cursor:pointer; line-height:1; }
   .nd-in:disabled { background:#f8fafc; color:#94a3b8; cursor:not-allowed; }
+  /* LOCATION: one box that takes "lat, lng" and a button that fills it.
+     The button keeps its own width so the box is what gives on a phone. */
+  .nd-loc-fld[hidden] { display:none; }
+  .nd-loc-row { display:flex; gap:8px; align-items:stretch; }
+  .nd-loc-row .nd-in { flex:1; min-width:0; }
+  .nd-loc-btn { flex:0 0 auto; padding:0 12px; border:1.5px solid #e2e8f0; border-radius:11px;
+                background:#f8fafc; font-family:inherit; font-size:11px; font-weight:900;
+                color:#913673; cursor:pointer; white-space:nowrap; }
+  .nd-loc-btn:hover { border-color:#e4a0ce; }
+  .nd-loc-btn:disabled { color:#94a3b8; cursor:wait; }
+  .nd-loc-opt { font-weight:700; letter-spacing:.04em; color:#cbd5e1; text-transform:none; }
+  .nd-loc-msg { font-size:10.5px; font-weight:700; color:#64748b; margin-top:5px; line-height:1.45; }
+  .nd-loc-msg:empty { display:none; }
+  .nd-loc-msg.bad { color:#b91c1c; }
+  .nd-d-loc { color:#913673; font-weight:800; text-decoration:underline; }
+  .nd-d-go { display:flex; gap:10px; margin-top:3px; }
+  .nd-d-gaia { color:#1b4332; }
   .nd-err { font-size:10.5px; font-weight:800; color:#b91c1c; background:#fef2f2; border:1px solid #fecaca;
             border-radius:9px; padding:8px 10px; margin-bottom:10px; line-height:1.5; }
   .nd-err[hidden] { display:none; }
@@ -1116,6 +1141,30 @@
               '<select class="nd-in" id="nd-f-plot" disabled>' +
                 '<option value="">Nursery first</option></select>' +
             '</div>' +
+          '</div>' +
+          /* WHERE, as a coordinate. OPTIONAL, and it says so on the label:
+             a plot is a hectare, and "the broken pipe in N12" is a walk
+             round it. Detect asks the phone; the box takes the same two
+             numbers typed or pasted, so somebody raising it from a desk
+             for a spot they were told about can still say where.
+
+             It is a BUTTON and not something the form does on opening:
+             asking for a position puts a permission prompt on the screen,
+             and this form is on 52 office pages where most cases are
+             raised from a desk — whose position is the office, which is
+             not where the problem is.
+
+             Hidden until the database has the columns for it — see
+             shared/RUN_ME_nelos_case_location.sql. */
+          '<div class="nd-fld nd-loc-fld" hidden>' +
+            '<label class="nd-lbl" for="nd-f-loc">Location ' +
+              '<span class="nd-loc-opt">(optional)</span></label>' +
+            '<div class="nd-loc-row">' +
+              '<input class="nd-in" id="nd-f-loc" maxlength="60" autocomplete="off" ' +
+                     'inputmode="text" placeholder="Latitude, longitude">' +
+              '<button type="button" class="nd-loc-btn">&#128205; Detect</button>' +
+            '</div>' +
+            '<div class="nd-loc-msg"></div>' +
           '</div>' +
           '<div class="nd-fld">' +
             '<span class="nd-lbl">Photo</span>' +
@@ -2067,6 +2116,21 @@
              fact('Assigned to', esc(SOURCE_LABEL[f.assigned_module || f.source_module] ||
                                      f.assigned_module || f.source_module || '')) +
              fact('PIC', f.assignee_name ? esc(f.assignee_name) : '<em>Unassigned</em>') +
+             /* Only where there is one. It is optional on the form, so a
+                dash here on every case that has none would be a row of
+                nothing on most of them. Opens the map, which is the only
+                thing anybody does with two numbers. */
+             (fmtLatLng(f.location_lat, f.location_lng)
+               ? fact('Location', '&#128205; ' + esc(fmtLatLng(f.location_lat, f.location_lng)) +
+                      /* Two doors, never one: the Gaia link does nothing
+                         on a phone without the app. No target on it — an
+                         app link in a new tab leaves an empty tab behind. */
+                      '<span class="nd-d-go">' +
+                      '<a class="nd-d-loc nd-d-gaia" href="' +
+                        esc(gaiaHref(f.location_lat, f.location_lng)) + '">Gaia</a>' +
+                      '<a class="nd-d-loc" target="_blank" rel="noopener" href="' +
+                        esc(mapsHref(f.location_lat, f.location_lng)) + '">Maps</a></span>')
+               : '') +
            '</div>' +
            body +
            '<a class="nd-d-open" href="' + esc(caseHref(c.id)) + '">Open full case &#8599;</a>' +
@@ -2533,6 +2597,22 @@
       var fld = formEl.querySelector('.nd-doc-fld');
       if (fld) fld.hidden = !on;
     });
+    /* And the location box, on the same terms. Filled in here rather than
+       with the other edit fields below: those wait on five reads, this
+       waits on its own one, and whichever lands second must not find the
+       box still hidden. */
+    var locOf = c || null;
+    accessToken().then(function (t) {
+      return t ? locAvailable(t) : false;
+    }).then(function (on) {
+      var fld = formEl.querySelector('.nd-loc-fld');
+      if (!fld) return;
+      fld.hidden = !on;
+      if (on && locOf && editing === locOf) {
+        formEl.querySelector('#nd-f-loc').value =
+          fmtLatLng(locOf.location_lat, locOf.location_lng);
+      }
+    });
 
     var nurs = formEl.querySelector('#nd-f-nursery');
     if (nurs.options.length <= 1) {
@@ -2770,6 +2850,111 @@
      them — the same test the column tiers above use. The picker stays
      hidden until the answer is yes: one that takes a file and loses it at
      the insert is worse than none. */
+  /* ── LOCATION ────────────────────────────────────────────────────
+     The same question about location_lat / location_lng, asked the same
+     way and for the same reason: a box that takes a coordinate and loses
+     it at the insert is worse than no box. */
+  var _locOn = null;
+  async function locAvailable(token) {
+    if (_locOn !== null) return _locOn;
+    try {
+      var res = await fetch(CFG.url + '/rest/v1/nelos_cases?select=location_lat,location_lng&limit=1',
+                            { headers: authHeaders(token) });
+      /* ONLY a 400 is the columns being absent. A refused read or a
+         dropped line is not an answer to that question, and is not
+         remembered, so the next opening of the form asks again. */
+      if (res.ok) _locOn = true;
+      else if (res.status === 400) {
+        _locOn = false;
+        warn('nelos_cases has no location_lat — run ' +
+             'shared/RUN_ME_nelos_case_location.sql to let a case carry a location.');
+      } else return false;
+    } catch (_) { return false; }
+    return _locOn;
+  }
+
+  /* "4.123456, 117.123456" → { lat, lng }.  Three answers and all three
+     are used: NULL is an empty box (no location, which is allowed), FALSE
+     is something typed that is not a coordinate (refused, by name), and
+     an object is a position. Comma, space or semicolon between the two,
+     brackets ignored, so a pair pasted out of a map app goes straight in.
+
+     Six decimals is about eleven centimetres, which is finer than any
+     phone reads and stops a float printing fifteen digits into the box.
+
+     SHARED RULE: MJMNelos.parseLatLng in shared_nelos.js and
+     src/lib/latLng.js in both phone repositories are this function.
+     Change one, change the others. This file is loaded bare on 52 pages
+     and depends on nothing but itself, which is why it has its own. */
+  function parseLatLng(text) {
+    var s = String(text == null ? '' : text).replace(/[()\[\]]/g, ' ').trim();
+    if (!s) return null;
+    var p = s.split(/[\s,;]+/).filter(Boolean);
+    if (p.length !== 2) return false;
+    var lat = Number(p[0]), lng = Number(p[1]);
+    if (!isFinite(lat) || !isFinite(lng)) return false;
+    if (Math.abs(lat) > 90 || Math.abs(lng) > 180) return false;
+    return { lat: Math.round(lat * 1e6) / 1e6, lng: Math.round(lng * 1e6) / 1e6 };
+  }
+  function fmtLatLng(lat, lng) {
+    if (lat == null || lng == null || lat === '' || lng === '') return '';
+    var a = Number(lat), b = Number(lng);
+    if (!isFinite(a) || !isFinite(b)) return '';
+    return a.toFixed(6) + ', ' + b.toFixed(6);
+  }
+  function mapsHref(lat, lng) {
+    return 'https://www.google.com/maps?q=' + encodeURIComponent(Number(lat) + ',' + Number(lng));
+  }
+
+  /* OPEN IT IN GAIA GPS, which is the map the nursery walks by.
+
+     On a PHONE this is the app's own link, which opens Gaia GPS on the spot
+     if it is installed and does nothing at all if it is not — which is why
+     the Maps link always stands beside it and is never replaced by it. On a
+     desk there is no app to open, so it is the Gaia web map, where the
+     address is zoom / longitude / latitude, in that order.
+
+     It CENTRES the map on the spot. It does not drop a waypoint: the link
+     has no word for one. */
+  function gaiaHref(lat, lng) {
+    var a = Number(lat), b = Number(lng);
+    if (/Android|iPhone|iPad|iPod/i.test(navigator.userAgent || '')) {
+      return 'gaiagps://map?lat=' + a + '&lng=' + b + '&z=17';
+    }
+    return 'https://www.gaiagps.com/map/?loc=17.0/' + b + '/' + a;
+  }
+
+  /* DETECT. Writes into the box it was pressed beside and nothing else,
+     so a reading that arrives after the form was rebuilt lands in markup
+     nobody is looking at rather than on the next case. Every failure says
+     what to do instead, which is always the same thing: key it in. */
+  function detectLoc(fld) {
+    var input = fld.querySelector('#nd-f-loc');
+    var btn   = fld.querySelector('.nd-loc-btn');
+    var msg   = fld.querySelector('.nd-loc-msg');
+    var say = function (t, bad) { msg.textContent = t; msg.className = 'nd-loc-msg' + (bad ? ' bad' : ''); };
+    if (!navigator.geolocation) {
+      return say('This device cannot give a location. Key it in instead.', true);
+    }
+    var done = function () { btn.disabled = false; btn.innerHTML = '&#128205; Detect'; };
+    btn.disabled = true; btn.textContent = 'Detecting…';
+    say('');
+    navigator.geolocation.getCurrentPosition(function (pos) {
+      done();
+      input.value = fmtLatLng(pos.coords.latitude, pos.coords.longitude);
+      var acc = pos.coords.accuracy;
+      say('Detected' + (isFinite(acc) ? ', accurate to about ' + Math.round(acc) + ' m' : '') +
+          '. You can still correct it.');
+    }, function (e) {
+      done();
+      say(e && e.code === 1
+            ? 'Location is switched off for this site. Allow it in the browser, or key it in.'
+            : e && e.code === 3
+            ? 'No location yet, the signal is weak. Try again, or key it in.'
+            : 'Could not get a location. Try again, or key it in.', true);
+    }, { enableHighAccuracy: true, timeout: 15000, maximumAge: 30000 });
+  }
+
   var _docsOn = null;
   async function docsAvailable(token) {
     if (_docsOn !== null) return _docsOn;
@@ -2875,6 +3060,22 @@ async function uploadPhoto(token) {
     }
     if (!assignTo) return formError('Choose who this is for.');
 
+    /* THE LOCATION IS OPTIONAL, AND A WRONG ONE IS NOT. Empty is no
+       location; something typed that is not two numbers in range is
+       refused before anything is uploaded, because a coordinate saved
+       wrong is a pin in the sea that reads exactly like a real one. Read
+       only while the box is on screen — a database without the columns
+       hides it, and a hidden box has no answer in it. */
+    var locFldEl = formEl.querySelector('.nd-loc-fld');
+    var locOn = !!locFldEl && !locFldEl.hidden;
+    var loc = locOn ? parseLatLng(formEl.querySelector('#nd-f-loc').value) : null;
+    if (loc === false) {
+      formError('The location is not a coordinate. Key it as latitude, longitude ' +
+                '(for example 4.123456, 117.123456), press Detect, or leave it empty.');
+      formEl.querySelector('#nd-f-loc').focus();
+      return;
+    }
+
     var btn = panel.querySelector('.nd-save');
     var reset = function () {
       btn.disabled = false;
@@ -2960,6 +3161,15 @@ async function uploadPhoto(token) {
     // the insert.
     if (photoUrl) row.photo_url = photoUrl;
     if (docUrl) { row.doc_url = docUrl; row.doc_name = docName; }
+    /* The location, on the same terms: named only when there is one, so
+       a database without the columns still takes the insert. An EDIT that
+       emptied the box clears it — but only where the row being edited
+       came down WITH the columns, or an empty box over a case whose
+       location this read never fetched would wipe it. */
+    if (loc) { row.location_lat = loc.lat; row.location_lng = loc.lng; }
+    else if (was && locOn && ('location_lat' in was)) {
+      row.location_lat = null; row.location_lng = null;
+    }
 
     /* An edit changes what the case IS, never what it has become. Status,
        who raised it and where from are its history; a person fixing a typo
@@ -3040,6 +3250,14 @@ async function uploadPhoto(token) {
       formError('');
     });
     formEl.querySelector('#nd-f-nursery').addEventListener('change', onNursery);
+
+    var locFld = formEl.querySelector('.nd-loc-fld');
+    locFld.querySelector('.nd-loc-btn').addEventListener('click', function () { detectLoc(locFld); });
+    locFld.querySelector('#nd-f-loc').addEventListener('input', function () {
+      var m = locFld.querySelector('.nd-loc-msg');
+      m.textContent = ''; m.className = 'nd-loc-msg';
+      formError('');
+    });
 
     formEl.querySelector('#nd-f-work').addEventListener('change', function () {
       if (this.value) formError('');
@@ -3255,6 +3473,8 @@ async function uploadPhoto(token) {
   /* Public handle, for the rare page that wants to nudge the dock after
      it raises a case of its own: window.NelosDock.refresh() */
   window.NelosDock = {
+    /* The location rules, so a test drives the shipped ones. */
+    _loc: { parse: parseLatLng, fmt: fmtLatLng, href: mapsHref, gaia: gaiaHref },
     refresh: function () { if (dock) refresh(); },
     open:    function () { if (dock) setOpen(true); },
     close:   function () { if (dock) setOpen(false); },

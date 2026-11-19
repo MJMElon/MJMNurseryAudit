@@ -307,6 +307,14 @@
         row.doc_name = opts.docName || 'Document';
       }
 
+      /* location_lat / location_lng arrive with
+         RUN_ME_nelos_case_location.sql. Same rule again: named only when
+         there is one, and dropped below on a database without them. */
+      if (opts.lat != null && opts.lng != null) {
+        row.location_lat = Number(opts.lat);
+        row.location_lng = Number(opts.lng);
+      }
+
       // Where the case is to be WORKED, when the raiser chose rather than
       // leaving it to the routing rules. nelos_route_case() returns early on
       // a case that already names its queue, so setting this overrides the
@@ -323,6 +331,12 @@
         console.warn('[nelos] nelos_cases has no doc_url — run ' +
                      'shared/RUN_ME_nelos_case_document.sql. Raising the case without the document.');
         delete row.doc_url; delete row.doc_name;
+        ins = await supa.from('nelos_cases').insert([row]).select().single();
+      }
+      if (ins.error && row.location_lat != null && /location_l(at|ng)/.test(ins.error.message || '')) {
+        console.warn('[nelos] nelos_cases has no location_lat — run ' +
+                     'shared/RUN_ME_nelos_case_location.sql. Raising the case without the location.');
+        delete row.location_lat; delete row.location_lng;
         ins = await supa.from('nelos_cases').insert([row]).select().single();
       }
       const { data, error } = ins;
@@ -681,8 +695,55 @@
     } catch (_) { return null; }
   }
 
+  /* ── A case's location, as a coordinate ──────────────────────────
+     "4.123456, 117.123456" → { lat, lng }. NULL is an empty box (no
+     location, which is allowed), FALSE is something typed that is not a
+     coordinate, an object is a position.
+
+     SHARED RULE: parseLatLng in shared_nelos_dock.js (which is loaded
+     bare and cannot read this file) and src/lib/latLng.js in both phone
+     repositories are this function. Change one, change the others. */
+  function parseLatLng(text) {
+    const s = String(text == null ? '' : text).replace(/[()\[\]]/g, ' ').trim();
+    if (!s) return null;
+    const p = s.split(/[\s,;]+/).filter(Boolean);
+    if (p.length !== 2) return false;
+    const lat = Number(p[0]), lng = Number(p[1]);
+    if (!isFinite(lat) || !isFinite(lng)) return false;
+    if (Math.abs(lat) > 90 || Math.abs(lng) > 180) return false;
+    return { lat: Math.round(lat * 1e6) / 1e6, lng: Math.round(lng * 1e6) / 1e6 };
+  }
+  function fmtLatLng(lat, lng) {
+    if (lat == null || lng == null || lat === '' || lng === '') return '';
+    const a = Number(lat), b = Number(lng);
+    if (!isFinite(a) || !isFinite(b)) return '';
+    return a.toFixed(6) + ', ' + b.toFixed(6);
+  }
+  function mapsHref(lat, lng) {
+    return 'https://www.google.com/maps?q=' + encodeURIComponent(Number(lat) + ',' + Number(lng));
+  }
+
+  /* OPEN IT IN GAIA GPS, which is the map the nursery walks by.
+
+     On a PHONE this is the app's own link, which opens Gaia GPS on the spot
+     if it is installed and does nothing at all if it is not — which is why
+     the Maps link always stands beside it and is never replaced by it. On a
+     desk there is no app to open, so it is the Gaia web map, where the
+     address is zoom / longitude / latitude, in that order.
+
+     It CENTRES the map on the spot. It does not drop a waypoint: the link
+     has no word for one. */
+  function gaiaHref(lat, lng) {
+    const a = Number(lat), b = Number(lng);
+    if (/Android|iPhone|iPad|iPod/i.test(navigator.userAgent || '')) {
+      return 'gaiagps://map?lat=' + a + '&lng=' + b + '&z=17';
+    }
+    return 'https://www.gaiagps.com/map/?loc=17.0/' + b + '/' + a;
+  }
+
   const api = {
     init, raise, pending, countPending, mountTodo,
+    parseLatLng, fmtLatLng, mapsHref, gaiaHref,
     handOff, takeHandOff,
     scope, inScope, applyScope,
     homeHref, caseHref,

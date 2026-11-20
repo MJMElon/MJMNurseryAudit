@@ -655,6 +655,9 @@
       // before this screen existed. Not a door to open by accident.
       case 'worker':  return false;
       case 'workers': return canDo('npayroll', 'workers', 'view');
+      // Adding and editing on the Worker System board. Same fallback the
+      // board always used: the Payroll module own Workers / manage.
+      case 'workers_edit': return canDo('npayroll', 'workers', 'manage');
       case 'setting': return canManageUsers();
       // Admin Portal and Audit Portal moved onto scan_admin.html from the
       // hub, where each had its own module-level card (data-module="mobile"

@@ -2121,15 +2121,20 @@
                 nothing on most of them. Opens the map, which is the only
                 thing anybody does with two numbers. */
              (fmtLatLng(f.location_lat, f.location_lng)
-               ? fact('Location', '&#128205; ' + esc(fmtLatLng(f.location_lat, f.location_lng)) +
-                      /* Two doors, never one: the Gaia link does nothing
-                         on a phone without the app. No target on it — an
-                         app link in a new tab leaves an empty tab behind. */
-                      '<span class="nd-d-go">' +
-                      '<a class="nd-d-loc nd-d-gaia" href="' +
-                        esc(gaiaHref(f.location_lat, f.location_lng)) + '">Gaia</a>' +
-                      '<a class="nd-d-loc" target="_blank" rel="noopener" href="' +
-                        esc(mapsHref(f.location_lat, f.location_lng)) + '">Maps</a></span>')
+               ? fact('Location',
+                      /* THE COORDINATE IS THE DOOR, and it goes to Gaia GPS:
+                         the office asked for the two numbers themselves to
+                         open it. Gaia has no link that drops a pin, so the
+                         press also COPIES the coordinate - pasted into Gaia
+                         search it becomes a Marked Location. No target on
+                         it: an app link in a new tab leaves an empty tab.
+                         No button beside it: the office asked for the
+                         coordinate alone to be the link. */
+                      '<a class="nd-d-loc nd-d-gaia" title="Open in Gaia GPS (the coordinate is copied, paste it in Gaia search to mark it)"' +
+                        ' data-copy="' + esc(fmtLatLng(f.location_lat, f.location_lng)) + '"' +
+                        ' onclick="try{navigator.clipboard.writeText(this.getAttribute(\'data-copy\'))}catch(e){}"' +
+                        ' href="' + esc(gaiaHref(f.location_lat, f.location_lng)) + '">&#128205; ' +
+                        esc(fmtLatLng(f.location_lat, f.location_lng)) + '</a>')
                : '') +
            '</div>' +
            body +
@@ -2908,20 +2913,14 @@
 
   /* OPEN IT IN GAIA GPS, which is the map the nursery walks by.
 
-     On a PHONE this is the app's own link, which opens Gaia GPS on the spot
-     if it is installed and does nothing at all if it is not — which is why
-     the Maps link always stands beside it and is never replaced by it. On a
-     desk there is no app to open, so it is the Gaia web map, where the
-     address is zoom / longitude / latitude, in that order.
-
-     It CENTRES the map on the spot. It does not drop a waypoint: the link
-     has no word for one. */
+     ONE LINK EVERYWHERE: the Gaia web map, whose address is zoom /
+     LONGITUDE / latitude, in that order. On a phone with Gaia GPS the
+     phone hands it to the app, which opens on the spot with a marked
+     location. The office tried ten links on an iPhone and this is the one
+     that showed the pin. The old app link only centred the map. */
   function gaiaHref(lat, lng) {
     var a = Number(lat), b = Number(lng);
-    if (/Android|iPhone|iPad|iPod/i.test(navigator.userAgent || '')) {
-      return 'gaiagps://map?lat=' + a + '&lng=' + b + '&z=17';
-    }
-    return 'https://www.gaiagps.com/map/?loc=17.0/' + b + '/' + a;
+    return 'https://www.gaiagps.com/map/?loc=17/' + b + '/' + a;
   }
 
   /* DETECT. Writes into the box it was pressed beside and nothing else,

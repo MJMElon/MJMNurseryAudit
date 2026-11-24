@@ -291,19 +291,74 @@
      not it is excluded, so a screen can offer the choice only where there is
      one to make. */
 
+  /* AN EVIDENCED 3RD CULLING ON THIS PLOT AND BATCH. One fact, and TWO
+     different questions turn on it, which is why it is written once here
+     and asked under two names below. An unevidenced 3rd culling never
+     became an event at all (see _load), so neither question can be
+     satisfied by a claim nobody has flown — the same condition the
+     report's own cull3 column carries. */
+  function hasCull3(evs) {
+    return (evs || []).some(e => e.type === '3rd_Culling'
+                              && Math.abs(Number(e.qty || 0)) > 0);
+  }
+
   /* A 3RD CULLING SUPERSEDES THE 2ND, and this is the one place that says
      so. It is netOfRow()'s `superseded` in operation_reports.html, asked of
      one plot-and-batch bucket's events instead of one row's columns: a 3rd
      culling already includes the seedlings 2nd culled on the way to it, so
-     taking the 2nd off as well takes one loss off twice.
+     taking the 2nd off as well takes one loss off twice. */
+  function cull2Superseded(evs) { return hasCull3(evs); }
 
-     An unevidenced 3rd culling never became an event (see _load), so this
-     cannot be satisfied by a claim nobody has flown — which is the same
-     condition the report's own cull3 column carries. */
-  function cull2Superseded(evs) {
-    return (evs || []).some(e => e.type === '3rd_Culling'
-                              && Math.abs(Number(e.qty || 0)) > 0);
-  }
+  /* ── A BATCH WHOSE 3RD CULLING IS DONE IS GONE FROM THE PLOT ───────────
+
+     The office, over an Interrow Spraying row on B14 still linking batches
+     234 and 262: *"已经结束了3rd culling了的batch就不要再link了 除了plot-R
+     3rd culling后 main plot不会有那个batch了 最多只会去p-R"*.
+
+     That is a fact about the GROUND and not about the arithmetic. A 3rd
+     culling is the batch leaving the main plot: the good seedlings go to
+     the -R plot and the rest are culled, so once it has happened there is
+     nothing of that batch standing there to spray, manure or weed. Whatever
+     balance the ledger still shows for it is a figure, not seedlings — and
+     the link was quoting it as CAPACITY, which is the piece-rate money.
+
+     So a bucket this answers yes to contributes NOTHING: not to the
+     quantity, and not to the batch names beside it. It is dropped rather
+     than counted at nought, so the names stop being offered too, which is
+     the half the office asked for by name — *就不要再link了*.
+
+     "FINISHED", NEVER "NEAR". The office drew that line themselves, and it
+     is the whole of why this is a rule where the Include / Exclude balance
+     choice beside it is not:
+
+       a transfer out and NO 3rd culling keyed — the batch is on its way out
+         and what is left on the plot is about to be culled. Only the office
+         knows whether a round was walked before the culling or after, so
+         that stays a CHOICE on the row (`exclBal`, and the section above).
+
+       an evidenced 3rd culling — it has happened. There is nothing left to
+         decide, and no round walked after it treated that batch.
+
+     THE -R EXCEPTION FALLS OUT rather than being a second condition, which
+     is why there is no -R test anywhere in this file. The question is asked
+     of one PLOT AND BATCH: on a -R plot that batch arrived by
+     Cull3_Transfer_In and carries no 3rd culling of its own, so it is not
+     gone and reads exactly as it always did. The day the -R plot is itself
+     3rd culled the batch really has gone from it too, and a written-out
+     exemption would have gone on counting seedlings nobody kept.
+
+     IT IS CUT AT THE WORK DATE like everything else here, so a round dated
+     BEFORE the culling still counts the batch in full — the seedlings were
+     standing when somebody sprayed them.
+
+     WHAT IT COSTS, and it is named rather than buried: a figure moves on
+     every unchecked row of a plot whose batch has been 3rd culled, in any
+     month. Nothing settled moves — a Checked row froze its figure the day
+     it was agreed (`qtyFrozen`) and a verified claim holds its own snapshot
+     — which is why this carries no month gate of its own.
+     `shared/CHECK_what_the_3rd_culling_rule_moves.sql` names every row that
+     does move, before anybody reloads the page. */
+  function cull3Done(evs) { return hasCull3(evs); }
 
   /* What one plot and batch is worth, up to a date. Every event already
      carries its own sign and the ones that take no part never became
@@ -368,10 +423,20 @@
 
     const allKeys = Object.keys(per);
     if (!allKeys.length) return null;
+
+    /* Every batch whose 3rd culling is keyed and flown by the work date is
+       off this plot — see cull3Done. Taken out FIRST, so what is left is
+       what is standing, and the Include / Exclude balance choice below is
+       only ever asked about a batch that really is still there. */
+    const gone = new Set(allKeys.filter(k => cull3Done(per[k].evs)));
+    const here = allKeys.filter(k => !gone.has(k));
+    let goneQty = 0;
+    gone.forEach(k => { goneQty += per[k].closing; });
+
     let culledBal = 0;
-    allKeys.forEach(k => { if (leftBy.has(k)) culledBal += Math.max(0, per[k].closing); });
+    here.forEach(k => { if (leftBy.has(k)) culledBal += Math.max(0, per[k].closing); });
     const excl = !!(opts && opts.exclBal) && culledBal > 0;
-    const keys = excl ? allKeys.filter(k => !leftBy.has(k)) : allKeys;
+    const keys = excl ? here.filter(k => !leftBy.has(k)) : here;
     /* ASKED PER BUCKET, never over the plot as a whole, because the
        supersede rule is per plot-and-batch: a plot with one batch 3rd
        culled and one not has some of its 2nd culling taken off and some of
@@ -423,8 +488,22 @@
       /* The balance left behind a transfer out — see "the culled balance"
          above — and whether this figure has it taken off. */
       culledBal: Math.round(culledBal),
-      culledBatches: allKeys.filter(k => leftBy.has(k)).map(k => per[k].label),
-      exclBal: excl
+      culledBatches: here.filter(k => leftBy.has(k)).map(k => per[k].label),
+      exclBal: excl,
+      /* The batches this plot no longer holds, and what the ledger still
+         showed for them — COUNTED AND NAMED rather than dropped in silence,
+         because a figure that has had a batch taken out of it and a figure
+         that never had one are the same number on screen. The cell says it;
+         nothing prices it. */
+      goneBatches: gone.size
+        ? allKeys.filter(k => gone.has(k)).map(k => per[k].label)
+            .sort((a, b) => String(a).localeCompare(String(b), 'en', { numeric: true }))
+        : [],
+      goneQty: Math.round(goneQty),
+      /* Nothing of this plot is standing any more: every batch it had has
+         been 3rd culled. The quantity really is nought, which is a different
+         statement from "could not be worked out" and has to read as one. */
+      allGone: gone.size > 0 && !here.length
     };
   }
 
@@ -469,10 +548,26 @@
       const link = linkedQty(r.plot, r.batch, r.tarikh, qtyOpts(r));
       if (link && link.qty != null) out.qtyFrozen = link.qty;
     }
-    if (!String(r.batch || '').trim()) {
-      const b = recBatches(r);
-      if (b && b.linked && b.value) out.batchFrozen = b.value;
-    }
+    /* THE BATCH NAMES, and they are written for a KEYED batch too. The
+       office: *"人为打的=link的batch的话,checked了也要长这样"* — a batch
+       somebody typed that IS the report's own answer is the report's own
+       answer, and once the row is settled it has to read like one, or they
+       are back to checking a cell that has already been agreed.
+
+       THE ONLY WAY TO SAY THAT WITHOUT RE-READING THE LEDGER UNDER A
+       SETTLED ROW is to write down what the report said at the moment it
+       was checked, which is what this field has always been for. A keyed
+       batch that did NOT agree writes nothing and stays the row left to
+       check, which is the whole of what that column is read down for.
+
+       ASKED OFF THE LINK AND NOT THROUGH recBatches, because that one
+       short-circuits on a checked row by design — and freezeCheckedRows
+       calls this over rows that are ALREADY checked, so a reader that
+       returns early there could never repair one. */
+    const keyedB = String(r.batch || '').trim();
+    const lk = linkedQty(r.plot, '', r.tarikh, qtyOpts(r));
+    const shown = lk ? (lk.batches || []).filter(b => b && b !== '—').join(', ') : '';
+    if (shown && (!keyedB || batchesAgree(keyedB, shown))) out.batchFrozen = shown;
     return out;
   }
 
@@ -486,16 +581,65 @@
 
      Keyed wins, exactly as the quantity does — for every job, interrow
      included. */
+  /* ── A KEYED BATCH THAT AGREES WITH THE LEDGER SAYS SO ─────────────────
+
+     The office asked for the mark to mean one more thing — *"如果FC填的
+     batch/人为填的batch=本来用link的话的batch 那就show link的icon 这样的话
+     我就只需要查没有link的icon的部分"* — and the reason is the sentence
+     after it: they go down that column looking for what to check, and a
+     keyed batch that matches the batch report is not a row anybody needs to
+     open. Unmarked used to mean "somebody typed this"; it now means
+     "somebody typed this AND it is not what the report says", which is the
+     only version of the column worth reading down.
+
+     THE KEYED VALUE IS STILL WHAT IS SHOWN AND WHAT DECIDES. Nothing is
+     rewritten: a batch somebody typed is their answer, it is what the
+     quantity beside it is counted over, and `agrees` only ever changes the
+     mark on it. The comparison is on the batch KEYS as a SET — letters and
+     digits, like every other key here — so "234, 262", "262,234" and
+     "262 / 234" are one answer and a stray space cannot send the office to
+     a row that is perfectly correct. */
+  function batchesAgree(a, b) {
+    const ka = [...new Set(batchList(a))].sort();
+    const kb = [...new Set(batchList(b))].sort();
+    return ka.length > 0 && ka.length === kb.length && ka.every((v, i) => v === kb[i]);
+  }
+
   function recBatches(r) {
     const keyed = String((r && r.batch) || '').trim();
-    if (keyed) return { value: keyed, linked: false };
     const frozen = String((r && r.batchFrozen) || '').trim();
-    if (frozen) return { value: frozen, linked: false, frozen: true };
-    const link = linkedQty(r && r.plot, r && r.batch, r && r.tarikh, qtyOpts(r));
-    if (!link || !link.batches.length) return { value: keyed, linked: false };
-    const shown = link.batches.filter(b => b && b !== '—').join(', ');
-    if (!shown) return { value: keyed, linked: false };
-    return { value: shown, linked: shown !== keyed, info: link };
+    /* HELD AT THE CHECK — and a batch somebody TYPED is held too, where
+       what they typed is what the report said on the day the row was
+       checked. It reads exactly like one the link filled in, because that
+       is what it is; only the hover says a person keyed it. The KEYED
+       spelling is what is shown, because that is what somebody wrote. */
+    if (frozen && (!keyed || batchesAgree(keyed, frozen)))
+      return { value: keyed || frozen, linked: false, frozen: true, agrees: !!keyed };
+    /* A CHECKED ROW IS SETTLED AND DOES NOT ASK THE LEDGER AGAIN, not even
+       for a mark. Checked is what stops a figure being a formula, and a row
+       that went green today and grew a 🔗 next week because a batch moved
+       would be exactly the thing that rule exists to stop. */
+    if (keyed && r && r.checked) return { value: keyed, linked: false };
+    /* Asked with NO batch, so the answer is every batch the ledger has
+       standing on that plot — which is the list a keyed one is compared
+       against. Passing the keyed value in would only ever hand it back. */
+    const link = linkedQty(r && r.plot, '', r && r.tarikh, qtyOpts(r));
+    const shown = link ? link.batches.filter(b => b && b !== '—').join(', ') : '';
+    if (keyed) {
+      /* A KEYED ANSWER THAT DISAGREES CARRIES NOTHING — no mark and no link
+         to describe it with. The cell wears nothing either, because on this
+         screen the ABSENCE is what the office reads down the column for, so
+         a field here would only ever feed a sentence that must not be on
+         the screen. */
+      return shown && batchesAgree(keyed, shown)
+        ? { value: keyed, linked: true, agrees: true, info: link }
+        : { value: keyed, linked: false };
+    }
+    /* No batch keyed and none to name. `info` rides along all the same, so
+       a cell can tell "this plot has been 3rd culled" from "the ledger has
+       nothing here", which are the same dash otherwise. */
+    if (!shown) return { value: keyed, linked: false, info: link || null };
+    return { value: shown, linked: true, info: link };
   }
 
   global.PlotMovement = {
@@ -504,7 +648,7 @@
     error: () => _err,
     events: () => _events,
     parseDate, logDate, plotKey, batchKey, batchList,
-    signed, liveCount, cull2Superseded, linkedQty, recQty, recBatches, freezeFor,
+    signed, liveCount, cull2Superseded, cull3Done, linkedQty, recQty, recBatches, freezeFor,
     isInterrow, qtyOpts
   };
 })(window);

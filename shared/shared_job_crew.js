@@ -36,10 +36,28 @@
   'use strict';
 
   var PREFIX = 'job_crew:';
-  /* The jobs whose columns come off the register. Seed Planting keeps a
-     hand-picked list of its own and Culling Monitoring pays named people
-     off its own rule, so neither is in it. */
-  var JOBS = ['pd', 'manuring', 'weeding', 'interrow', 'loading_seedlings', 'transplanting'];
+  /* The jobs a Team Board group can be dragged onto. Culling Monitoring is
+     not one: it pays NAMED PEOPLE AT THEIR OWN RATES, and a group carries
+     no price.
+
+     SEED PLANTING IS IN IT AND IS NOT LIKE THE OTHER SIX, which is the one
+     thing to know before reading a caller. On the six, the groups ARE the
+     sheet columns. On Seed Planting the groups say WHO MAY BE PICKED, and
+     the month list the office keys is still what the columns are — the
+     office asked for exactly that split, in their own words:
+
+       "pre nursery 是没有工人的 是由别的职位轮流去做 但是有些职位不能做
+        所以要drag"
+       "例如我drag BNN worker UNN1 worker UNN2 worker 过去seed planting,
+        admin drag down 可以看到这三个职位，她可以选这个月是谁"
+
+     The Pre Nursery has no crew of its own; other positions TAKE TURNS, and
+     not every position may. So the drag answers which positions, and the
+     dropdown on the sheet answers which of their people did it this month.
+     Making the groups the columns instead would put every eligible person
+     on the sheet whatever they did, which is the wall 轮流 guarantees. */
+  var JOBS = ['pd', 'manuring', 'weeding', 'interrow', 'loading_seedlings',
+              'transplanting', 'seed_planting'];
 
   /* The Team Board's rows, in its order and with its words. A third copy:
      BOARD_ROLES in scan/scan_workers.html is the original. Change one,

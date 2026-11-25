@@ -10,9 +10,15 @@
    - classify()      the page hands it the Monthly Maturity rows it has
                      already built; the agent hands it buildStockRows().
                      Available stock = the Plot Balance of every row
-                     matured by the end of this month, or whose latest
-                     height audit is 1.5 m or more. Culled, Sold Out and
-                     Closed rows hold nothing to sell. A row counts once.
+                     whose seedlings are 10 MONTHS OLD OR MORE today (off
+                     the batch seed-in date, days / 30.44, the Batch
+                     Record's count), or whose latest height audit is
+                     1.5 m or more. A row with no seed-in date falls back
+                     to its Maturity Date (matured by the end of this
+                     month). Culled, Sold Out and Closed rows hold nothing
+                     to sell. A row counts once. Rows not yet available
+                     are filed by the month they turn 10 months, for the
+                     three-month Collection forecast (upcoming).
    - buildStockRows() the Monthly Maturity Allocation built from the raw
                      ledger, month rows AND Plot-R rows, the way
                      loadMaturity() in operation/operation_stock_sales.js
@@ -37,6 +43,26 @@
 
   var CULL = 0.9;
   var HEIGHT_CM = 150;              // 1.5 m
+  var AGE_MONTHS = 10;              // "10 months and above"
+  var AGE_DAYS = Math.ceil(AGE_MONTHS * 30.44);   // floor(days / 30.44) >= 10
+  var FORECAST_MONTHS = 3;          // this month and the next two
+
+  /* The day a batch's seedlings turn AGE_MONTHS, off the seed-in date. */
+  function readyDate(seedIn) {
+    if (!seedIn) return null;
+    var t = new Date(seedIn);
+    if (isNaN(t.getTime())) return null;
+    var d = new Date(t.getFullYear(), t.getMonth(), t.getDate());
+    d.setDate(d.getDate() + AGE_DAYS);
+    return d;
+  }
+  function ageMonths(seedIn, now) {
+    if (!seedIn) return null;
+    var t = new Date(seedIn);
+    if (isNaN(t.getTime())) return null;
+    var days = Math.max(0, Math.floor(((now || new Date()) - t) / 86400000));
+    return Math.floor(days / 30.44);
+  }
   var RE_LOG_DATE = /(?:Cull)?Date:\s*(\d{4}-\d{2}-\d{2})/i;
 
   function logDate(l) {
@@ -108,8 +134,12 @@
   /* The Monthly Maturity Allocation off the raw ledger, month rows and
      Plot-R rows — loadMaturity() in the page. */
   function buildStockRows(src) {
-    var batchBreed = {};
-    (src.seeds || []).forEach(function (b) { if (b.batch_name && b.breed_name) batchBreed[b.batch_name] = b.breed_name; });
+    var batchBreed = {}, batchSeedIn = {};
+    (src.seeds || []).forEach(function (b) {
+      if (b.batch_name && b.breed_name) batchBreed[b.batch_name] = b.breed_name;
+      var d = b.transaction_date || b.created_at;
+      if (b.batch_name && d) batchSeedIn[b.batch_name] = d;
+    });
     var plotNursery = {}, prefixNursery = {};
     (src.plots || []).forEach(function (p) {
       if (!p.plot_name || !p.nursery_name) return;
@@ -138,6 +168,7 @@
         var x = g[k], t = new Date(x.firstDate);
         var m = isPR ? t : (function () { var d = new Date(t); d.setMonth(d.getMonth() + 9); return d; })();
         return { key: k, batch: x.batch, plot: x.plot, breed: x.breed || batchBreed[x.batch] || '—',
+          seedIn: batchSeedIn[x.batch] || null,
           location: location(x.plot), qty: x.qty, afterCulling: isPR ? x.qty : Math.round(x.qty * CULL),
           doDeducted: 0, transplantDate: t, matureDate: m, isPR: !!isPR };
       });
@@ -218,14 +249,16 @@
   }
 
   /* Available stock. rows: { plot, batch, breed, location, matureDate,
-     status, figures:{plotBalance,culled,soldOut} }. */
+     seedIn, status, figures:{plotBalance,culled,soldOut} }. */
   function classify(rows, opts) {
     opts = opts || {};
     var now = opts.now || new Date();
+    var today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
     var heights = opts.heights || {};
-    var thisMonth = monthKey(now);
-    var nextMonth = monthKey(new Date(now.getFullYear(), now.getMonth() + 1, 1));
-    var avail = [], nextMature = [];
+    var keys = [];
+    for (var i = 0; i < FORECAST_MONTHS; i++) keys.push(monthKey(new Date(now.getFullYear(), now.getMonth() + i, 1)));
+    var thisMonth = keys[0];
+    var avail = [], upcoming = keys.map(function (k) { return { key: k, rows: [], qty: 0 }; });
     (rows || []).forEach(function (r) {
       var f = r.figures || {};
       if (f.culled || f.soldOut || r.status === 'finished') return;
@@ -233,21 +266,27 @@
       if (!bal) return;
       var h = heights[heightKey(r.plot, r.batch)];
       var tall = !!(h && h.avg != null && h.avg >= HEIGHT_CM);
-      var mk = monthKey(r.matureDate);
+      var ready = readyDate(r.seedIn);
       var row = { plot: r.plot, batch: r.batch, breed: r.breed, location: r.location,
-        matureDate: r.matureDate, height: h && h.avg != null ? h.avg : null,
+        matureDate: r.matureDate, seedIn: r.seedIn || null, readyDate: ready,
+        age: ageMonths(r.seedIn, now),
+        height: h && h.avg != null ? h.avg : null,
         heightDate: h ? h.date : null, balance: bal };
-      if (mk <= thisMonth) { row.why = 'matured'; avail.push(row); }
-      else if (tall) { row.why = 'tall'; avail.push(row); }
-      else if (mk === nextMonth) { row.why = 'next'; nextMature.push(row); }
+      var old = ready ? ready <= today : monthKey(r.matureDate) <= thisMonth;
+      if (old) { row.why = 'matured'; avail.push(row); return; }
+      if (tall) { row.why = 'tall'; avail.push(row); return; }
+      var rk = monthKey(ready || r.matureDate);
+      var slot = keys.indexOf(rk);
+      if (slot >= 0) { row.why = 'upcoming'; upcoming[slot].rows.push(row); upcoming[slot].qty += bal; }
     });
     var byDate = function (a, b) { return (a.matureDate - b.matureDate) || String(a.plot).localeCompare(String(b.plot)); };
-    avail.sort(byDate); nextMature.sort(byDate);
+    avail.sort(byDate); upcoming.forEach(function (u) { u.rows.sort(byDate); });
     var sum = function (l) { return l.reduce(function (s, r) { return s + r.balance; }, 0); };
     var matured = sum(avail.filter(function (r) { return r.why === 'matured'; }));
-    var tall = sum(avail.filter(function (r) { return r.why === 'tall'; }));
-    return { avail: avail, nextMature: nextMature, matured: matured, tall: tall,
-      available: matured + tall, nextNew: sum(nextMature) };
+    var tallQty = sum(avail.filter(function (r) { return r.why === 'tall'; }));
+    var nextMature = upcoming[1] ? upcoming[1].rows : [];
+    return { avail: avail, upcoming: upcoming, nextMature: nextMature, matured: matured, tall: tallQty,
+      available: matured + tallQty, nextNew: sum(nextMature) };
   }
 
   /* What every order still owes — loadCustomerOrders() in the page. */
@@ -317,7 +356,8 @@
   }
 
   global.MJMStockAnalysis = {
-    HEIGHT_CM: HEIGHT_CM, logDate: logDate, monthKey: monthKey,
+    HEIGHT_CM: HEIGHT_CM, AGE_MONTHS: AGE_MONTHS, FORECAST_MONTHS: FORECAST_MONTHS,
+    readyDate: readyDate, ageMonths: ageMonths, logDate: logDate, monthKey: monthKey,
     heightKey: heightKey, latestHeights: latestHeights, figures: figures,
     buildStockRows: buildStockRows, classify: classify,
     orderBalances: orderBalances, orderKey: orderKey, openOrders: openOrders

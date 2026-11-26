@@ -144,13 +144,44 @@
     '.pm-tabs{display:none!important;}' +
     '.palms-frame{display:block!important;}';
 
+  /* EMBEDDED, PALMS WEARS LIFE OF PLOT'S COLOURS (the office: "PALMS的颜色跟着
+     大主题走"): the page's own teal and slate are swapped for the cream,
+     brown and green of the page it sits in. Opened on its own, nothing moves. */
+  var THEME = [
+    ['#f0fdfa', '#fbf7ef'], ['#ccfbf1', '#e8dcc8'], ['#99f6e4', '#d9c8a8'], ['#5eead4', '#b8a27a'],
+    ['#14b8a6', '#4a7a2e'], ['#0d9488', '#3d6b24'], ['#0f766e', '#4a7a2e'],
+    ['rgba(13,148,136', 'rgba(92,61,30'], ['rgba(20,184,166', 'rgba(74,122,46'],
+    ['#0f172a', '#3d2610'], ['#1e293b', '#3d2610'], ['#334155', '#5c3d1e'], ['#475569', '#5c3d1e'],
+    ['#64748b', '#8a7a68'], ['#94a3b8', '#a89880'], ['#cbd5e1', '#d9c8a8'],
+    ['#e2e8f0', '#e8dcc8'], ['#f1f5f9', '#f1ead9'], ['#f8fafc', '#fdfaf4'],
+  ];
+  var THEME_CSS =
+    'body{background:#fdfaf4!important;}.card{background:#fffdf8!important;}' +
+    '.bg-white{background-color:#fffdf8!important;}' +
+    '.bg-teal-50,.bg-slate-50{background-color:#fbf7ef!important;}' +
+    '.bg-teal-100{background-color:#f1ead9!important;}' +
+    '.border-teal-100,.border-teal-200,.border-slate-100,.border-slate-200{border-color:#e8dcc8!important;}' +
+    '.text-teal-600,.text-teal-700,.text-teal-800{color:#4a7a2e!important;}' +
+    '.text-slate-800,.text-slate-900{color:#3d2610!important;}' +
+    '.text-slate-500,.text-slate-600,.text-slate-700{color:#5c3d1e!important;}' +
+    '.text-slate-400{color:#8a7a68!important;}';
+  function retheme() {
+    var tags = document.querySelectorAll('style:not(#palms-embed-css)');
+    for (var i = 0; i < tags.length; i++) {
+      var css = tags[i].textContent, out = css;
+      for (var j = 0; j < THEME.length; j++) out = out.split(THEME[j][0]).join(THEME[j][1]).split(THEME[j][0].toUpperCase()).join(THEME[j][1]);
+      if (out !== css) tags[i].textContent = out;
+    }
+  }
+
   function mount() {
     var host = document.getElementById('palms-nav');
     if (EMBED && !document.getElementById('palms-embed-css')) {
       var st = document.createElement('style');
       st.id = 'palms-embed-css';
-      st.textContent = EMBED_CSS;
+      st.textContent = EMBED_CSS + THEME_CSS;
       (document.head || document.documentElement).appendChild(st);
+      retheme();
     }
     if (!host) return;
     host.innerHTML = html((host.dataset && host.dataset.page) || '');

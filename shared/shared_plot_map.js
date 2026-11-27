@@ -183,6 +183,12 @@
     const byKey = {};
     (legend || []).forEach((e) => { byKey[e.key] = e; });
     const onPlotClick = typeof o.onPlotClick === 'function' ? o.onPlotClick : null;
+    /* A layer of pictures over the shapes and under the labels, drawn by the
+       caller: decorate(unit, pts, status, everyPts) answers the HTML for one
+       shape, in the map's own percent units. Life of Plot puts its cats here
+       (the office: "保留palms的map … 在palms上面加上猫猫"). No decorate,
+       no layer content, which is how every caller before this behaves. */
+    let decorate = typeof o.decorate === 'function' ? o.decorate : null;
 
     injectCss();
 
@@ -214,6 +220,7 @@
                           user-select:none; -webkit-user-drag:none;">
               <svg class="pm-svg" viewBox="0 0 100 100" preserveAspectRatio="none"
                    style="position:absolute; inset:0; width:100%; height:100%;"></svg>
+              <div class="pm-deco" style="position:absolute; inset:0; width:100%; height:100%; pointer-events:none; overflow:hidden;"></div>
               <div class="pm-labels" style="position:absolute; inset:0; width:100%; height:100%; pointer-events:none;"></div>
             </div>
           </div>
@@ -266,6 +273,7 @@
         }).join('');
     })();
     const elImg = q('.pm-image'), elSvg = q('.pm-svg'), elLabels = q('.pm-labels');
+    const elDeco = q('.pm-deco');
     const elNone = q('.pm-nomap'), elLvl = q('.pm-zlvl');
 
     function applyTransform() {
@@ -329,6 +337,9 @@
       elLabels.innerHTML = '';
       const shapes = [];
       const labels = [];
+      const decos = [];
+      const ptsOf = (p) => { try { const v = JSON.parse(p.raw); return Array.isArray(v) && v.length ? v : null; } catch (e) { return null; } };
+      const everyPts = decorate ? unitList().filter((p) => p.raw && String(p.raw).startsWith('[')).map(ptsOf).filter(Boolean) : [];
       unitList().forEach((p) => {
         if (!p.raw || !String(p.raw).startsWith('[')) return;
         let pts;
@@ -351,6 +362,8 @@
           `<polygon points="${pts.map((pt) => pt.x + ',' + pt.y).join(' ')}" fill="${fill}" ` +
           `stroke="${stroke}" stroke-width="${width}" class="pm-shape" data-pm-plot="${esc(p.key)}"/>`);
 
+        if (decorate) { try { decos.push(decorate(p, pts, st, everyPts) || ''); } catch (e) { console.warn('[map] decorate:', e); } }
+
         const cx = pts.reduce((s, pt) => s + pt.x, 0) / pts.length;
         const cy = pts.reduce((s, pt) => s + pt.y, 0) / pts.length;
         const cls = st && st.tone === 'over' ? 'over' : (st && st.tone === 'ok' ? '' : 'none');
@@ -366,6 +379,7 @@
       });
       elSvg.innerHTML = shapes.join('');
       elLabels.innerHTML = labels.join('');
+      if (elDeco) elDeco.innerHTML = decos.join('');
     }
 
     function setNursery(name) {
@@ -515,6 +529,11 @@
       /* Which plots are split, and where. Passing {} puts every plot back to
          being drawn whole. */
       setAreas: function (byPlot) { AREAS = byPlot || {}; refresh(); },
+      /* Set (or clear, with null) the picture layer and redraw. */
+      setDecorate: function (fn) { decorate = typeof fn === 'function' ? fn : null; refresh(); },
+      /* The document the map lives in, so a caller in another frame can put
+         its own stylesheet beside it. */
+      doc: function () { return mount.ownerDocument; },
       areasOf: function (plot) { return (AREAS[plot] || []).slice(); },
       /* Every shape on the map, as { key, label, plot, area, raw }. */
       units: function (nursery) { return unitList(nursery); },
